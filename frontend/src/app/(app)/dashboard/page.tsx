@@ -23,6 +23,9 @@ import {
   CheckCircle2,
   AlertCircle,
   Timer,
+  UtensilsCrossed,
+  Zap,
+  BarChart3,
 } from 'lucide-react';
 
 interface DashboardStats {

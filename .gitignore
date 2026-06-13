@@ -1,41 +1,31 @@
-# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+# Root gitignore for whatsapp_marketing_solution
 
-# dependencies
-/node_modules
-/.pnp
-.pnp.*
-.yarn/*
-!.yarn/patches
-!.yarn/plugins
-!.yarn/releases
-!.yarn/versions
+# Python Backend
+python_backend/venv/
+python_backend/.env
+python_backend/__pycache__/
+python_backend/**/__pycache__/
+python_backend/app/__pycache__/
+python_backend/app/**/__pycache__/
+*.pyc
 
-# testing
-/coverage
+# Frontend (Next.js)
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+frontend/build/
+frontend/.env*
+frontend/*.tsbuildinfo
+frontend/next-env.d.ts
 
-# next.js
-/.next/
-/out/
+# MongoDB Local (if any leftover or custom)
+mongodb_local/
 
-# production
-/build
-
-# misc
+# General
 .DS_Store
 *.pem
-
-# debug
+*.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
-
-# env files (can opt-in for committing if needed)
-.env*
-
-# vercel
-.vercel
-
-# typescript
-*.tsbuildinfo
-next-env.d.ts
