@@ -59,10 +59,21 @@ async def login(user_data: UserLogin):
 
     return {"token": access_token, "user": user_resp}
 
+@router.get("/registration-status")
+async def registration_status():
+    """Check if any user is already registered in the system."""
+    count = await db.db.users.count_documents({})
+    return {"registered": count > 0}
+
 @router.post("/register", response_model=Token)
 async def register(user_data: UserCreate):
-    """Register a new user account."""
-    # Check if email already exists
+    """Register a new user account (Only allowed if no user exists)."""
+    # Restrict to single user
+    existing_count = await db.db.users.count_documents({})
+    if existing_count > 0:
+        raise HTTPException(status_code=400, detail="Registration is disabled. A user is already registered.")
+
+    # Check if email already exists (fallback check)
     existing = await db.db.users.find_one({"email": user_data.email})
     if existing:
         raise HTTPException(status_code=409, detail="An account with this email already exists")

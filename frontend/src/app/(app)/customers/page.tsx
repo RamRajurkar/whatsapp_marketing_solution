@@ -5,8 +5,10 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '@/lib/api';
 import toast from 'react-hot-toast';
 import { format } from 'date-fns';
+import { formatIndianPhone } from '@/lib/phone';
 import {
-  Users, Search, Plus, Pencil, Trash2, UserPlus,
+  Users, Search, Plus, Pencil, Trash2, UserPlus, Send,
+  MessageSquare, FileText, Loader2, X,
 } from 'lucide-react';
 
 const TAG_COLORS: Record<string, string> = {
@@ -51,7 +53,10 @@ function CustomerModal({ customer, onClose, onSave }: any) {
           </div>
           <div>
             <label style={{ fontSize: '13px', fontWeight: '500', color: '#374151', display: 'block', marginBottom: '6px' }}>WhatsApp Number *</label>
-            <input className="input-field" value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value, waId: e.target.value })} placeholder="919876543210 (without +)" />
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ backgroundColor: '#f1f5f9', padding: '10px 14px', borderRadius: '8px', border: '1px solid #e2e8f0', color: '#64748b', fontWeight: '600', fontSize: '14px' }}>+91</span>
+              <input className="input-field" value={form.phone.startsWith('91') && form.phone.length >= 12 ? form.phone.substring(2) : form.phone} onChange={e => setForm({ ...form, phone: e.target.value.replace(/\D/g, ''), waId: e.target.value.replace(/\D/g, '') })} placeholder="9876543210" style={{ flex: 1 }} maxLength={10} />
+            </div>
           </div>
           <div>
             <label style={{ fontSize: '13px', fontWeight: '500', color: '#374151', display: 'block', marginBottom: '8px' }}>Tags</label>
@@ -86,10 +91,161 @@ function CustomerModal({ customer, onClose, onSave }: any) {
   );
 }
 
+
+function SendMessageModal({ customer, onClose }: { customer: any; onClose: () => void }) {
+  const [mode, setMode] = useState<'text' | 'template'>('text');
+  const [text, setText] = useState('');
+  const [templateName, setTemplateName] = useState('');
+  const [templateLang, setTemplateLang] = useState('en');
+  const [sending, setSending] = useState(false);
+
+  const { data: templatesData } = useQuery({
+    queryKey: ['templates'],
+    queryFn: () => api.get('/api/messaging/templates').then(r => r.data),
+  });
+
+  const handleSend = async () => {
+    if (mode === 'text' && !text.trim()) return;
+    if (mode === 'template' && !templateName.trim()) return;
+
+    setSending(true);
+    try {
+      if (mode === 'text') {
+        await api.post('/api/messaging/send-text', { phone: customer.phone, text: text.trim() });
+        toast.success(`Message sent to ${customer.name}`);
+      } else {
+        await api.post('/api/messaging/send-template', {
+          phone: customer.phone,
+          templateName,
+          templateLanguage: templateLang,
+        });
+        toast.success(`Template sent to ${customer.name}`);
+      }
+      onClose();
+    } catch (err: any) {
+      toast.error(err.response?.data?.detail || 'Failed to send');
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const templates = templatesData?.templates || [];
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '480px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+          <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <Send size={18} style={{ color: '#1B5E37' }} />
+            Send to {customer.name}
+          </h3>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af', padding: '4px' }}>
+            <X size={20} />
+          </button>
+        </div>
+
+        <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '10px', padding: '10px 14px', marginBottom: '16px', fontSize: '13px', color: '#166534' }}>
+          <strong>To:</strong> {formatIndianPhone(customer.phone)}
+        </div>
+
+        {/* Mode Toggle */}
+        <div style={{ display: 'flex', gap: '0', marginBottom: '16px', background: '#f3f4f6', borderRadius: '10px', padding: '3px' }}>
+          <button
+            onClick={() => setMode('text')}
+            style={{
+              flex: 1, padding: '8px 16px', borderRadius: '8px', border: 'none', cursor: 'pointer',
+              fontSize: '13px', fontWeight: '600', fontFamily: 'Inter, sans-serif', transition: 'all 0.15s',
+              background: mode === 'text' ? 'white' : 'transparent',
+              color: mode === 'text' ? '#1B5E37' : '#6b7280',
+              boxShadow: mode === 'text' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
+            }}
+          >
+            <MessageSquare size={14} /> Text Message
+          </button>
+          <button
+            onClick={() => setMode('template')}
+            style={{
+              flex: 1, padding: '8px 16px', borderRadius: '8px', border: 'none', cursor: 'pointer',
+              fontSize: '13px', fontWeight: '600', fontFamily: 'Inter, sans-serif', transition: 'all 0.15s',
+              background: mode === 'template' ? 'white' : 'transparent',
+              color: mode === 'template' ? '#1B5E37' : '#6b7280',
+              boxShadow: mode === 'template' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
+            }}
+          >
+            <FileText size={14} /> Template
+          </button>
+        </div>
+
+        {mode === 'text' ? (
+          <div>
+            <label style={{ fontSize: '13px', fontWeight: '500', color: '#374151', display: 'block', marginBottom: '6px' }}>Message</label>
+            <textarea
+              className="input-field"
+              value={text}
+              onChange={e => setText(e.target.value)}
+              placeholder="Type your message..."
+              rows={4}
+              style={{ resize: 'none', fontFamily: 'Inter, sans-serif' }}
+            />
+            <p style={{ margin: '6px 0 0', fontSize: '11px', color: '#9ca3af' }}>
+              Note: Text messages can only be sent within the 24-hour customer service window.
+            </p>
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+            <div>
+              <label style={{ fontSize: '13px', fontWeight: '500', color: '#374151', display: 'block', marginBottom: '6px' }}>Template</label>
+              {templates.length > 0 ? (
+                <select
+                  className="input-field"
+                  value={templateName}
+                  onChange={e => setTemplateName(e.target.value)}
+                >
+                  <option value="">Select a template...</option>
+                  {templates.map((t: any) => (
+                    <option key={t.name + t.language} value={t.name}>
+                      {t.name} ({t.status})
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <input className="input-field" value={templateName} onChange={e => setTemplateName(e.target.value)} placeholder="hello_world" />
+              )}
+            </div>
+            <div>
+              <label style={{ fontSize: '13px', fontWeight: '500', color: '#374151', display: 'block', marginBottom: '6px' }}>Language</label>
+              <select className="input-field" value={templateLang} onChange={e => setTemplateLang(e.target.value)}>
+                <option value="en">English</option>
+                <option value="en_US">English (US)</option>
+                <option value="hi">Hindi</option>
+                <option value="ar">Arabic</option>
+              </select>
+            </div>
+            <p style={{ margin: '0', fontSize: '11px', color: '#9ca3af' }}>
+              Templates can be sent anytime — no 24-hour window restriction.
+            </p>
+          </div>
+        )}
+
+        <div style={{ display: 'flex', gap: '10px', marginTop: '24px', justifyContent: 'flex-end' }}>
+          <button className="btn-secondary" onClick={onClose}>Cancel</button>
+          <button className="btn-primary" onClick={handleSend} disabled={sending} style={{ opacity: sending ? 0.6 : 1 }}>
+            {sending ? <><Loader2 size={14} className="spin" /> Sending...</> : <><Send size={14} /> Send Message</>}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
 export default function CustomersPage() {
   const queryClient = useQueryClient();
   const [search, setSearch] = useState('');
   const [modal, setModal] = useState<{ open: boolean; customer?: any }>({ open: false });
+  const [sendModal, setSendModal] = useState<{ open: boolean; customer?: any }>({ open: false });
 
   const { data, isLoading } = useQuery({
     queryKey: ['customers', search],
@@ -171,7 +327,7 @@ export default function CustomersPage() {
                 <tr>
                   <td colSpan={6} style={{ textAlign: 'center', padding: '48px', color: '#9ca3af' }}>
                     <Users size={36} style={{ color: '#d1d5db', marginBottom: '8px' }} />
-                    <div>No customers yet. Customers appear automatically when they message you on WhatsApp.</div>
+                    <div>No customers yet. Add your first customer to start messaging!</div>
                   </td>
                 </tr>
               ) : (
@@ -189,9 +345,9 @@ export default function CustomersPage() {
                       </div>
                     </td>
                     <td>
-                      <a href={`/inbox`} style={{ color: '#1B5E37', fontWeight: '500', textDecoration: 'none', fontSize: '13px' }}>
-                        +{c.phone}
-                      </a>
+                      <span style={{ color: '#1B5E37', fontWeight: '500', fontSize: '13px' }}>
+                        {formatIndianPhone(c.phone)}
+                      </span>
                     </td>
                     <td>
                       <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
@@ -206,6 +362,14 @@ export default function CustomersPage() {
                     </td>
                     <td>
                       <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end' }}>
+                        <button
+                          className="btn-primary"
+                          style={{ padding: '6px 12px', fontSize: '12px' }}
+                          onClick={() => setSendModal({ open: true, customer: c })}
+                        >
+                          <Send size={12} />
+                          Message
+                        </button>
                         <button className="btn-secondary" style={{ padding: '6px 12px', fontSize: '12px' }} onClick={() => setModal({ open: true, customer: c })}>
                           <Pencil size={12} />
                           Edit
@@ -228,6 +392,13 @@ export default function CustomersPage() {
           customer={modal.customer}
           onClose={() => setModal({ open: false })}
           onSave={handleSave}
+        />
+      )}
+
+      {sendModal.open && sendModal.customer && (
+        <SendMessageModal
+          customer={sendModal.customer}
+          onClose={() => setSendModal({ open: false })}
         />
       )}
     </div>

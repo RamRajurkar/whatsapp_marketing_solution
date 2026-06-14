@@ -5,27 +5,13 @@ import uvicorn
 from contextlib import asynccontextmanager
 from app.database import connect_to_mongo, close_mongo_connection, db
 from app.utils.auth import get_password_hash
-from app.routes import auth, settings, customers, webhook, conversations
+from app.routes import auth, settings, customers, webhook, conversations, broadcasts, messaging
 from datetime import datetime
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
     await connect_to_mongo()
-    
-    # Seed default user if not exists
-    if db.db is not None:
-        admin_exists = await db.db.users.find_one({"email": "admin@restaurant.com"})
-        if not admin_exists:
-            await db.db.users.insert_one({
-                "email": "admin@restaurant.com",
-                "password": get_password_hash("Admin@123"),
-                "restaurantName": "My Restaurant",
-                "createdAt": datetime.utcnow(),
-                "updatedAt": datetime.utcnow()
-            })
-            print("Default admin user created.")
-
     yield
     # Shutdown
     await close_mongo_connection()
@@ -49,6 +35,8 @@ app.include_router(settings.router, prefix="/api/settings", tags=["settings"])
 app.include_router(customers.router, prefix="/api/customers", tags=["customers"])
 app.include_router(webhook.router, prefix="/api/webhook", tags=["webhook"])
 app.include_router(conversations.router, prefix="/api/conversations", tags=["conversations"])
+app.include_router(broadcasts.router, prefix="/api/broadcasts", tags=["broadcasts"])
+app.include_router(messaging.router, prefix="/api/messaging", tags=["messaging"])
 
 @app.get("/")
 async def root():

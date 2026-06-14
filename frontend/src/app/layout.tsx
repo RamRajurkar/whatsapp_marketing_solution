@@ -2,11 +2,22 @@ import type { Metadata } from 'next';
 import './globals.css';
 import { Providers } from './providers';
 
+import type { Viewport } from 'next';
+
 export const metadata: Metadata = {
   title: 'RestoChat — Restaurant WhatsApp Manager',
   description: 'Manage your restaurant WhatsApp communications with ease. Real-time inbox, reservations, broadcasts and more.',
+  manifest: '/manifest.json',
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'default',
+    title: 'RestoChat',
+  },
 };
 
+export const viewport: Viewport = {
+  themeColor: '#111827',
+};
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">

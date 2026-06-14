@@ -3,6 +3,7 @@ from typing import Optional, List
 from pydantic import BaseModel
 from app.routes.auth import get_current_user
 from app.database import db
+from app.utils.phone import normalize_indian_phone
 from bson import ObjectId
 from datetime import datetime
 
@@ -49,12 +50,20 @@ async def get_customers(
 
 @router.post("/")
 async def create_customer(customer: CustomerCreate, current_user: dict = Depends(get_current_user)):
+    # Normalize phone number to 91XXXXXXXXXX format
+    try:
+        normalized_phone = normalize_indian_phone(customer.phone)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
     # Check if phone already exists
-    existing = await db.db.customers.find_one({"phone": customer.phone})
+    existing = await db.db.customers.find_one({"phone": normalized_phone})
     if existing:
         raise HTTPException(status_code=400, detail="Customer with this phone number already exists")
         
     new_customer = customer.model_dump()
+    new_customer["phone"] = normalized_phone
+    new_customer["waId"] = normalized_phone
     new_customer["createdAt"] = datetime.utcnow()
     new_customer["updatedAt"] = datetime.utcnow()
     new_customer["lastSeen"] = None
@@ -74,6 +83,14 @@ async def update_customer(customer_id: str, customer: CustomerUpdate, current_us
     update_data = {k: v for k, v in customer.model_dump().items() if v is not None}
     if not update_data:
         return {"message": "No fields to update"}
+    
+    # Normalize phone if being updated
+    if "phone" in update_data:
+        try:
+            update_data["phone"] = normalize_indian_phone(update_data["phone"])
+            update_data["waId"] = update_data["phone"]
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
         
     update_data["updatedAt"] = datetime.utcnow()
     

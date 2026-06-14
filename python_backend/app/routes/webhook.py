@@ -1,6 +1,8 @@
 from fastapi import APIRouter, Request, Response, HTTPException
 from app.database import db
 from app.socket import sio
+from app.utils.phone import normalize_indian_phone
+from app.config import settings
 from datetime import datetime
 
 router = APIRouter()
@@ -13,9 +15,16 @@ async def verify_webhook(request: Request):
     challenge = request.query_params.get("hub.challenge")
 
     if mode and token:
-        # Check against the admin user's verify token
+        # Check against the admin user's verify token or the global settings token
         admin = await db.db.users.find_one({"email": "admin@restaurant.com"})
-        if admin and admin.get("waVerifyToken") == token:
+        
+        valid_token = None
+        if admin and admin.get("waVerifyToken"):
+            valid_token = admin.get("waVerifyToken")
+        else:
+            valid_token = settings.WA_VERIFY_TOKEN
+            
+        if valid_token == token:
             return Response(content=challenge, status_code=200)
         else:
             raise HTTPException(status_code=403, detail="Forbidden")
@@ -36,6 +45,11 @@ async def receive_webhook(request: Request):
                     for msg in value["messages"]:
                         contact = value["contacts"][0] if "contacts" in value else {}
                         phone_number = msg.get("from")
+                        # Normalize to Indian format (91XXXXXXXXXX)
+                        try:
+                            phone_number = normalize_indian_phone(phone_number)
+                        except ValueError:
+                            pass  # Keep original if normalization fails
                         customer_name = contact.get("profile", {}).get("name", "Unknown")
                         message_id = msg.get("id")
                         timestamp = datetime.utcfromtimestamp(int(msg.get("timestamp", datetime.utcnow().timestamp())))
@@ -90,7 +104,8 @@ async def receive_webhook(request: Request):
                         message_doc["_id"] = str(message_doc.pop("_id"))
                         
                         # Emit socket events
-                        await sio.emit("message:new", message_doc, room=conv_id)
+                        emit_doc = {**message_doc, "timestamp": timestamp.isoformat(), "createdAt": message_doc["createdAt"].isoformat()}
+                        await sio.emit("message:new", emit_doc, room=conv_id)
                         await sio.emit("conversation:updated", {"conversationId": conv_id})
                         
                 # Handle message statuses (read, delivered, failed)
@@ -107,7 +122,14 @@ async def receive_webhook(request: Request):
                         if msg_record:
                             conv_id = msg_record.get("conversationId")
                             msg_record["_id"] = str(msg_record["_id"])
-                            await sio.emit("message:new", msg_record, room=conv_id)
+                            emit_doc = {**msg_record}
+                            if "timestamp" in emit_doc and hasattr(emit_doc["timestamp"], "isoformat"):
+                                emit_doc["timestamp"] = emit_doc["timestamp"].isoformat()
+                            if "createdAt" in emit_doc and hasattr(emit_doc["createdAt"], "isoformat"):
+                                emit_doc["createdAt"] = emit_doc["createdAt"].isoformat()
+                            if "updatedAt" in emit_doc and hasattr(emit_doc["updatedAt"], "isoformat"):
+                                emit_doc["updatedAt"] = emit_doc["updatedAt"].isoformat()
+                            await sio.emit("message:new", emit_doc, room=conv_id)
                             await sio.emit("conversation:updated", {"conversationId": conv_id})
 
     return Response(content="EVENT_RECEIVED", status_code=200)
