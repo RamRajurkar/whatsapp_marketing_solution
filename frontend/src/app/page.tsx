@@ -3,7 +3,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/lib/store/authStore';
-import { BRANDING } from '@/lib/branding.config';
+import { useBranding, defaultBranding } from '@/lib/hooks/useBranding';
 
 type Stage = 'checking' | 'ready' | 'error';
 type ServiceStatus = 'waiting' | 'ok' | 'error';
@@ -24,7 +24,9 @@ const RETRY_INTERVAL_MS = 2000;
 
 export default function SplashPage() {
   const router = useRouter();
-  const { token } = useAuthStore();
+  const { token, hydrated, checkAuth } = useAuthStore();
+  const { data: BRANDING_DATA, isLoading: brandingLoading } = useBranding();
+  const BRANDING = BRANDING_DATA || defaultBranding;
 
   const [stage, setStage]       = useState<Stage>('checking');
   const [services, setServices] = useState<ServiceState>({ backend: 'waiting', mongodb: 'waiting' });
@@ -316,11 +318,11 @@ export default function SplashPage() {
             {BRANDING.logoPath ? (
               <img
                 src={BRANDING.logoPath}
-                alt={BRANDING.logoAlt}
+                alt={BRANDING.appName}
                 style={{ width: '64px', height: '64px', objectFit: 'contain', borderRadius: '12px' }}
               />
             ) : (
-              <span>{BRANDING.logoEmoji}</span>
+              <span>💬</span>
             )}
           </div>
           <div className="app-name">{BRANDING.appName}</div>

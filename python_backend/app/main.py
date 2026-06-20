@@ -1,4 +1,5 @@
 from fastapi import FastAPI, Request
+from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from slowapi import _rate_limit_exceeded_handler
@@ -11,6 +12,10 @@ from datetime import datetime, timezone
 from app.database import connect_to_mongo, close_mongo_connection, db
 from app.utils.auth import get_password_hash
 from app.routes import auth, settings, customers, webhook, conversations, broadcasts, messaging
+import os
+
+# Ensure uploads directory exists
+os.makedirs("uploads/branding", exist_ok=True)
 
 
 @asynccontextmanager
@@ -44,6 +49,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 
 from app.socket import sio
 

@@ -5,7 +5,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useAuthStore } from '@/lib/store/authStore';
 import { useEffect, useState } from 'react';
 import api from '@/lib/api';
-import { BRANDING } from '@/lib/branding.config';
+import { useBranding } from '@/lib/hooks/useBranding';
 import toast from 'react-hot-toast';
 import {
   LayoutDashboard,
@@ -46,6 +46,7 @@ export function Sidebar() {
   const pathname   = usePathname();
   const router     = useRouter();
   const { clearAuth } = useAuthStore();
+  const { data: BRANDING } = useBranding();
   const [waStatus, setWaStatus] = useState<WaStatus>('checking');
 
   // Check WhatsApp connection status on mount (and every 2 minutes)
@@ -92,21 +93,20 @@ export function Sidebar() {
       `}</style>
 
       <div className="sidebar">
-        {/* ── Logo ── */}
         <div style={{ padding: '20px 24px 16px', borderBottom: '1px solid #f3f4f6' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             <div style={{
               width: '40px', height: '40px', borderRadius: '12px',
-              background: `linear-gradient(135deg, ${BRANDING.primaryColor}, ${BRANDING.accentColor})`,
+              background: BRANDING ? `linear-gradient(135deg, ${BRANDING.primaryColor}, ${BRANDING.accentColor})` : '#1B5E37',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               flexShrink: 0,
-              boxShadow: `0 4px 12px ${BRANDING.primaryColor}4D`,
+              boxShadow: BRANDING ? `0 4px 12px ${BRANDING.primaryColor}4D` : 'none',
               overflow: 'hidden',
             }}>
-              {BRANDING.logoPath ? (
+              {BRANDING?.logoPath ? (
                 <img
                   src={BRANDING.logoPath}
-                  alt={BRANDING.logoAlt}
+                  alt={BRANDING.appName}
                   style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '12px' }}
                 />
               ) : (
@@ -115,7 +115,7 @@ export function Sidebar() {
             </div>
             <div>
               <div style={{ color: '#1a1a2e', fontWeight: '800', fontSize: '17px', letterSpacing: '-0.3px' }}>
-                {BRANDING.appName}
+                {BRANDING?.appName || 'RestoChat'}
               </div>
             </div>
           </div>

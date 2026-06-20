@@ -6,7 +6,7 @@ import { useAuthStore } from '@/lib/store/authStore';
 import api from '@/lib/api';
 import toast from 'react-hot-toast';
 import { Loader2, Eye, EyeOff, MessageCircle, ArrowRight, CheckCircle2, UserPlus } from 'lucide-react';
-import { BRANDING } from '@/lib/branding.config';
+import { useBranding, defaultBranding } from '@/lib/hooks/useBranding';
 import './login.css';
 
 const DEFAULT_LOGIN_BG = 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=1400&q=80';
@@ -25,6 +25,9 @@ export default function LoginPage() {
   const [isRegistered, setIsRegistered] = useState(true);
   const [isRegisterMode, setIsRegisterMode] = useState(false);
   const [currentLine, setCurrentLine] = useState(0);
+
+  const { data: BRANDING_DATA, isLoading: brandingLoading } = useBranding();
+  const BRANDING = BRANDING_DATA || defaultBranding;
 
   // If already logged in, redirect
   useEffect(() => {
@@ -110,7 +113,7 @@ export default function LoginPage() {
     [email, password, restaurantName, isRegisterMode, setAuth, router]
   );
 
-  if (checkingStatus) {
+  if (checkingStatus || brandingLoading) {
     return (
       <div style={{ display:'flex', alignItems:'center', justifyContent:'center', minHeight:'100vh', background:'#030712' }}>
         <div style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:'12px' }}>
@@ -129,7 +132,7 @@ export default function LoginPage() {
         <img
           className="login-hero-img"
           src={BRANDING.loginBgPath || DEFAULT_LOGIN_BG}
-          alt={BRANDING.loginBgAlt}
+          alt={BRANDING.appName}
           loading="eager"
         />
         <div className="login-hero-overlay" />
@@ -181,11 +184,11 @@ export default function LoginPage() {
             {BRANDING.logoPath ? (
               <img
                 src={BRANDING.logoPath}
-                alt={BRANDING.logoAlt}
+                alt={BRANDING.appName}
                 className="login-brand-logo-img"
               />
             ) : (
-              <div className="login-brand-icon">
+              <div className="login-brand-icon" style={{ background: `linear-gradient(135deg, ${BRANDING.primaryColor} 0%, ${BRANDING.accentColor} 100%)` }}>
                 <MessageCircle size={22} color="white" />
               </div>
             )}

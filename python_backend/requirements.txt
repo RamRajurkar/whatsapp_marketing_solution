@@ -12,3 +12,4 @@ cloudinary
 httpx
 slowapi
 limits
+aiofiles

@@ -1,10 +1,11 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '@/lib/api';
 import toast from 'react-hot-toast';
-import { Radio, UtensilsCrossed, Loader2, Save, Link, Plug, Lock } from 'lucide-react';
+import { Radio, UtensilsCrossed, Loader2, Save, Link, Plug, Lock, Palette, UploadCloud, Image as ImageIcon } from 'lucide-react';
+import { useBranding } from '@/lib/hooks/useBranding';
 
 export default function SettingsPage() {
   const queryClient = useQueryClient();
@@ -14,9 +15,22 @@ export default function SettingsPage() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [updatingPassword, setUpdatingPassword] = useState(false);
 
+  // Separate states for branding and API settings to avoid mixing them
+  const [brandingForm, setBrandingForm] = useState<any>({});
+  
+  const logoInputRef = useRef<HTMLInputElement>(null);
+  const loginBgInputRef = useRef<HTMLInputElement>(null);
+  const [uploadingLogo, setUploadingLogo] = useState(false);
+  const [uploadingBg, setUploadingBg] = useState(false);
+
   const { data: settings, isLoading } = useQuery({ queryKey: ['settings'], queryFn: () => api.get('/api/settings').then(r => r.data) });
+  const { data: brandingData, isLoading: brandingLoading } = useBranding();
+
   useEffect(() => { if (settings) setForm(settings); }, [settings]);
+  useEffect(() => { if (brandingData) setBrandingForm(brandingData); }, [brandingData]);
+
   const updateMutation = useMutation({ mutationFn: (data: any) => api.patch('/api/settings', data), onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['settings'] }); toast.success('Settings saved!'); }, onError: () => toast.error('Failed to save') });
+  const updateBrandingMutation = useMutation({ mutationFn: (data: any) => api.patch('/api/settings/branding', data), onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['branding'] }); toast.success('Branding saved!'); }, onError: () => toast.error('Failed to save branding') });
   
   const testConnection = async () => {
     setTesting(true);
@@ -46,7 +60,43 @@ export default function SettingsPage() {
     }
   };
 
-  if (isLoading) return <div style={{ padding: '32px' }}>Loading...</div>;
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>, type: 'logo' | 'loginBg') => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('Image must be less than 5MB');
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append('type', type);
+    formData.append('file', file);
+
+    const isLogo = type === 'logo';
+    isLogo ? setUploadingLogo(true) : setUploadingBg(true);
+
+    try {
+      await api.post('/api/settings/upload-branding', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      queryClient.invalidateQueries({ queryKey: ['branding'] });
+      toast.success(`${isLogo ? 'Logo' : 'Background'} uploaded successfully!`);
+    } catch (err) {
+      toast.error(`Failed to upload ${isLogo ? 'logo' : 'background'}`);
+    } finally {
+      isLogo ? setUploadingLogo(false) : setUploadingBg(false);
+      // Reset input
+      if (e.target) e.target.value = '';
+    }
+  };
+
+  const handleSaveAll = () => {
+    updateMutation.mutate(form);
+    updateBrandingMutation.mutate(brandingForm);
+  };
+
+  if (isLoading || brandingLoading) return <div style={{ padding: '32px' }}><Loader2 className="animate-spin text-emerald-600" /></div>;
 
   return (
     <div>
@@ -99,8 +149,69 @@ export default function SettingsPage() {
             </button>
           </div>
         </div>
-        <button className="btn-primary" onClick={() => updateMutation.mutate(form)} disabled={updateMutation.isPending} style={{ padding: '12px 28px', fontSize: '15px', marginBottom: '32px' }}>
-          {updateMutation.isPending ? <><Loader2 size={16} /> Saving...</> : <><Save size={16} /> Save All Settings</>}
+
+        {/* Branding & Appearance */}
+        <div className="glass-card" style={{ padding: '28px', marginBottom: '20px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '24px' }}>
+            <div style={{ width: '40px', height: '40px', borderRadius: '12px', background: 'linear-gradient(135deg, #8B5CF6, #6D28D9)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Palette size={20} color="white" /></div>
+            <div><h2 style={{ margin: 0, fontSize: '17px', fontWeight: '700', color: '#1a1a2e' }}>Branding & Appearance</h2><p style={{ margin: 0, fontSize: '13px', color: '#6b7280' }}>Customize your app's look and feel</p></div>
+          </div>
+          
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+              <div><label style={{ fontSize: '13px', fontWeight: '500', color: '#374151', display: 'block', marginBottom: '6px' }}>App Name</label><input className="input-field" value={brandingForm.appName || ''} onChange={e => setBrandingForm({ ...brandingForm, appName: e.target.value })} placeholder="RestoChat" /></div>
+              <div><label style={{ fontSize: '13px', fontWeight: '500', color: '#374151', display: 'block', marginBottom: '6px' }}>Tagline</label><input className="input-field" value={brandingForm.tagline || ''} onChange={e => setBrandingForm({ ...brandingForm, tagline: e.target.value })} placeholder="WhatsApp Marketing Solution" /></div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px' }}>
+              <div><label style={{ fontSize: '13px', fontWeight: '500', color: '#374151', display: 'block', marginBottom: '6px' }}>Primary Color</label><input type="color" className="input-field" style={{ padding: '4px', height: '44px', cursor: 'pointer' }} value={brandingForm.primaryColor || '#1B5E37'} onChange={e => setBrandingForm({ ...brandingForm, primaryColor: e.target.value })} /></div>
+              <div><label style={{ fontSize: '13px', fontWeight: '500', color: '#374151', display: 'block', marginBottom: '6px' }}>Accent Color</label><input type="color" className="input-field" style={{ padding: '4px', height: '44px', cursor: 'pointer' }} value={brandingForm.accentColor || '#2E7D4F'} onChange={e => setBrandingForm({ ...brandingForm, accentColor: e.target.value })} /></div>
+              <div><label style={{ fontSize: '13px', fontWeight: '500', color: '#374151', display: 'block', marginBottom: '6px' }}>Dark Color</label><input type="color" className="input-field" style={{ padding: '4px', height: '44px', cursor: 'pointer' }} value={brandingForm.darkColor || '#0d2b1a'} onChange={e => setBrandingForm({ ...brandingForm, darkColor: e.target.value })} /></div>
+            </div>
+
+            {/* File Uploaders */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginTop: '8px' }}>
+              
+              {/* Logo Upload */}
+              <div style={{ border: '1px dashed #D1D5DB', borderRadius: '12px', padding: '20px', textAlign: 'center', background: '#FAFBFC', position: 'relative' }}>
+                <input type="file" accept="image/png, image/jpeg, image/svg+xml" style={{ display: 'none' }} ref={logoInputRef} onChange={e => handleImageUpload(e, 'logo')} />
+                {brandingData?.logoPath ? (
+                  <div style={{ marginBottom: '12px', display: 'flex', justifyContent: 'center' }}>
+                    <img src={brandingData.logoPath} alt="Logo" style={{ width: '64px', height: '64px', objectFit: 'contain', borderRadius: '8px', border: '1px solid #E5E7EB' }} />
+                  </div>
+                ) : (
+                  <div style={{ width: '48px', height: '48px', borderRadius: '50%', background: '#E5E7EB', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px' }}><ImageIcon size={20} color="#6B7280" /></div>
+                )}
+                <h3 style={{ margin: '0 0 4px', fontSize: '14px', fontWeight: '600', color: '#111827' }}>App Logo</h3>
+                <p style={{ margin: '0 0 16px', fontSize: '12px', color: '#6B7280' }}>Recommended: Square, min 200×200px<br/>(PNG, JPG, SVG)</p>
+                <button onClick={() => logoInputRef.current?.click()} disabled={uploadingLogo} className="btn-secondary" style={{ padding: '8px 16px', fontSize: '13px', width: '100%' }}>
+                  {uploadingLogo ? <><Loader2 size={14} className="animate-spin"/> Uploading...</> : <><UploadCloud size={14}/> {brandingData?.logoPath ? 'Change Logo' : 'Upload Logo'}</>}
+                </button>
+              </div>
+
+              {/* Login BG Upload */}
+              <div style={{ border: '1px dashed #D1D5DB', borderRadius: '12px', padding: '20px', textAlign: 'center', background: '#FAFBFC', position: 'relative' }}>
+                <input type="file" accept="image/png, image/jpeg, image/webp" style={{ display: 'none' }} ref={loginBgInputRef} onChange={e => handleImageUpload(e, 'loginBg')} />
+                {brandingData?.loginBgPath ? (
+                  <div style={{ marginBottom: '12px', display: 'flex', justifyContent: 'center' }}>
+                    <img src={brandingData.loginBgPath} alt="Login BG" style={{ width: '100%', height: '64px', objectFit: 'cover', borderRadius: '8px', border: '1px solid #E5E7EB' }} />
+                  </div>
+                ) : (
+                  <div style={{ width: '48px', height: '48px', borderRadius: '50%', background: '#E5E7EB', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px' }}><ImageIcon size={20} color="#6B7280" /></div>
+                )}
+                <h3 style={{ margin: '0 0 4px', fontSize: '14px', fontWeight: '600', color: '#111827' }}>Login Background</h3>
+                <p style={{ margin: '0 0 16px', fontSize: '12px', color: '#6B7280' }}>Recommended: Landscape, min 1200×800px<br/>(JPG, PNG, WEBP)</p>
+                <button onClick={() => loginBgInputRef.current?.click()} disabled={uploadingBg} className="btn-secondary" style={{ padding: '8px 16px', fontSize: '13px', width: '100%' }}>
+                  {uploadingBg ? <><Loader2 size={14} className="animate-spin"/> Uploading...</> : <><UploadCloud size={14}/> {brandingData?.loginBgPath ? 'Change Background' : 'Upload Background'}</>}
+                </button>
+              </div>
+
+            </div>
+          </div>
+        </div>
+
+        <button className="btn-primary" onClick={handleSaveAll} disabled={updateMutation.isPending || updateBrandingMutation.isPending} style={{ padding: '12px 28px', fontSize: '15px', marginBottom: '32px' }}>
+          {(updateMutation.isPending || updateBrandingMutation.isPending) ? <><Loader2 size={16} className="animate-spin"/> Saving...</> : <><Save size={16} /> Save All Settings</>}
         </button>
       </div>
     </div>

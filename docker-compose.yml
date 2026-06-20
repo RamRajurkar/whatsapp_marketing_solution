@@ -52,6 +52,8 @@ services:
     depends_on:
       - mongodb
       - redis
+    volumes:
+      - uploads_data:/app/uploads
     networks:
       - wa_network
 
@@ -97,6 +99,7 @@ services:
 
 volumes:
   mongodb_data:
+  uploads_data:
 
 networks:
   wa_network:

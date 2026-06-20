@@ -1,7 +1,9 @@
-from fastapi import APIRouter, Depends, HTTPException
-from typing import Optional
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
+from typing import Optional, List
 from pydantic import BaseModel
 from bson import ObjectId
+import os
+import aiofiles
 from app.routes.auth import get_current_user
 from app.database import db
 from app.config import settings
@@ -18,6 +20,36 @@ class SettingsUpdate(BaseModel):
     waAccessToken: Optional[str] = None
     waVerifyToken: Optional[str] = None
     password: Optional[str] = None
+
+class BrandingUpdate(BaseModel):
+    appName: Optional[str] = None
+    tagline: Optional[str] = None
+    primaryColor: Optional[str] = None
+    accentColor: Optional[str] = None
+    darkColor: Optional[str] = None
+    impactLines: Optional[List[str]] = None
+    trustStats: Optional[list] = None
+
+DEFAULT_BRANDING = {
+    "appName": "RestoChat",
+    "tagline": "WhatsApp Marketing Solution",
+    "logoPath": None,
+    "loginBgPath": None,
+    "primaryColor": "#1B5E37",
+    "accentColor": "#2E7D4F",
+    "darkColor": "#0d2b1a",
+    "impactLines": [
+        "Automate customer engagement via WhatsApp",
+        "Increase repeat orders by 40% with targeted broadcasts",
+        "Manage reservations and orders in real-time",
+        "Reduce response time to under 2 minutes"
+    ],
+    "trustStats": [
+        {"number": "10K+", "label": "Messages / Day"},
+        {"number": "500+", "label": "Businesses"},
+        {"number": "99.9%", "label": "Uptime"}
+    ]
+}
 
 @router.get("/")
 async def get_settings(current_user: dict = Depends(get_current_user)):
@@ -91,3 +123,69 @@ async def test_connection(current_user: dict = Depends(get_current_user)):
             raise HTTPException(status_code=400, detail=f"Meta API Error: {response.text}")
             
     return {"message": "Connection successful", "phoneInfo": response.json()}
+
+
+@router.get("/branding")
+async def get_branding():
+    """Public endpoint to get app branding configurations."""
+    branding = await db.db.branding.find_one({})
+    if not branding:
+        # Create default branding if it doesn't exist
+        await db.db.branding.insert_one(DEFAULT_BRANDING.copy())
+        branding = DEFAULT_BRANDING.copy()
+        
+    # Remove _id from response
+    if "_id" in branding:
+        branding["_id"] = str(branding["_id"])
+        
+    return branding
+
+
+@router.patch("/branding")
+async def update_branding(branding_data: BrandingUpdate, current_user: dict = Depends(get_current_user)):
+    update_data = {k: v for k, v in branding_data.model_dump().items() if v is not None}
+    
+    if not update_data:
+        return {"message": "No fields to update"}
+        
+    # We only have one branding document
+    result = await db.db.branding.update_one(
+        {}, 
+        {"$set": update_data},
+        upsert=True
+    )
+    
+    return {"message": "Branding updated successfully"}
+
+
+@router.post("/upload-branding")
+async def upload_branding_image(
+    type: str = Form(...),
+    file: UploadFile = File(...),
+    current_user: dict = Depends(get_current_user)
+):
+    if type not in ["logo", "loginBg"]:
+        raise HTTPException(status_code=400, detail="Invalid image type. Must be 'logo' or 'loginBg'")
+        
+    # Create extension
+    ext = file.filename.split(".")[-1] if "." in file.filename else "png"
+    filename = f"{type}.{ext}"
+    filepath = os.path.join("uploads", "branding", filename)
+    
+    os.makedirs(os.path.dirname(filepath), exist_ok=True)
+    
+    async with aiofiles.open(filepath, 'wb') as out_file:
+        content = await file.read()
+        await out_file.write(content)
+        
+    url_path = f"http://localhost:5000/uploads/branding/{filename}"
+    
+    # Update db
+    field = "logoPath" if type == "logo" else "loginBgPath"
+    await db.db.branding.update_one(
+        {},
+        {"$set": {field: url_path}},
+        upsert=True
+    )
+    
+    return {"message": "Image uploaded successfully", "url": url_path}
