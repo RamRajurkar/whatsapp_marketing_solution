@@ -329,8 +329,8 @@ export default function InboxPage() {
                       {msg.type === 'text' && <p style={{ margin: 0, fontSize: '14px', lineHeight: '1.5', wordBreak: 'break-word' }}>{msg.content?.text}</p>}
                       {msg.type === 'template' && (
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <FileText size={16} style={{ color: '#6b7280', flexShrink: 0 }} />
-                          <p style={{ margin: 0, fontSize: '14px', lineHeight: '1.5', fontStyle: 'italic', color: '#6b7280' }}>{msg.content?.text || `[Template: ${msg.content?.templateName}]`}</p>
+                          <FileText size={16} style={{ color: msg.direction === 'outbound' ? 'rgba(255,255,255,0.8)' : '#6b7280', flexShrink: 0 }} />
+                          <p style={{ margin: 0, fontSize: '14px', lineHeight: '1.5', fontStyle: 'italic', color: msg.direction === 'outbound' ? 'rgba(255,255,255,0.9)' : '#6b7280' }}>{msg.content?.text || `[Template: ${msg.content?.templateName}]`}</p>
                         </div>
                       )}
                       {msg.type === 'image' && <div>{msg.content?.mediaUrl ? <img src={msg.content.mediaUrl} alt="Image" style={{ maxWidth: '240px', borderRadius: '8px' }} /> : <p style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '6px' }}><Image size={16} /> Image</p>}</div>}
