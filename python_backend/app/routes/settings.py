@@ -178,7 +178,8 @@ async def upload_branding_image(
         content = await file.read()
         await out_file.write(content)
         
-    url_path = f"http://localhost:5000/uploads/branding/{filename}"
+    import time
+    url_path = f"http://localhost:5000/uploads/branding/{filename}?v={int(time.time())}"
     
     # Update db
     field = "logoPath" if type == "logo" else "loginBgPath"
