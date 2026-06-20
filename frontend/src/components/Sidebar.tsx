@@ -5,6 +5,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useAuthStore } from '@/lib/store/authStore';
 import { useEffect, useState } from 'react';
 import api from '@/lib/api';
+import { BRANDING } from '@/lib/branding.config';
 import toast from 'react-hot-toast';
 import {
   LayoutDashboard,
@@ -96,16 +97,25 @@ export function Sidebar() {
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             <div style={{
               width: '40px', height: '40px', borderRadius: '12px',
-              background: 'linear-gradient(135deg, #1B5E37, #2E7D4F)',
+              background: `linear-gradient(135deg, ${BRANDING.primaryColor}, ${BRANDING.accentColor})`,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               flexShrink: 0,
-              boxShadow: '0 4px 12px rgba(27, 94, 55, 0.3)',
+              boxShadow: `0 4px 12px ${BRANDING.primaryColor}4D`,
+              overflow: 'hidden',
             }}>
-              <MessageCircle size={20} color="white" />
+              {BRANDING.logoPath ? (
+                <img
+                  src={BRANDING.logoPath}
+                  alt={BRANDING.logoAlt}
+                  style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '12px' }}
+                />
+              ) : (
+                <MessageCircle size={20} color="white" />
+              )}
             </div>
             <div>
               <div style={{ color: '#1a1a2e', fontWeight: '800', fontSize: '17px', letterSpacing: '-0.3px' }}>
-                RestoChat
+                {BRANDING.appName}
               </div>
             </div>
           </div>

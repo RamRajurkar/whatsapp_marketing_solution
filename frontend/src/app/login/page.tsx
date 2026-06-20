@@ -5,9 +5,12 @@ import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/lib/store/authStore';
 import api from '@/lib/api';
 import toast from 'react-hot-toast';
-import { Loader2, Eye, EyeOff, MessageCircle, ArrowRight, CheckCircle2, UserPlus, LogIn } from 'lucide-react';
-import { IMPACT_LINES, APP_NAME } from '@/lib/constants';
+import { Loader2, Eye, EyeOff, MessageCircle, ArrowRight, CheckCircle2, UserPlus } from 'lucide-react';
+import { BRANDING } from '@/lib/branding.config';
 import './login.css';
+
+const DEFAULT_LOGIN_BG = 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=1400&q=80';
+
 
 export default function LoginPage() {
   const router = useRouter();
@@ -50,7 +53,7 @@ export default function LoginPage() {
   // Rotate impact lines
   useEffect(() => {
     const interval = setInterval(() => {
-      setCurrentLine((prev) => (prev + 1) % IMPACT_LINES.length);
+      setCurrentLine((prev) => (prev + 1) % BRANDING.impactLines.length);
     }, 3500);
     return () => clearInterval(interval);
   }, []);
@@ -109,10 +112,11 @@ export default function LoginPage() {
 
   if (checkingStatus) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-gray-950">
-        <div className="flex flex-col items-center gap-3">
-          <Loader2 className="w-10 h-10 text-emerald-500 animate-spin" />
-          <span className="text-gray-400 text-sm">Loading RestoChat...</span>
+      <div style={{ display:'flex', alignItems:'center', justifyContent:'center', minHeight:'100vh', background:'#030712' }}>
+        <div style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:'12px' }}>
+          <Loader2 style={{ width:40, height:40, color: BRANDING.primaryColor, animation:'spin 1s linear infinite' }} />
+          <span style={{ color:'#6b7280', fontSize:'14px' }}>Loading {BRANDING.appName}...</span>
+          <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
         </div>
       </div>
     );
@@ -124,8 +128,8 @@ export default function LoginPage() {
       <div className="login-hero">
         <img
           className="login-hero-img"
-          src="https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=1400&q=80"
-          alt="Modern restaurant interior"
+          src={BRANDING.loginBgPath || DEFAULT_LOGIN_BG}
+          alt={BRANDING.loginBgAlt}
           loading="eager"
         />
         <div className="login-hero-overlay" />
@@ -144,7 +148,7 @@ export default function LoginPage() {
           </h1>
 
           <div className="login-impact-carousel">
-            {IMPACT_LINES.map((line, i) => (
+            {BRANDING.impactLines.map((line, i) => (
               <div
                 key={i}
                 className={`login-impact-line ${i === currentLine ? 'active' : ''}`}
@@ -156,20 +160,15 @@ export default function LoginPage() {
           </div>
 
           <div className="login-trust-row">
-            <div className="login-trust-item">
-              <span className="login-trust-number">10K+</span>
-              <span className="login-trust-label">Messages / Day</span>
-            </div>
-            <div className="login-trust-divider" />
-            <div className="login-trust-item">
-              <span className="login-trust-number">500+</span>
-              <span className="login-trust-label">Businesses</span>
-            </div>
-            <div className="login-trust-divider" />
-            <div className="login-trust-item">
-              <span className="login-trust-number">99.9%</span>
-              <span className="login-trust-label">Uptime</span>
-            </div>
+            {BRANDING.trustStats.map((stat, i) => (
+              <>
+                {i > 0 && <div key={`div-${i}`} className="login-trust-divider" />}
+                <div key={stat.label} className="login-trust-item">
+                  <span className="login-trust-number">{stat.number}</span>
+                  <span className="login-trust-label">{stat.label}</span>
+                </div>
+              </>
+            ))}
           </div>
         </div>
       </div>
@@ -178,10 +177,19 @@ export default function LoginPage() {
       <div className="login-form-panel">
         <div className="login-form-container">
           <div className="login-brand">
-            <div className="login-brand-icon">
-              <MessageCircle size={22} color="white" />
-            </div>
-            <span className="login-brand-name">{APP_NAME}</span>
+            {/* Logo: image if provided, otherwise emoji icon */}
+            {BRANDING.logoPath ? (
+              <img
+                src={BRANDING.logoPath}
+                alt={BRANDING.logoAlt}
+                className="login-brand-logo-img"
+              />
+            ) : (
+              <div className="login-brand-icon">
+                <MessageCircle size={22} color="white" />
+              </div>
+            )}
+            <span className="login-brand-name">{BRANDING.appName}</span>
           </div>
 
           <h2 className="login-greeting">

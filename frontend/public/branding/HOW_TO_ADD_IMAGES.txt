@@ -1,0 +1,16 @@
+Put your client branding files in this folder:
+
+  logo.png        ← App logo (shown in sidebar, login page, PWA icon area)
+                    Recommended: square, min 200×200px, transparent background
+                    Supported formats: .png .jpg .svg .webp
+
+  login-bg.jpg    ← Login page left-panel background image
+                    Recommended: landscape photo, min 1200×800px, dark/moody tone
+
+After adding files here, update frontend/src/lib/branding.config.ts:
+
+  logoPath:     '/branding/logo.png'
+  loginBgPath:  '/branding/login-bg.jpg'
+
+Then rebuild:
+  docker-compose up -d --build

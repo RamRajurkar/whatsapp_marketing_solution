@@ -3,6 +3,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/lib/store/authStore';
+import { BRANDING } from '@/lib/branding.config';
 
 type Stage = 'checking' | 'ready' | 'error';
 type ServiceStatus = 'waiting' | 'ok' | 'error';
@@ -114,7 +115,7 @@ export default function SplashPage() {
           align-items: center;
           justify-content: center;
           min-height: 100vh;
-          background: linear-gradient(145deg, #0d2b1a 0%, #1B5E37 55%, #2E7D4F 100%);
+          background: linear-gradient(145deg, ${BRANDING.darkColor} 0%, ${BRANDING.primaryColor} 55%, ${BRANDING.accentColor} 100%);
           font-family: 'Inter', sans-serif;
           color: white;
           padding: 24px;
@@ -311,9 +312,19 @@ export default function SplashPage() {
 
         <div className="card">
           {/* Logo & title */}
-          <div className="logo-ring">💬</div>
-          <div className="app-name">RestoChat</div>
-          <div className="app-tagline">WhatsApp Marketing Solution</div>
+          <div className="logo-ring">
+            {BRANDING.logoPath ? (
+              <img
+                src={BRANDING.logoPath}
+                alt={BRANDING.logoAlt}
+                style={{ width: '64px', height: '64px', objectFit: 'contain', borderRadius: '12px' }}
+              />
+            ) : (
+              <span>{BRANDING.logoEmoji}</span>
+            )}
+          </div>
+          <div className="app-name">{BRANDING.appName}</div>
+          <div className="app-tagline">{BRANDING.tagline}</div>
 
           {/* ── Service status panel ── */}
           {(stage === 'checking' || stage === 'error') && (

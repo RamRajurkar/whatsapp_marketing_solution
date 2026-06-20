@@ -198,6 +198,15 @@
   letter-spacing: -0.3px;
 }
 
+/* Custom logo image (when logoPath is set in branding.config.ts) */
+.login-brand-logo-img {
+  width: 40px;
+  height: 40px;
+  object-fit: contain;
+  border-radius: 10px;
+  flex-shrink: 0;
+}
+
 /* ——— Greeting ——— */
 .login-greeting {
   font-size: 26px;
