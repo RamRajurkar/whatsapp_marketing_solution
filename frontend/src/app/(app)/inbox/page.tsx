@@ -87,7 +87,7 @@ function NewConversationModal({ onClose, onCreated }: { onClose: () => void; onC
 function SendTemplateModal({ conversationId, phone, onClose }: { conversationId: string; phone: string; onClose: () => void }) {
   const queryClient = useQueryClient();
   const [templateName, setTemplateName] = useState('');
-  const [templateLang, setTemplateLang] = useState('en');
+  const [templateLang, setTemplateLang] = useState('en_US');
   const [sending, setSending] = useState(false);
 
   const { data: templatesData } = useQuery({
@@ -135,7 +135,11 @@ function SendTemplateModal({ conversationId, phone, onClose }: { conversationId:
           <div>
             <label style={{ fontSize: '13px', fontWeight: '500', color: '#374151', display: 'block', marginBottom: '6px' }}>Template</label>
             {templates.length > 0 ? (
-              <select className="input-field" value={templateName} onChange={e => setTemplateName(e.target.value)}>
+              <select className="input-field" value={templateName} onChange={e => {
+                const selected = templates.find((t: any) => t.name === e.target.value);
+                setTemplateName(e.target.value);
+                if (selected?.language) setTemplateLang(selected.language);
+              }}>
                 <option value="">Select a template...</option>
                 {templates.map((t: any) => (
                   <option key={t.name + t.language} value={t.name}>{t.name} ({t.status})</option>
@@ -148,8 +152,9 @@ function SendTemplateModal({ conversationId, phone, onClose }: { conversationId:
           <div>
             <label style={{ fontSize: '13px', fontWeight: '500', color: '#374151', display: 'block', marginBottom: '6px' }}>Language</label>
             <select className="input-field" value={templateLang} onChange={e => setTemplateLang(e.target.value)}>
-              <option value="en">English</option>
               <option value="en_US">English (US)</option>
+              <option value="en">English</option>
+              <option value="en_GB">English (UK)</option>
               <option value="hi">Hindi</option>
               <option value="ar">Arabic</option>
             </select>
