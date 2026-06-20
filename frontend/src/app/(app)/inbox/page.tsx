@@ -203,7 +203,11 @@ export default function InboxPage() {
   });
   const sendText = useMutation({
     mutationFn: (text: string) => api.post(`/api/conversations/${selectedConvId}/send-text`, { text }),
-    onSuccess: () => { setMessageText(''); queryClient.invalidateQueries({ queryKey: ['messages', selectedConvId] }); queryClient.invalidateQueries({ queryKey: ['conversations'] }); },
+    onSuccess: () => {
+      setMessageText('');
+      queryClient.refetchQueries({ queryKey: ['messages', selectedConvId] });
+      queryClient.refetchQueries({ queryKey: ['conversations'] });
+    },
     onError: (err: any) => toast.error(err.response?.data?.detail || 'Failed to send'),
   });
 
