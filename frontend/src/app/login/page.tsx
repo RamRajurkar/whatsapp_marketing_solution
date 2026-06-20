@@ -84,6 +84,7 @@ export default function LoginPage() {
             restaurantName: data.user.restaurantName || '',
           };
           localStorage.setItem('wa_token', data.token);
+          document.cookie = `wa_token=${data.token}; path=/; max-age=604800; SameSite=Strict`;
           setAuth(data.token, userData);
           toast.success('Registration successful! Welcome to your dashboard.');
           router.push('/dashboard');
@@ -97,8 +98,9 @@ export default function LoginPage() {
             restaurantName: data.user.restaurantName || '',
           };
           localStorage.setItem('wa_token', data.token);
+          document.cookie = `wa_token=${data.token}; path=/; max-age=604800; SameSite=Strict`;
           setAuth(data.token, userData);
-          toast.success('Welcome back!');
+          toast.success('Login successful!');
           router.push('/dashboard');
         }
       } catch (err: any) {
