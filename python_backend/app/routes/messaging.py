@@ -7,8 +7,12 @@ from app.config import settings
 from app.socket import sio
 from app.utils.phone import normalize_indian_phone
 from bson import ObjectId
-from datetime import datetime
+from datetime import datetime, timezone
 import httpx
+
+
+def _now():
+    return datetime.now(timezone.utc)
 
 router = APIRouter()
 
@@ -39,7 +43,7 @@ async def send_text_direct(req: SendTextRequest, current_user: dict = Depends(ge
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-    now = datetime.utcnow()
+    now = _now()
 
     # Mock mode
     if wa_token == "test_token":
@@ -154,7 +158,7 @@ async def send_template_direct(req: SendTemplateRequest, current_user: dict = De
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-    now = datetime.utcnow()
+    now = _now()
 
     # Mock mode
     if wa_token == "test_token":

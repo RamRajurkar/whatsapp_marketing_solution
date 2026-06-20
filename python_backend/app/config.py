@@ -6,12 +6,14 @@ class Settings(BaseSettings):
     DB_NAME: str = "resto_chat"
     JWT_SECRET: str = "your-super-secret-jwt-key"
     PORT: int = 5000
-    
+
     # WhatsApp Meta API
     WA_PHONE_NUMBER_ID: Optional[str] = None
     WA_BUSINESS_ACCOUNT_ID: Optional[str] = None
     WA_ACCESS_TOKEN: Optional[str] = None
     WA_VERIFY_TOKEN: Optional[str] = None
+    # App secret from Meta Developer Portal — used to verify webhook signatures
+    WA_APP_SECRET: Optional[str] = None
 
     # Cloudinary
     CLOUDINARY_CLOUD_NAME: Optional[str] = None
@@ -22,3 +24,12 @@ class Settings(BaseSettings):
         env_file = ".env"
 
 settings = Settings()
+
+# Warn at startup if JWT_SECRET is still the insecure default
+if settings.JWT_SECRET == "your-super-secret-jwt-key":
+    import warnings
+    warnings.warn(
+        "⚠️  JWT_SECRET is using the insecure default value. "
+        "Set a strong random secret in your .env file before going to production!",
+        stacklevel=2
+    )

@@ -5,7 +5,10 @@ from app.routes.auth import get_current_user
 from app.database import db
 from app.utils.phone import normalize_indian_phone
 from bson import ObjectId
-from datetime import datetime
+from datetime import datetime, timezone
+
+def _now():
+    return datetime.now(timezone.utc)
 
 router = APIRouter()
 
@@ -64,8 +67,8 @@ async def create_customer(customer: CustomerCreate, current_user: dict = Depends
     new_customer = customer.model_dump()
     new_customer["phone"] = normalized_phone
     new_customer["waId"] = normalized_phone
-    new_customer["createdAt"] = datetime.utcnow()
-    new_customer["updatedAt"] = datetime.utcnow()
+    new_customer["createdAt"] = _now()
+    new_customer["updatedAt"] = _now()
     new_customer["lastSeen"] = None
     
     result = await db.db.customers.insert_one(new_customer)
@@ -92,7 +95,7 @@ async def update_customer(customer_id: str, customer: CustomerUpdate, current_us
         except ValueError as e:
             raise HTTPException(status_code=400, detail=str(e))
         
-    update_data["updatedAt"] = datetime.utcnow()
+    update_data["updatedAt"] = _now()
     
     result = await db.db.customers.update_one(
         {"_id": obj_id},

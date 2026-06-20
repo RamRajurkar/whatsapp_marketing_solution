@@ -3,9 +3,12 @@ uvicorn[standard]
 motor
 python-dotenv
 pydantic
+pydantic-settings
 python-jose[cryptography]
 passlib[bcrypt]
 python-multipart
 python-socketio
 cloudinary
 httpx
+slowapi
+limits

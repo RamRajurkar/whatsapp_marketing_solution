@@ -123,6 +123,11 @@ html, body {
 .badge-scheduled { background: #EDE9FE; color: #6D28D9; }
 .badge-draft { background: #F3F4F6; color: #6B7280; }
 .badge-sent { background: #D1FAE5; color: #047857; }
+.badge-partial { background: #FEF3C7; color: #B45309; }
+.badge-sending { background: #DBEAFE; color: #1D4ED8; }
+.badge-failed { background: #FEE2E2; color: #B91C1C; }
+
+@keyframes spin { to { transform: rotate(360deg); } }
 
 /* ============ SIDEBAR ============ */
 .sidebar {
