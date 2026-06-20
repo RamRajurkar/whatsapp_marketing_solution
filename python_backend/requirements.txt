@@ -13,3 +13,4 @@ httpx
 slowapi
 limits
 aiofiles
+pydantic[email]
