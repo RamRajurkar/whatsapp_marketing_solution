@@ -69,7 +69,7 @@ export function Sidebar() {
     localStorage.removeItem('wa_token');
     clearAuth();
     toast.success('Logged out successfully');
-    router.push('/login');
+    window.location.href = '/login';
   };
 
   const statusConfig: Record<WaStatus, { color: string; text: string; dotClass: string }> = {
