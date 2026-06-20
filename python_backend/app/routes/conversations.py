@@ -22,7 +22,8 @@ class SendMessageRequest(BaseModel):
 
 class SendTemplateInConvoRequest(BaseModel):
     templateName: str
-    templateLanguage: str = "en"
+    templateLanguage: str = "en_US"
+    templateText: Optional[str] = None
 
 
 @router.get("/")
@@ -204,7 +205,7 @@ async def send_template_in_conversation(
             message_id = resp.json().get("messages", [{}])[0].get("id", "unknown")
 
     now          = _now()
-    display_text = f"[Template: {req.templateName}]"
+    display_text = req.templateText if req.templateText else f"[Template: {req.templateName}]"
     message_doc  = {
         "conversationId":    conversation_id,
         "whatsappMessageId": message_id,

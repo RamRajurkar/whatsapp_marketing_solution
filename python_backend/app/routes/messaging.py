@@ -275,6 +275,7 @@ async def get_templates(current_user: dict = Depends(get_current_user)):
             "language": t.get("language"),
             "status": t.get("status"),
             "category": t.get("category"),
+            "components": t.get("components", []),
         })
 
     return {"templates": templates}

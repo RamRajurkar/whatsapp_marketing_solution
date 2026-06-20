@@ -88,6 +88,7 @@ function SendTemplateModal({ conversationId, phone, onClose }: { conversationId:
   const queryClient = useQueryClient();
   const [templateName, setTemplateName] = useState('');
   const [templateLang, setTemplateLang] = useState('en_US');
+  const [templateText, setTemplateText] = useState('');
   const [sending, setSending] = useState(false);
 
   const { data: templatesData } = useQuery({
@@ -102,6 +103,7 @@ function SendTemplateModal({ conversationId, phone, onClose }: { conversationId:
       await api.post(`/api/conversations/${conversationId}/send-template`, {
         templateName,
         templateLanguage: templateLang,
+        templateText,
       });
       toast.success('Template sent!');
       queryClient.invalidateQueries({ queryKey: ['messages', conversationId] });
@@ -138,7 +140,12 @@ function SendTemplateModal({ conversationId, phone, onClose }: { conversationId:
               <select className="input-field" value={templateName} onChange={e => {
                 const selected = templates.find((t: any) => t.name === e.target.value);
                 setTemplateName(e.target.value);
+                setTemplateText('');
                 if (selected?.language) setTemplateLang(selected.language);
+                if (selected?.components) {
+                  const bodyComp = selected.components.find((c: any) => c.type === 'BODY');
+                  if (bodyComp?.text) setTemplateText(bodyComp.text);
+                }
               }}>
                 <option value="">Select a template...</option>
                 {templates.map((t: any) => (
