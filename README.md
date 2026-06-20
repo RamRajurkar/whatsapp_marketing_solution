@@ -159,12 +159,18 @@ docker-compose logs -f
 
 Deploy to a new client PC in ~30 minutes using the included scripts.
 
+### What is Required (Prerequisites)
+Before you paste the folder on the client's PC, you **must** ensure the following:
+1. **Docker Desktop Installer**: You must download the `Docker Desktop Installer.exe` from [docker.com](https://www.docker.com/products/docker-desktop/) and place it inside the `installers/` folder on your pendrive. The setup script will automatically install it on the client PC.
+2. **Cloudflare Tunnel (Optional but Recommended)**: To receive live WhatsApp messages, the client PC needs a public URL. You will need to install `cloudflared` or ngrok to expose port 5000 securely.
+
 ### Pendrive Contents
+Your pendrive should look exactly like this before plugging it into the client's PC:
 ```
 📁 RestoChat-Setup/
 ├── 📁 app/                     ← Full cloned repo
 ├── 📁 installers/
-│   └── DockerDesktopInstaller.exe
+│   └── DockerDesktopInstaller.exe  ← YOU MUST DOWNLOAD THIS MANUALLY AND PLACE IT HERE
 ├── setup.bat                   ← Run this first (as Administrator)
 ├── start.bat
 ├── stop.bat
@@ -172,10 +178,9 @@ Deploy to a new client PC in ~30 minutes using the included scripts.
 ```
 
 ### Setup Steps
-1. Copy this repo to a pendrive as the `app/` folder
-2. Add `DockerDesktopInstaller.exe` to `installers/`
-3. On the client PC: right-click `setup.bat` → **Run as Administrator**
-4. Follow the prompts (restaurant name, WhatsApp credentials)
+1. Copy the `RestoChat-Setup` folder from your pendrive to the client PC's Desktop.
+2. Right-click `setup.bat` → **Run as Administrator**
+3. Follow the prompts (restaurant name, WhatsApp credentials)
 5. The script will:
    - Install Docker if missing
    - Copy app to `C:\RestoChat`
