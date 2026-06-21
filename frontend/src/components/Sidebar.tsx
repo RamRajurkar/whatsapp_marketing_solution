@@ -191,7 +191,7 @@ export function Sidebar() {
             className="sidebar-link"
             onClick={() =>
               window.open(
-                'https://github.com/Business-Projects-Prathamesh/whatsapp_marketing_solution',
+                `https://wa.me/917447875452?text=${encodeURIComponent('Hello! I need some help regarding the RestoChat system.')}`,
                 '_blank'
               )
             }
