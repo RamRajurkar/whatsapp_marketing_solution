@@ -8,19 +8,7 @@ export function TopHeader() {
 
   return (
     <div className="top-header">
-      {/* Search Bar */}
-      <div className="search-bar">
-        <Search size={16} style={{ color: '#9ca3af', flexShrink: 0 }} />
-        <input placeholder="Search anything..." />
-        <div style={{
-          display: 'flex', alignItems: 'center', gap: '4px',
-          padding: '3px 8px', background: '#f3f4f6', borderRadius: '6px',
-          fontSize: '11px', color: '#9ca3af', fontWeight: '600', flexShrink: 0,
-        }}>
-          <span>Ctrl</span>
-          <span>F</span>
-        </div>
-      </div>
+      <div style={{ flex: 1 }}></div>
 
       {/* Right side */}
       <div className="header-actions">
