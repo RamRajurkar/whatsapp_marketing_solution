@@ -15,6 +15,8 @@ import {
 } from 'lucide-react';
 import EmojiPicker from 'emoji-picker-react';
 
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+
 const AVATAR_COLORS = [
   ['#D1FAE5', '#166534'], ['#DBEAFE', '#1E40AF'], ['#FCE7F3', '#9D174D'],
   ['#FEF3C7', '#92400E'], ['#EDE9FE', '#5B21B6'], ['#FEE2E2', '#991B1B'],
@@ -266,14 +268,14 @@ function SendTemplateModal({ conversationId, phone, customerName, onClose }: { c
                   <label style={{ fontSize: '13px', color: '#475569', display: 'block', marginBottom: '8px', fontWeight: '500' }}>Select from Media Library</label>
                   <div style={{ display: 'flex', gap: '10px', overflowX: 'auto', paddingBottom: '8px' }}>
                     {mediaList.map((m: any) => {
-                      const fullUrl = m.url;
+                      const fullUrl = m.url.startsWith('http') ? m.url : `${API_BASE}${m.url}`;
                       const isSelected = headerMediaUrl === fullUrl;
                       return (
                         <div 
                           key={m._id} 
                           onClick={() => { setHeaderMediaUrl(fullUrl); setHeaderMediaFile(null); }}
                           style={{ 
-                            width: '80px', height: '80px', flexShrink: 0, borderRadius: '8px', cursor: 'pointer',
+                            width: '120px', height: '120px', flexShrink: 0, borderRadius: '8px', cursor: 'pointer',
                             border: isSelected ? '3px solid #22c55e' : '1px solid #e2e8f0',
                             backgroundImage: `url(${fullUrl})`,
                             backgroundSize: 'cover', backgroundPosition: 'center',
