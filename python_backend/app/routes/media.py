@@ -2,7 +2,7 @@ import os
 import uuid
 from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, File, UploadFile, HTTPException
-from app.utils.auth import get_current_user
+from app.routes.auth import get_current_user
 from app.database import db
 from bson import ObjectId
 

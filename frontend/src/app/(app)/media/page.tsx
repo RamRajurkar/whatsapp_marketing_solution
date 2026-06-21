@@ -107,7 +107,7 @@ export default function MediaPage() {
               <div key={item._id} style={{ position: 'relative', borderRadius: '12px', overflow: 'hidden', border: '1px solid #e5e7eb', backgroundColor: '#f9fafb', group: 'true' }}>
                 <div style={{ paddingBottom: '100%', position: 'relative' }}>
                   <img 
-                    src={process.env.NEXT_PUBLIC_API_URL ? `${process.env.NEXT_PUBLIC_API_URL}${item.url}` : item.url} 
+                    src={item.url} 
                     alt={item.filename} 
                     style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', objectFit: 'cover' }} 
                   />

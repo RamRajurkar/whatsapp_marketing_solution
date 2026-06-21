@@ -266,7 +266,7 @@ function SendTemplateModal({ conversationId, phone, customerName, onClose }: { c
                   <label style={{ fontSize: '13px', color: '#475569', display: 'block', marginBottom: '8px', fontWeight: '500' }}>Select from Media Library</label>
                   <div style={{ display: 'flex', gap: '10px', overflowX: 'auto', paddingBottom: '8px' }}>
                     {mediaList.map((m: any) => {
-                      const fullUrl = process.env.NEXT_PUBLIC_API_URL ? `${process.env.NEXT_PUBLIC_API_URL}${m.url}` : m.url;
+                      const fullUrl = m.url;
                       const isSelected = headerMediaUrl === fullUrl;
                       return (
                         <div 
