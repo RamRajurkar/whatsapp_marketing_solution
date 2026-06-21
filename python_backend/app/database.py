@@ -10,7 +10,7 @@ db = DataBase()
 
 async def connect_to_mongo():
     try:
-        db.client = AsyncIOMotorClient(settings.MONGODB_URI)
+        db.client = AsyncIOMotorClient(settings.MONGODB_URI, tz_aware=True)
         db.db = db.client[settings.DB_NAME]
         print(f"Connected to MongoDB: {settings.DB_NAME}")
     except Exception as e:
@@ -34,6 +34,6 @@ def get_worker_db():
     Returns:
         tuple: (client, database) — both Motor async objects.
     """
-    client = AsyncIOMotorClient(settings.MONGODB_URI)
+    client = AsyncIOMotorClient(settings.MONGODB_URI, tz_aware=True)
     database = client[settings.DB_NAME]
     return client, database
