@@ -24,6 +24,7 @@ import {
   Wifi,
   WifiOff,
   Loader2,
+  Image,
 } from 'lucide-react';
 
 const menuItems = [
@@ -35,6 +36,7 @@ const menuItems = [
   { href: '/menu',          icon: UtensilsCrossed, label: 'Menu' },
   { href: '/templates',     icon: MessageCircle,   label: 'Templates' },
   { href: '/broadcasts',    icon: Megaphone,       label: 'Broadcasts' },
+  { href: '/media',         icon: Image,           label: 'Media' },
   { href: '/reports',       icon: BarChart3,       label: 'Reports' },
 ];
 

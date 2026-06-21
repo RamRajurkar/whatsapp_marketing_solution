@@ -103,7 +103,13 @@ function SendTemplateModal({ conversationId, phone, customerName, onClose }: { c
     queryFn: () => api.get('/api/messaging/templates').then(r => r.data),
   });
 
+  const { data: mediaData } = useQuery({
+    queryKey: ['media'],
+    queryFn: () => api.get('/api/media').then(r => r.data),
+  });
+
   const templates = templatesData?.templates || [];
+  const mediaList = mediaData?.media || [];
 
   // Get the currently selected template object
   const selectedTemplate = templates.find((t: any) => t.name === templateName);
@@ -210,7 +216,7 @@ function SendTemplateModal({ conversationId, phone, customerName, onClose }: { c
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '480px', maxHeight: '85vh', overflowY: 'auto' }}>
+      <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '580px', maxHeight: '85vh', overflowY: 'auto' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
           <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '10px' }}>
             <FileText size={18} style={{ color: '#1B5E37' }} />
@@ -227,10 +233,10 @@ function SendTemplateModal({ conversationId, phone, customerName, onClose }: { c
           <div>
             <label style={{ fontSize: '13px', fontWeight: '500', color: '#374151', display: 'block', marginBottom: '6px' }}>Template</label>
             {templates.length > 0 ? (
-              <select className="input-field" value={templateName} onChange={e => handleTemplateSelect(e.target.value)}>
-                <option value="">Select a template...</option>
+              <select className="input-field" style={{ padding: '10px 14px', fontSize: '14px', backgroundColor: '#f9fafb', cursor: 'pointer' }} value={templateName} onChange={e => handleTemplateSelect(e.target.value)}>
+                <option value="">✨ Select a template...</option>
                 {templates.map((t: any) => (
-                  <option key={t.name + t.language} value={t.name}>{t.name} ({t.status})</option>
+                  <option key={t.name + t.language} value={t.name}>{t.name} — {t.category || 'MARKETING'} ({t.status})</option>
                 ))}
               </select>
             ) : (
@@ -250,13 +256,38 @@ function SendTemplateModal({ conversationId, phone, customerName, onClose }: { c
 
           {/* Header Media URL — shown when template has IMAGE/VIDEO/DOCUMENT header */}
           {needsHeaderMedia && (
-            <div style={{ background: '#f8fafc', padding: '12px', borderRadius: '8px', border: '1px dashed #cbd5e1' }}>
-              <label style={{ fontSize: '13px', fontWeight: '600', color: '#374151', display: 'block', marginBottom: '10px' }}>
+            <div style={{ background: '#f8fafc', padding: '16px', borderRadius: '12px', border: '1px dashed #cbd5e1' }}>
+              <label style={{ fontSize: '14px', fontWeight: '600', color: '#1e293b', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '12px' }}>
                 {headerComp.format === 'IMAGE' ? '🖼️ Header Image' : headerComp.format === 'VIDEO' ? '🎬 Header Video' : '📄 Header Document'}
               </label>
               
+              {headerComp.format === 'IMAGE' && mediaList.length > 0 && (
+                <div style={{ marginBottom: '16px' }}>
+                  <label style={{ fontSize: '13px', color: '#475569', display: 'block', marginBottom: '8px', fontWeight: '500' }}>Select from Media Library</label>
+                  <div style={{ display: 'flex', gap: '10px', overflowX: 'auto', paddingBottom: '8px' }}>
+                    {mediaList.map((m: any) => {
+                      const fullUrl = process.env.NEXT_PUBLIC_API_URL ? `${process.env.NEXT_PUBLIC_API_URL}${m.url}` : m.url;
+                      const isSelected = headerMediaUrl === fullUrl;
+                      return (
+                        <div 
+                          key={m._id} 
+                          onClick={() => { setHeaderMediaUrl(fullUrl); setHeaderMediaFile(null); }}
+                          style={{ 
+                            width: '80px', height: '80px', flexShrink: 0, borderRadius: '8px', cursor: 'pointer',
+                            border: isSelected ? '3px solid #22c55e' : '1px solid #e2e8f0',
+                            backgroundImage: `url(${fullUrl})`,
+                            backgroundSize: 'cover', backgroundPosition: 'center',
+                            opacity: isSelected ? 1 : 0.8, transition: 'all 0.2s'
+                          }}
+                        />
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
               <div style={{ marginBottom: '12px' }}>
-                <label style={{ fontSize: '12px', color: '#64748b', display: 'block', marginBottom: '4px' }}>Upload File (Recommended)</label>
+                <label style={{ fontSize: '12px', color: '#64748b', display: 'block', marginBottom: '4px' }}>Upload File directly to WhatsApp</label>
                 <input 
                   type="file" 
                   className="input-field" 
