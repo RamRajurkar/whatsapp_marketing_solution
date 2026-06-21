@@ -4,6 +4,7 @@ from pydantic import BaseModel
 from app.routes.auth import get_current_user
 from app.database import db
 from app.config import settings
+from app.utils.template_utils import build_template_components
 from bson import ObjectId
 from datetime import datetime, timezone
 import httpx
@@ -23,6 +24,10 @@ class BroadcastCreate(BaseModel):
     audienceTags: Optional[List[str]] = []
     scheduledAt: Optional[str] = None
     status: str = "draft"
+    templateComponents: Optional[List[dict]] = None  # Template component definitions
+    headerMediaUrl: Optional[str] = None
+    bodyParams: Optional[List[str]] = None
+    carouselCards: Optional[List[dict]] = None
 
 
 @router.get("/")
@@ -60,6 +65,31 @@ async def delete_broadcast(broadcast_id: str, current_user: dict = Depends(get_c
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Broadcast not found")
     return {"message": "Broadcast deleted"}
+
+
+@router.put("/{broadcast_id}")
+async def update_broadcast(broadcast_id: str, data: BroadcastCreate, current_user: dict = Depends(get_current_user)):
+    """Update an existing broadcast campaign."""
+    try:
+        obj_id = ObjectId(broadcast_id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid broadcast ID")
+
+    broadcast = await db.db.broadcasts.find_one({"_id": obj_id})
+    if not broadcast:
+        raise HTTPException(status_code=404, detail="Broadcast not found")
+        
+    if broadcast.get("status") not in ("draft", "scheduled"):
+        raise HTTPException(status_code=400, detail="Only draft or scheduled broadcasts can be edited")
+
+    update_data = data.model_dump(exclude_unset=True)
+    update_data["updatedAt"] = _now()
+    
+    await db.db.broadcasts.update_one({"_id": obj_id}, {"$set": update_data})
+    
+    updated = await db.db.broadcasts.find_one({"_id": obj_id})
+    updated["_id"] = str(updated["_id"])
+    return updated
 
 
 @router.post("/{broadcast_id}/send")
@@ -128,6 +158,10 @@ async def send_broadcast(
         template_lang=broadcast.get("templateLanguage", "en"),
         wa_phone_id=wa_phone_id,
         wa_token=wa_token,
+        template_components=broadcast.get("templateComponents"),
+        header_media_url=broadcast.get("headerMediaUrl"),
+        body_params=broadcast.get("bodyParams"),
+        carousel_cards=broadcast.get("carouselCards"),
     )
 
     return {
@@ -145,10 +179,29 @@ async def _do_send_broadcast(
     template_lang: str,
     wa_phone_id: str,
     wa_token: str,
+    template_components: Optional[List[dict]] = None,
+    header_media_url: Optional[str] = None,
+    body_params: Optional[List[str]] = None,
+    carousel_cards: Optional[List[dict]] = None,
 ):
     """Background task: send template messages to all target customers."""
     sent_count   = 0
     failed_count = 0
+
+    # Pre-build the template payload (same for every recipient)
+    template_payload = {
+        "name":     template_name,
+        "language": {"code": template_lang},
+    }
+    if template_components:
+        components = build_template_components(
+            template_components=template_components,
+            header_media_url=header_media_url,
+            body_params=body_params,
+            carousel_cards=carousel_cards,
+        )
+        if components:
+            template_payload["components"] = components
 
     if wa_token == "test_token":
         # ── Mock mode ─────────────────────────────────────────────────────────
@@ -180,10 +233,7 @@ async def _do_send_broadcast(
                     "recipient_type":    "individual",
                     "to":                phone,
                     "type":              "template",
-                    "template": {
-                        "name":     template_name,
-                        "language": {"code": template_lang},
-                    },
+                    "template":          template_payload,
                 }
 
                 try:

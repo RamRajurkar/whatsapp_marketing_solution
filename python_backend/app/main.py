@@ -56,6 +56,8 @@ from app.socket import sio
 
 socket_app = socketio.ASGIApp(sio, app)
 
+from app.routes import auth, settings, customers, webhook, conversations, broadcasts, messaging, reports
+
 app.include_router(auth.router,          prefix="/api/auth",          tags=["auth"])
 app.include_router(settings.router,      prefix="/api/settings",      tags=["settings"])
 app.include_router(customers.router,     prefix="/api/customers",     tags=["customers"])
@@ -63,6 +65,7 @@ app.include_router(webhook.router,       prefix="/api/webhook",       tags=["web
 app.include_router(conversations.router, prefix="/api/conversations", tags=["conversations"])
 app.include_router(broadcasts.router,    prefix="/api/broadcasts",    tags=["broadcasts"])
 app.include_router(messaging.router,     prefix="/api/messaging",     tags=["messaging"])
+app.include_router(reports.router,       prefix="/api/reports",       tags=["reports"])
 
 @app.get("/")
 async def root():

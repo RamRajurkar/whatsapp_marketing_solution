@@ -1,12 +1,13 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, Fragment } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/lib/store/authStore';
 import api from '@/lib/api';
 import toast from 'react-hot-toast';
 import { Loader2, Eye, EyeOff, MessageCircle, ArrowRight, CheckCircle2, UserPlus } from 'lucide-react';
 import { useBranding, defaultBranding } from '@/lib/hooks/useBranding';
+import appLogo from '../../../public/icon-512x512.png';
 import './login.css';
 
 const DEFAULT_LOGIN_BG = 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=1400&q=80';
@@ -165,14 +166,14 @@ export default function LoginPage() {
           </div>
 
           <div className="login-trust-row">
-            {BRANDING.trustStats.map((stat, i) => (
-              <>
-                {i > 0 && <div key={`div-${i}`} className="login-trust-divider" />}
-                <div key={stat.label} className="login-trust-item">
+            {BRANDING.trustStats.map((stat: any, i: number) => (
+              <Fragment key={stat.label}>
+                {i > 0 && <div className="login-trust-divider" />}
+                <div className="login-trust-item">
                   <span className="login-trust-number">{stat.number}</span>
                   <span className="login-trust-label">{stat.label}</span>
                 </div>
-              </>
+              </Fragment>
             ))}
           </div>
         </div>
@@ -182,18 +183,11 @@ export default function LoginPage() {
       <div className="login-form-panel">
         <div className="login-form-container">
           <div className="login-brand">
-            {/* Logo: image if provided, otherwise emoji icon */}
-            {BRANDING.logoPath ? (
-              <img
-                src={BRANDING.logoPath}
-                alt={BRANDING.appName}
-                className="login-brand-logo-img"
-              />
-            ) : (
-              <div className="login-brand-icon" style={{ background: `linear-gradient(135deg, ${BRANDING.primaryColor} 0%, ${BRANDING.accentColor} 100%)` }}>
-                <MessageCircle size={22} color="white" />
-              </div>
-            )}
+            <img
+              src={appLogo.src}
+              alt="App Logo"
+              className="login-brand-logo-img"
+            />
             <span className="login-brand-name">{BRANDING.appName}</span>
           </div>
 

@@ -6,5 +6,6 @@ docker-compose up -d
 echo.
 echo RestoChat is running at http://localhost:3000
 echo.
-timeout /t 3 /nobreak >nul
+echo Waiting for services to be ready...
+timeout /t 8 /nobreak >nul
 start http://localhost:3000

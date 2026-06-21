@@ -11,8 +11,9 @@ import { formatIndianPhone } from '@/lib/phone';
 import {
   MessageSquare, Search, User, CalendarDays, Zap, Paperclip,
   Send, Loader2, Image, FileText, Check, CheckCheck,
-  Inbox as InboxIcon, Hand, Plus, X, AlertCircle, Clock,
+  Inbox as InboxIcon, Hand, Plus, X, AlertCircle, Clock, Smile,
 } from 'lucide-react';
+import EmojiPicker from 'emoji-picker-react';
 
 const AVATAR_COLORS = [
   ['#D1FAE5', '#166534'], ['#DBEAFE', '#1E40AF'], ['#FCE7F3', '#9D174D'],
@@ -84,26 +85,110 @@ function NewConversationModal({ onClose, onCreated }: { onClose: () => void; onC
 }
 
 
-function SendTemplateModal({ conversationId, phone, onClose }: { conversationId: string; phone: string; onClose: () => void }) {
+function SendTemplateModal({ conversationId, phone, customerName, onClose }: { conversationId: string; phone: string; customerName: string; onClose: () => void }) {
   const queryClient = useQueryClient();
   const [templateName, setTemplateName] = useState('');
   const [templateLang, setTemplateLang] = useState('en_US');
   const [templateText, setTemplateText] = useState('');
   const [sending, setSending] = useState(false);
 
+  // Component parameter state
+  const [headerMediaUrl, setHeaderMediaUrl] = useState('');
+  const [headerMediaFile, setHeaderMediaFile] = useState<File | null>(null);
+  const [bodyParams, setBodyParams] = useState<string[]>([]);
+  const [carouselCards, setCarouselCards] = useState<{ mediaUrl: string; bodyParams: string[] }[]>([]);
+
   const { data: templatesData } = useQuery({
     queryKey: ['templates'],
     queryFn: () => api.get('/api/messaging/templates').then(r => r.data),
   });
 
+  const templates = templatesData?.templates || [];
+
+  // Get the currently selected template object
+  const selectedTemplate = templates.find((t: any) => t.name === templateName);
+  const selectedComponents: any[] = selectedTemplate?.components || [];
+
+  // Derived info about what the template needs
+  const headerComp = selectedComponents.find((c: any) => c.type === 'HEADER');
+  const bodyComp = selectedComponents.find((c: any) => c.type === 'BODY');
+  const carouselComp = selectedComponents.find((c: any) => c.type === 'CAROUSEL');
+
+  const needsHeaderMedia = headerComp && ['IMAGE', 'VIDEO', 'DOCUMENT'].includes(headerComp.format);
+  const bodyVarSlots = bodyComp?.text?.match(/\{\{\d+\}\}/g) || [];
+  const needsBodyParams = bodyVarSlots.length > 0;
+
+  // Handle template selection change
+  const handleTemplateSelect = (name: string) => {
+    const selected = templates.find((t: any) => t.name === name);
+    setTemplateName(name);
+    setTemplateText('');
+    setHeaderMediaUrl('');
+    setHeaderMediaFile(null);
+    setBodyParams([]);
+    setCarouselCards([]);
+
+    if (selected?.language) setTemplateLang(selected.language);
+    if (selected?.components) {
+      const body = selected.components.find((c: any) => c.type === 'BODY');
+      if (body?.text) setTemplateText(body.text);
+
+      // Initialize body params array — auto-fill {{1}} with customer name
+      const vars = body?.text?.match(/\{\{\d+\}\}/g) || [];
+      if (vars.length > 0) {
+        const params = new Array(vars.length).fill('');
+        if (customerName && customerName !== 'Unknown') params[0] = customerName;
+        setBodyParams(params);
+      }
+
+      // Initialize carousel cards
+      const carousel = selected.components.find((c: any) => c.type === 'CAROUSEL');
+      if (carousel?.cards?.length) {
+        setCarouselCards(
+          carousel.cards.map((card: any) => {
+            const cardBody = card.components?.find((c: any) => c.type === 'BODY');
+            const cardVars = cardBody?.text?.match(/\{\{\d+\}\}/g) || [];
+            return { mediaUrl: '', bodyParams: new Array(cardVars.length).fill('') };
+          })
+        );
+      }
+    }
+  };
+
   const handleSend = async () => {
     if (!templateName.trim()) return;
+    // Validate required params
+    if (needsHeaderMedia && !headerMediaUrl.trim() && !headerMediaFile) {
+      toast.error('Please provide the header media URL or upload a file');
+      return;
+    }
+    if (needsHeaderMedia && headerMediaUrl.trim().startsWith('data:')) {
+      toast.error('Please provide a public link (http:// or https://), not a pasted image / Base64 data.');
+      return;
+    }
     setSending(true);
     try {
+      let headerMediaId = undefined;
+      
+      // Upload file if selected
+      if (headerMediaFile) {
+        const formData = new FormData();
+        formData.append('file', headerMediaFile);
+        const uploadResp = await api.post('/api/messaging/upload-media', formData, {
+          headers: { 'Content-Type': 'multipart/form-data' }
+        });
+        headerMediaId = uploadResp.data.id;
+      }
+
       await api.post(`/api/conversations/${conversationId}/send-template`, {
         templateName,
         templateLanguage: templateLang,
         templateText,
+        templateComponents: selectedComponents.length > 0 ? selectedComponents : undefined,
+        headerMediaUrl: headerMediaUrl.trim() || undefined,
+        headerMediaId: headerMediaId,
+        bodyParams: bodyParams.length > 0 ? bodyParams : undefined,
+        carouselCards: carouselCards.length > 0 ? carouselCards : undefined,
       });
       toast.success('Template sent!');
       queryClient.invalidateQueries({ queryKey: ['messages', conversationId] });
@@ -116,11 +201,9 @@ function SendTemplateModal({ conversationId, phone, onClose }: { conversationId:
     }
   };
 
-  const templates = templatesData?.templates || [];
-
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '420px' }}>
+      <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '480px', maxHeight: '85vh', overflowY: 'auto' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
           <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '10px' }}>
             <FileText size={18} style={{ color: '#1B5E37' }} />
@@ -137,16 +220,7 @@ function SendTemplateModal({ conversationId, phone, onClose }: { conversationId:
           <div>
             <label style={{ fontSize: '13px', fontWeight: '500', color: '#374151', display: 'block', marginBottom: '6px' }}>Template</label>
             {templates.length > 0 ? (
-              <select className="input-field" value={templateName} onChange={e => {
-                const selected = templates.find((t: any) => t.name === e.target.value);
-                setTemplateName(e.target.value);
-                setTemplateText('');
-                if (selected?.language) setTemplateLang(selected.language);
-                if (selected?.components) {
-                  const bodyComp = selected.components.find((c: any) => c.type === 'BODY');
-                  if (bodyComp?.text) setTemplateText(bodyComp.text);
-                }
-              }}>
+              <select className="input-field" value={templateName} onChange={e => handleTemplateSelect(e.target.value)}>
                 <option value="">Select a template...</option>
                 {templates.map((t: any) => (
                   <option key={t.name + t.language} value={t.name}>{t.name} ({t.status})</option>
@@ -166,6 +240,125 @@ function SendTemplateModal({ conversationId, phone, onClose }: { conversationId:
               <option value="ar">Arabic</option>
             </select>
           </div>
+
+          {/* Header Media URL — shown when template has IMAGE/VIDEO/DOCUMENT header */}
+          {needsHeaderMedia && (
+            <div style={{ background: '#f8fafc', padding: '12px', borderRadius: '8px', border: '1px dashed #cbd5e1' }}>
+              <label style={{ fontSize: '13px', fontWeight: '600', color: '#374151', display: 'block', marginBottom: '10px' }}>
+                {headerComp.format === 'IMAGE' ? '🖼️ Header Image' : headerComp.format === 'VIDEO' ? '🎬 Header Video' : '📄 Header Document'}
+              </label>
+              
+              <div style={{ marginBottom: '12px' }}>
+                <label style={{ fontSize: '12px', color: '#64748b', display: 'block', marginBottom: '4px' }}>Upload File (Recommended)</label>
+                <input 
+                  type="file" 
+                  className="input-field" 
+                  style={{ padding: '8px' }}
+                  onChange={e => {
+                    if (e.target.files?.[0]) {
+                      setHeaderMediaFile(e.target.files[0]);
+                      setHeaderMediaUrl(''); // Clear URL if file selected
+                    }
+                  }} 
+                  accept={headerComp.format === 'IMAGE' ? 'image/*' : headerComp.format === 'VIDEO' ? 'video/*' : '*/*'}
+                />
+              </div>
+              
+              <div style={{ textAlign: 'center', fontSize: '12px', color: '#94a3b8', margin: '8px 0' }}>— OR —</div>
+
+              <div>
+                <label style={{ fontSize: '12px', color: '#64748b', display: 'block', marginBottom: '4px' }}>Paste Public URL</label>
+                <input
+                  className="input-field"
+                  value={headerMediaUrl}
+                  onChange={e => {
+                    setHeaderMediaUrl(e.target.value);
+                    if (e.target.value) setHeaderMediaFile(null); // Clear file if URL entered
+                  }}
+                  placeholder={`https://example.com/media.${headerComp.format === 'IMAGE' ? 'jpg' : headerComp.format === 'VIDEO' ? 'mp4' : 'pdf'}`}
+                />
+              </div>
+            </div>
+          )}
+
+          {/* Body Variables — shown when template body has {{1}}, {{2}}, etc. */}
+          {needsBodyParams && (
+            <div>
+              <label style={{ fontSize: '13px', fontWeight: '500', color: '#374151', display: 'block', marginBottom: '6px' }}>
+                📝 Body Variables
+              </label>
+              {bodyVarSlots.map((_: any, idx: number) => (
+                <div key={idx} style={{ marginBottom: '6px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{ fontSize: '12px', color: '#6b7280', fontWeight: '600', minWidth: '36px' }}>{`{{${idx + 1}}}`}</span>
+                    <input
+                      className="input-field"
+                      value={bodyParams[idx] || ''}
+                      onChange={e => {
+                        const updated = [...bodyParams];
+                        updated[idx] = e.target.value;
+                        setBodyParams(updated);
+                      }}
+                      placeholder={`Value for {{${idx + 1}}}`}
+                      style={{ flex: 1 }}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Carousel Cards — shown when template has CAROUSEL component */}
+          {carouselComp && carouselCards.length > 0 && (
+            <div>
+              <label style={{ fontSize: '13px', fontWeight: '500', color: '#374151', display: 'block', marginBottom: '6px' }}>
+                🎠 Carousel Cards
+              </label>
+              {carouselCards.map((card, cardIdx) => {
+                const cardDef = carouselComp.cards?.[cardIdx];
+                const cardHeaderDef = cardDef?.components?.find((c: any) => c.type === 'HEADER');
+                const cardBodyDef = cardDef?.components?.find((c: any) => c.type === 'BODY');
+                const cardBodyVars = cardBodyDef?.text?.match(/\{\{\d+\}\}/g) || [];
+                return (
+                  <div key={cardIdx} style={{ background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '8px', padding: '10px', marginBottom: '8px' }}>
+                    <p style={{ margin: '0 0 8px', fontSize: '12px', fontWeight: '600', color: '#374151' }}>Card {cardIdx + 1}</p>
+                    {cardHeaderDef && ['IMAGE', 'VIDEO'].includes(cardHeaderDef.format) && (
+                      <input
+                        className="input-field"
+                        value={card.mediaUrl}
+                        onChange={e => {
+                          const updated = [...carouselCards];
+                          updated[cardIdx] = { ...updated[cardIdx], mediaUrl: e.target.value };
+                          setCarouselCards(updated);
+                        }}
+                        placeholder={`Media URL for card ${cardIdx + 1}`}
+                        style={{ marginBottom: '6px' }}
+                      />
+                    )}
+                    {cardBodyVars.map((_: any, varIdx: number) => (
+                      <div key={varIdx} style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                        <span style={{ fontSize: '11px', color: '#6b7280', minWidth: '30px' }}>{`{{${varIdx + 1}}}`}</span>
+                        <input
+                          className="input-field"
+                          value={card.bodyParams[varIdx] || ''}
+                          onChange={e => {
+                            const updated = [...carouselCards];
+                            const updatedParams = [...updated[cardIdx].bodyParams];
+                            updatedParams[varIdx] = e.target.value;
+                            updated[cardIdx] = { ...updated[cardIdx], bodyParams: updatedParams };
+                            setCarouselCards(updated);
+                          }}
+                          placeholder={`Value for {{${varIdx + 1}}}`}
+                          style={{ flex: 1 }}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
           <p style={{ margin: 0, fontSize: '11px', color: '#9ca3af' }}>
             Templates can be sent anytime. Use them to re-open conversations outside the 24-hour window.
           </p>
@@ -191,6 +384,7 @@ export default function InboxPage() {
   const [showQuickReplies, setShowQuickReplies] = useState(false);
   const [newConvModal, setNewConvModal] = useState(false);
   const [templateModal, setTemplateModal] = useState(false);
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -235,7 +429,7 @@ export default function InboxPage() {
   const getMessageTime = (ts: string) => { try { return format(new Date(ts), 'HH:mm'); } catch { return ''; } };
 
   return (
-    <div style={{ display: 'flex', height: 'calc(100vh - 68px)', overflow: 'hidden' }}>
+    <div style={{ display: 'flex', height: 'calc(100vh / 1.1 - 68px)', overflow: 'hidden' }}>
       {/* Chat List */}
       <div style={{ width: '340px', borderRight: '1px solid #e5e7eb', background: 'white', display: 'flex', flexDirection: 'column', flexShrink: 0 }}>
         <div style={{ padding: '20px 16px 12px', borderBottom: '1px solid #f3f4f6' }}>
@@ -319,7 +513,7 @@ export default function InboxPage() {
                 </div>
               </>)}
             </div>
-            <div style={{ flex: 1, overflowY: 'auto', padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <div style={{ flex: 1, overflowY: 'auto', padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: '8px', backgroundColor: '#efeae2', backgroundImage: 'url("https://user-images.githubusercontent.com/15075759/28719144-86dc0f70-73b1-11e7-911d-60d70fcded21.png")', backgroundRepeat: 'repeat' }}>
               {msgLoading ? <div style={{ textAlign: 'center', color: '#9ca3af', paddingTop: '40px' }}>Loading...</div>
               : messages.length === 0 ? <div style={{ textAlign: 'center', color: '#9ca3af', paddingTop: '60px' }}><Hand size={40} style={{ color: '#d1d5db', marginBottom: '12px' }} /><div>No messages yet. Send the first message!</div></div>
               : messages.map((msg: any) => (
@@ -329,8 +523,8 @@ export default function InboxPage() {
                       {msg.type === 'text' && <p style={{ margin: 0, fontSize: '14px', lineHeight: '1.5', wordBreak: 'break-word' }}>{msg.content?.text}</p>}
                       {msg.type === 'template' && (
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <FileText size={16} style={{ color: msg.direction === 'outbound' ? 'rgba(255,255,255,0.8)' : '#6b7280', flexShrink: 0 }} />
-                          <p style={{ margin: 0, fontSize: '14px', lineHeight: '1.5', fontStyle: 'italic', color: msg.direction === 'outbound' ? 'rgba(255,255,255,0.9)' : '#6b7280' }}>{msg.content?.text || `[Template: ${msg.content?.templateName}]`}</p>
+                          <FileText size={16} style={{ color: '#6b7280', flexShrink: 0 }} />
+                          <p style={{ margin: 0, fontSize: '14px', lineHeight: '1.5', fontStyle: 'italic', color: '#6b7280' }}>{msg.content?.text || `[Template: ${msg.content?.templateName}]`}</p>
                         </div>
                       )}
                       {msg.type === 'image' && <div>{msg.content?.mediaUrl ? <img src={msg.content.mediaUrl} alt="Image" style={{ maxWidth: '240px', borderRadius: '8px' }} /> : <p style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '6px' }}><Image size={16} /> Image</p>}</div>}
@@ -369,6 +563,19 @@ export default function InboxPage() {
                 <button type="button" onClick={() => setShowQuickReplies(!showQuickReplies)} style={{ padding: '10px', background: showQuickReplies ? '#E8F5E9' : '#f9fafb', border: `1px solid ${showQuickReplies ? '#A7D5B8' : '#e5e7eb'}`, borderRadius: '10px', cursor: 'pointer', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Zap size={18} style={{ color: showQuickReplies ? '#1B5E37' : '#6b7280' }} /></button>
                 <input type="file" ref={fileInputRef} style={{ display: 'none' }} accept="image/*,application/pdf" onChange={async (e) => { const file = e.target.files?.[0]; if (!file) return; toast('File upload requires Cloudinary setup.'); e.target.value = ''; }} />
                 <button type="button" onClick={() => fileInputRef.current?.click()} style={{ padding: '10px', background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '10px', cursor: 'pointer', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Paperclip size={18} style={{ color: '#6b7280' }} /></button>
+                <div style={{ position: 'relative' }}>
+                  <button type="button" onClick={() => setShowEmojiPicker(!showEmojiPicker)} style={{ padding: '10px', background: showEmojiPicker ? '#E8F5E9' : '#f9fafb', border: `1px solid ${showEmojiPicker ? '#A7D5B8' : '#e5e7eb'}`, borderRadius: '10px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <Smile size={18} style={{ color: showEmojiPicker ? '#1B5E37' : '#6b7280' }} />
+                  </button>
+                  {showEmojiPicker && (
+                    <div style={{ position: 'absolute', bottom: '50px', left: 0, zIndex: 100 }}>
+                      <EmojiPicker onEmojiClick={(emojiData) => {
+                        setMessageText(prev => prev + emojiData.emoji);
+                        setShowEmojiPicker(false);
+                      }} />
+                    </div>
+                  )}
+                </div>
                 <textarea value={messageText} onChange={e => setMessageText(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(e as any); } }} placeholder="Type a message..." rows={1} className="input-field" style={{ flex: 1, resize: 'none', maxHeight: '100px', fontFamily: 'Inter, sans-serif', lineHeight: '1.5' }} />
                 <button type="submit" disabled={!messageText.trim() || sendText.isPending} className="btn-primary" style={{ padding: '10px 18px', borderRadius: '10px', flexShrink: 0, opacity: (!messageText.trim() || sendText.isPending) ? 0.5 : 1 }}>
                   {sendText.isPending ? <Loader2 size={18} /> : <><Send size={16} /> Send</>}
@@ -394,6 +601,7 @@ export default function InboxPage() {
         <SendTemplateModal
           conversationId={selectedConvId}
           phone={selectedConv.customerPhone}
+          customerName={selectedConv.customerName || ''}
           onClose={() => setTemplateModal(false)}
         />
       )}

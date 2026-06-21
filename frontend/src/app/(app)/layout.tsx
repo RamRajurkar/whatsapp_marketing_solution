@@ -17,9 +17,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   if (!token) return null;
 
   return (
-    <div style={{ display: 'flex' }}>
+    <div style={{ display: 'flex', zoom: 1.1 }}>
       <Sidebar />
-      <main className="main-layout" style={{ flex: 1, minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
+      <main className="main-layout" style={{ flex: 1, minHeight: 'calc(100vh / 1.1)', display: 'flex', flexDirection: 'column' }}>
         <TopHeader />
         <div style={{ flex: 1 }}>
           {children}

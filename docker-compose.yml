@@ -12,6 +12,12 @@ services:
     command: --wiredTigerCacheSizeGB 0.25
     environment:
       MONGO_INITDB_DATABASE: whatsapp_saas
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
     networks:
       - wa_network
 
@@ -21,6 +27,12 @@ services:
     restart: unless-stopped
     ports:
       - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
     networks:
       - wa_network
 
@@ -44,16 +56,25 @@ services:
       WA_ACCESS_TOKEN: ${WA_ACCESS_TOKEN}
       WA_VERIFY_TOKEN: ${WA_VERIFY_TOKEN:-restaurant_webhook_verify_2024}
       WA_APP_SECRET: ${WA_APP_SECRET}
+      WA_APP_ID: ${WA_APP_ID}
       WA_API_VERSION: v19.0
       CLOUDINARY_CLOUD_NAME: ${CLOUDINARY_CLOUD_NAME}
       CLOUDINARY_API_KEY: ${CLOUDINARY_API_KEY}
       CLOUDINARY_API_SECRET: ${CLOUDINARY_API_SECRET}
       FRONTEND_URL: http://localhost:3000
     depends_on:
-      - mongodb
-      - redis
+      mongodb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     volumes:
       - uploads_data:/app/uploads
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5000/api/health')"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
     networks:
       - wa_network
 
@@ -69,7 +90,8 @@ services:
       NEXT_PUBLIC_API_URL: http://localhost:5000
       NEXT_PUBLIC_SOCKET_URL: http://localhost:5000
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
     networks:
       - wa_network
 
@@ -78,7 +100,7 @@ services:
     container_name: wa_nginx
     restart: unless-stopped
     ports:
-      - "80:80"
+      - "8080:80"
     volumes:
       - ./nginx.conf:/etc/nginx/nginx.conf:ro
     depends_on:
@@ -91,9 +113,7 @@ services:
     image: cloudflare/cloudflared:latest
     container_name: wa_tunnel
     restart: unless-stopped
-    command: tunnel --no-autoupdate run
-    environment:
-      - TUNNEL_TOKEN=${CLOUDFLARE_TUNNEL_TOKEN}
+    command: tunnel --url http://backend:5000
     networks:
       - wa_network
 
@@ -104,3 +124,4 @@ volumes:
 networks:
   wa_network:
     driver: bridge
+

@@ -170,25 +170,7 @@ export default function SettingsPage() {
             </div>
 
             {/* File Uploaders */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginTop: '8px' }}>
-              
-              {/* Logo Upload */}
-              <div style={{ border: '1px dashed #D1D5DB', borderRadius: '12px', padding: '20px', textAlign: 'center', background: '#FAFBFC', position: 'relative' }}>
-                <input type="file" accept="image/png, image/jpeg, image/svg+xml" style={{ display: 'none' }} ref={logoInputRef} onChange={e => handleImageUpload(e, 'logo')} />
-                {brandingData?.logoPath ? (
-                  <div style={{ marginBottom: '12px', display: 'flex', justifyContent: 'center' }}>
-                    <img src={brandingData.logoPath} alt="Logo" style={{ width: '64px', height: '64px', objectFit: 'contain', borderRadius: '8px', border: '1px solid #E5E7EB' }} />
-                  </div>
-                ) : (
-                  <div style={{ width: '48px', height: '48px', borderRadius: '50%', background: '#E5E7EB', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px' }}><ImageIcon size={20} color="#6B7280" /></div>
-                )}
-                <h3 style={{ margin: '0 0 4px', fontSize: '14px', fontWeight: '600', color: '#111827' }}>App Logo</h3>
-                <p style={{ margin: '0 0 16px', fontSize: '12px', color: '#6B7280' }}>Recommended: Square, min 200×200px<br/>(PNG, JPG, SVG)</p>
-                <button onClick={() => logoInputRef.current?.click()} disabled={uploadingLogo} className="btn-secondary" style={{ padding: '8px 16px', fontSize: '13px', width: '100%' }}>
-                  {uploadingLogo ? <><Loader2 size={14} className="animate-spin"/> Uploading...</> : <><UploadCloud size={14}/> {brandingData?.logoPath ? 'Change Logo' : 'Upload Logo'}</>}
-                </button>
-              </div>
-
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '16px', marginTop: '8px' }}>
               {/* Login BG Upload */}
               <div style={{ border: '1px dashed #D1D5DB', borderRadius: '12px', padding: '20px', textAlign: 'center', background: '#FAFBFC', position: 'relative' }}>
                 <input type="file" accept="image/png, image/jpeg, image/webp" style={{ display: 'none' }} ref={loginBgInputRef} onChange={e => handleImageUpload(e, 'loginBg')} />

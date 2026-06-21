@@ -97,13 +97,24 @@ async def update_customer(customer_id: str, customer: CustomerUpdate, current_us
         
     update_data["updatedAt"] = _now()
     
+    # Fetch the customer first so we know their phone number for syncing
+    existing_customer = await db.db.customers.find_one({"_id": obj_id})
+    if not existing_customer:
+        raise HTTPException(status_code=404, detail="Customer not found")
+
     result = await db.db.customers.update_one(
         {"_id": obj_id},
         {"$set": update_data}
     )
     
-    if result.matched_count == 0:
-        raise HTTPException(status_code=404, detail="Customer not found")
+    # Sync name change to conversations so inbox reflects updated name
+    customer_phone = update_data.get("phone") or existing_customer.get("phone")
+    new_name = update_data.get("name")
+    if new_name and customer_phone:
+        await db.db.conversations.update_many(
+            {"customerPhone": customer_phone},
+            {"$set": {"customerName": new_name}}
+        )
         
     return {"message": "Customer updated successfully"}
 

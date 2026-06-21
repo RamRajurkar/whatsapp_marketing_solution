@@ -108,10 +108,11 @@ html, body {
 }
 
 .msg-outbound {
-  background: var(--brand-green);
-  color: white;
+  background: #ffffff;
+  color: #111827;
+  border: 1px solid #e5e7eb;
   border-radius: 14px 0 14px 14px;
-  box-shadow: 0 2px 8px rgba(27, 94, 55, 0.25);
+  box-shadow: var(--shadow-xs);
 }
 
 /* Status badges */
@@ -132,7 +133,7 @@ html, body {
 /* ============ SIDEBAR ============ */
 .sidebar {
   background: var(--sidebar-bg);
-  height: 100vh;
+  height: calc(100vh / 1.1);
   position: fixed;
   left: 0;
   top: 0;

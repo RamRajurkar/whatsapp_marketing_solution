@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from typing import Optional, List
 from pydantic import BaseModel
 from app.routes.auth import get_current_user
@@ -6,6 +6,7 @@ from app.database import db
 from app.config import settings
 from app.socket import sio
 from app.utils.phone import normalize_indian_phone
+from app.utils.template_utils import build_template_components
 from bson import ObjectId
 from datetime import datetime, timezone
 import httpx
@@ -26,6 +27,10 @@ class SendTemplateRequest(BaseModel):
     phone: str
     templateName: str
     templateLanguage: str = "en"
+    templateComponents: Optional[List[dict]] = None  # Template component definitions from Meta API
+    headerMediaUrl: Optional[str] = None             # URL for image/video/document headers
+    bodyParams: Optional[List[str]] = None           # Values for body variables {{1}}, {{2}}, etc.
+    carouselCards: Optional[List[dict]] = None       # Per-card params: {mediaUrl, bodyParams}
 
 
 @router.post("/send-text")
@@ -170,15 +175,28 @@ async def send_template_direct(req: SendTemplateRequest, current_user: dict = De
             "Authorization": f"Bearer {wa_token}",
             "Content-Type": "application/json"
         }
+        template_payload: dict = {
+            "name": req.templateName,
+            "language": {"code": req.templateLanguage}
+        }
+
+        # Build components array for templates with media/variables/carousel
+        if req.templateComponents:
+            components = build_template_components(
+                template_components=req.templateComponents,
+                header_media_url=req.headerMediaUrl,
+                body_params=req.bodyParams,
+                carousel_cards=req.carouselCards,
+            )
+            if components:
+                template_payload["components"] = components
+
         payload = {
             "messaging_product": "whatsapp",
             "recipient_type": "individual",
             "to": phone,
             "type": "template",
-            "template": {
-                "name": req.templateName,
-                "language": {"code": req.templateLanguage}
-            }
+            "template": template_payload
         }
     
         async with httpx.AsyncClient(timeout=30.0) as client:
@@ -279,3 +297,118 @@ async def get_templates(current_user: dict = Depends(get_current_user)):
         })
 
     return {"templates": templates}
+
+@router.post("/templates")
+async def create_template(
+    name: str = Form(...),
+    category: str = Form(...),
+    language: str = Form(...),
+    bodyText: str = Form(...),
+    file: Optional[UploadFile] = File(None),
+    current_user: dict = Depends(get_current_user),
+):
+    """Create a new template on Meta WhatsApp Manager with an optional image header."""
+    wa_business_id = current_user.get("waBusinessAccountId") or settings.WA_BUSINESS_ACCOUNT_ID
+    wa_token = current_user.get("waAccessToken") or settings.WA_ACCESS_TOKEN
+    wa_app_id = settings.WA_APP_ID
+
+    if not wa_business_id or not wa_token or not wa_app_id:
+        raise HTTPException(status_code=400, detail="Missing WhatsApp credentials or WA_APP_ID in settings")
+
+    components = []
+    
+    # 1. Handle Image Header if present
+    if file:
+        file_bytes = await file.read()
+        file_length = len(file_bytes)
+        file_type = file.content_type or "image/jpeg"
+
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            # Step A: Get upload session
+            session_url = f"https://graph.facebook.com/v19.0/{wa_app_id}/uploads"
+            session_params = {"file_length": file_length, "file_type": file_type}
+            session_headers = {"Authorization": f"Bearer {wa_token}"}
+            session_resp = await client.post(session_url, params=session_params, headers=session_headers)
+            if session_resp.status_code != 200:
+                raise HTTPException(status_code=400, detail=f"Failed to create upload session: {session_resp.text}")
+            session_id = session_resp.json().get("id")
+
+            # Step B: Upload file
+            upload_url = f"https://graph.facebook.com/v19.0/{session_id}"
+            upload_headers = {"Authorization": f"OAuth {wa_token}", "file_offset": "0"}
+            upload_resp = await client.post(upload_url, headers=upload_headers, content=file_bytes)
+            if upload_resp.status_code != 200:
+                raise HTTPException(status_code=400, detail=f"Failed to upload image: {upload_resp.text}")
+            header_handle = upload_resp.json().get("h")
+
+            components.append({
+                "type": "HEADER",
+                "format": "IMAGE",
+                "example": {
+                    "header_handle": [header_handle]
+                }
+            })
+
+    # 2. Add Body component
+    import re
+    body_component = {
+        "type": "BODY",
+        "text": bodyText
+    }
+    
+    vars_found = re.findall(r'\{\{(\d+)\}\}', bodyText)
+    if vars_found:
+        max_var = max([int(v) for v in vars_found])
+        examples = [f"Value{i}" for i in range(1, max_var + 1)]
+        body_component["example"] = {"body_text": [examples]}
+
+    components.append(body_component)
+
+    # 3. Create Template
+    create_url = f"https://graph.facebook.com/v19.0/{wa_business_id}/message_templates"
+    create_payload = {
+        "name": name,
+        "language": language,
+        "category": category,
+        "components": components
+    }
+    create_headers = {"Authorization": f"Bearer {wa_token}", "Content-Type": "application/json"}
+
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        resp = await client.post(create_url, json=create_payload, headers=create_headers)
+        if resp.status_code not in (200, 201):
+            raise HTTPException(status_code=400, detail=f"Failed to create template: {resp.text}")
+        return resp.json()
+
+@router.post("/upload-media")
+async def upload_media(
+    file: UploadFile = File(...),
+    current_user: dict = Depends(get_current_user),
+):
+    """Upload media directly to WhatsApp API for sending in messages/templates."""
+    wa_phone_id = current_user.get("waPhoneNumberId") or settings.WA_PHONE_NUMBER_ID
+    wa_token = current_user.get("waAccessToken") or settings.WA_ACCESS_TOKEN
+
+    if not wa_phone_id or not wa_token:
+        raise HTTPException(status_code=400, detail="Missing WhatsApp credentials in settings")
+
+    file_bytes = await file.read()
+    file_type = file.content_type or "image/jpeg"
+
+    upload_url = f"https://graph.facebook.com/v19.0/{wa_phone_id}/media"
+    headers = {"Authorization": f"Bearer {wa_token}"}
+    
+    # We must use multipart/form-data for the media API
+    files = {
+        "file": (file.filename or "media.jpg", file_bytes, file_type)
+    }
+    data = {
+        "messaging_product": "whatsapp"
+    }
+
+    async with httpx.AsyncClient(timeout=60.0) as client:
+        resp = await client.post(upload_url, headers=headers, data=data, files=files)
+        if resp.status_code not in (200, 201):
+            raise HTTPException(status_code=400, detail=f"Failed to upload media to WhatsApp: {resp.text}")
+            
+        return {"id": resp.json().get("id")}

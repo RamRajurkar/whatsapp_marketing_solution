@@ -14,6 +14,7 @@ class Settings(BaseSettings):
     WA_VERIFY_TOKEN: Optional[str] = None
     # App secret from Meta Developer Portal — used to verify webhook signatures
     WA_APP_SECRET: Optional[str] = None
+    WA_APP_ID: Optional[str] = None
 
     # Cloudinary
     CLOUDINARY_CLOUD_NAME: Optional[str] = None

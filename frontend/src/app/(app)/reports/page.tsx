@@ -28,6 +28,16 @@ export default function ReportsPage() {
         </div>
       </div>
       <div style={{ padding: '0 32px' }}>
+        {data?.totals?.broadcasts && (
+          <div className="glass-card" style={{ padding: '24px', marginBottom: '24px' }}>
+            <h3 style={{ margin: '0 0 20px', fontSize: '15px', fontWeight: '700', color: '#1a1a2e', display: 'flex', alignItems: 'center', gap: '8px' }}><Megaphone size={16} style={{ color: '#1B5E37' }} /> Broadcast Statistics</h3>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px' }}>
+              {[{ label: 'Total Sent', value: data.totals.broadcasts.total || 0, color: '#6b7280' }, { label: 'Delivered', value: data.totals.broadcasts.sent || 0, color: '#1B5E37' }, { label: 'Failed', value: data.totals.broadcasts.failed || 0, color: '#EF4444' }].map(s => (
+                <div key={s.label} style={{ textAlign: 'center', padding: '20px', background: '#FAFBFC', borderRadius: '12px' }}><div style={{ fontSize: '28px', fontWeight: '800', color: s.color }}>{s.value}</div><div style={{ fontSize: '13px', color: '#6b7280', marginTop: '4px' }}>{s.label}</div></div>
+              ))}
+            </div>
+          </div>
+        )}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', marginBottom: '28px' }}>
           {[
             { icon: Users, label: 'Total Customers', value: dashboard?.totalCustomers || 0, color: '#1B5E37', bg: '#E8F5E9' },
@@ -75,16 +85,6 @@ export default function ReportsPage() {
             ) : <div style={{ height: '180px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#9ca3af', fontSize: '13px' }}>No data yet</div>}
           </div>
         </div>
-        {data?.totals?.broadcasts && (
-          <div className="glass-card" style={{ padding: '24px', marginBottom: '32px' }}>
-            <h3 style={{ margin: '0 0 20px', fontSize: '15px', fontWeight: '700', color: '#1a1a2e', display: 'flex', alignItems: 'center', gap: '8px' }}><Megaphone size={16} style={{ color: '#1B5E37' }} /> Broadcast Statistics</h3>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px' }}>
-              {[{ label: 'Total Sent', value: data.totals.broadcasts.total || 0, color: '#6b7280' }, { label: 'Delivered', value: data.totals.broadcasts.sent || 0, color: '#1B5E37' }, { label: 'Failed', value: data.totals.broadcasts.failed || 0, color: '#EF4444' }].map(s => (
-                <div key={s.label} style={{ textAlign: 'center', padding: '20px', background: '#FAFBFC', borderRadius: '12px' }}><div style={{ fontSize: '28px', fontWeight: '800', color: s.color }}>{s.value}</div><div style={{ fontSize: '13px', color: '#6b7280', marginTop: '4px' }}>{s.label}</div></div>
-              ))}
-            </div>
-          </div>
-        )}
       </div>
     </div>
   );

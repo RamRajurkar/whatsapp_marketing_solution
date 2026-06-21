@@ -18,6 +18,8 @@ api.interceptors.response.use(
   (err) => {
     if (err.response?.status === 401 && typeof window !== 'undefined') {
       localStorage.removeItem('wa_token');
+      localStorage.removeItem('wa_auth');
+      document.cookie = `wa_token=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/`;
       window.location.href = '/login';
     }
     return Promise.reject(err);

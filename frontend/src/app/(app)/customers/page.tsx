@@ -99,14 +99,73 @@ function SendMessageModal({ customer, onClose }: { customer: any; onClose: () =>
   const [templateLang, setTemplateLang] = useState('en');
   const [sending, setSending] = useState(false);
 
+  // Component parameter state
+  const [headerMediaUrl, setHeaderMediaUrl] = useState('');
+  const [bodyParams, setBodyParams] = useState<string[]>([]);
+  const [carouselCards, setCarouselCards] = useState<{ mediaUrl: string; bodyParams: string[] }[]>([]);
+
   const { data: templatesData } = useQuery({
     queryKey: ['templates'],
     queryFn: () => api.get('/api/messaging/templates').then(r => r.data),
   });
 
+  const templates = templatesData?.templates || [];
+
+  // Get the currently selected template object
+  const selectedTemplate = templates.find((t: any) => t.name === templateName);
+  const selectedComponents: any[] = selectedTemplate?.components || [];
+
+  // Derived info about what the template needs
+  const headerComp = selectedComponents.find((c: any) => c.type === 'HEADER');
+  const bodyComp = selectedComponents.find((c: any) => c.type === 'BODY');
+  const carouselComp = selectedComponents.find((c: any) => c.type === 'CAROUSEL');
+
+  const needsHeaderMedia = headerComp && ['IMAGE', 'VIDEO', 'DOCUMENT'].includes(headerComp.format);
+  const bodyVarSlots = bodyComp?.text?.match(/\{\{\d+\}\}/g) || [];
+  const needsBodyParams = bodyVarSlots.length > 0;
+
+  // Handle template selection change
+  const handleTemplateSelect = (name: string) => {
+    const selected = templates.find((t: any) => t.name === name);
+    setTemplateName(name);
+    setHeaderMediaUrl('');
+    setBodyParams([]);
+    setCarouselCards([]);
+
+    if (selected?.language) setTemplateLang(selected.language);
+    if (selected?.components) {
+      // Initialize body params array — auto-fill {{1}} with customer name
+      const body = selected.components.find((c: any) => c.type === 'BODY');
+      const vars = body?.text?.match(/\{\{\d+\}\}/g) || [];
+      if (vars.length > 0) {
+        const params = new Array(vars.length).fill('');
+        if (customer?.name && customer.name !== 'Unknown') params[0] = customer.name;
+        setBodyParams(params);
+      }
+
+      // Initialize carousel cards
+      const carousel = selected.components.find((c: any) => c.type === 'CAROUSEL');
+      if (carousel?.cards?.length) {
+        setCarouselCards(
+          carousel.cards.map((card: any) => {
+            const cardBody = card.components?.find((c: any) => c.type === 'BODY');
+            const cardVars = cardBody?.text?.match(/\{\{\d+\}\}/g) || [];
+            return { mediaUrl: '', bodyParams: new Array(cardVars.length).fill('') };
+          })
+        );
+      }
+    }
+  };
+
   const handleSend = async () => {
     if (mode === 'text' && !text.trim()) return;
     if (mode === 'template' && !templateName.trim()) return;
+
+    // Validate required params
+    if (mode === 'template' && needsHeaderMedia && !headerMediaUrl.trim()) {
+      toast.error('Please provide the header media URL');
+      return;
+    }
 
     setSending(true);
     try {
@@ -118,6 +177,10 @@ function SendMessageModal({ customer, onClose }: { customer: any; onClose: () =>
           phone: customer.phone,
           templateName,
           templateLanguage: templateLang,
+          templateComponents: selectedComponents.length > 0 ? selectedComponents : undefined,
+          headerMediaUrl: headerMediaUrl.trim() || undefined,
+          bodyParams: bodyParams.length > 0 ? bodyParams : undefined,
+          carouselCards: carouselCards.length > 0 ? carouselCards : undefined,
         });
         toast.success(`Template sent to ${customer.name}`);
       }
@@ -129,11 +192,9 @@ function SendMessageModal({ customer, onClose }: { customer: any; onClose: () =>
     }
   };
 
-  const templates = templatesData?.templates || [];
-
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '480px' }}>
+      <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '480px', maxHeight: '85vh', overflowY: 'auto' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
           <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '10px' }}>
             <Send size={18} style={{ color: '#1B5E37' }} />
@@ -201,7 +262,7 @@ function SendMessageModal({ customer, onClose }: { customer: any; onClose: () =>
                 <select
                   className="input-field"
                   value={templateName}
-                  onChange={e => setTemplateName(e.target.value)}
+                  onChange={e => handleTemplateSelect(e.target.value)}
                 >
                   <option value="">Select a template...</option>
                   {templates.map((t: any) => (
@@ -223,6 +284,103 @@ function SendMessageModal({ customer, onClose }: { customer: any; onClose: () =>
                 <option value="ar">Arabic</option>
               </select>
             </div>
+
+            {/* Header Media URL — shown when template has IMAGE/VIDEO/DOCUMENT header */}
+            {needsHeaderMedia && (
+              <div>
+                <label style={{ fontSize: '13px', fontWeight: '500', color: '#374151', display: 'block', marginBottom: '6px' }}>
+                  {headerComp.format === 'IMAGE' ? '🖼️ Header Image URL' : headerComp.format === 'VIDEO' ? '🎬 Header Video URL' : '📄 Header Document URL'}
+                </label>
+                <input
+                  className="input-field"
+                  value={headerMediaUrl}
+                  onChange={e => setHeaderMediaUrl(e.target.value)}
+                  placeholder={`https://example.com/media.${headerComp.format === 'IMAGE' ? 'jpg' : headerComp.format === 'VIDEO' ? 'mp4' : 'pdf'}`}
+                />
+                <p style={{ margin: '4px 0 0', fontSize: '11px', color: '#9ca3af' }}>
+                  Public URL to the {headerComp.format.toLowerCase()} file
+                </p>
+              </div>
+            )}
+
+            {/* Body Variables — shown when template body has {{1}}, {{2}}, etc. */}
+            {needsBodyParams && (
+              <div>
+                <label style={{ fontSize: '13px', fontWeight: '500', color: '#374151', display: 'block', marginBottom: '6px' }}>
+                  📝 Body Variables
+                </label>
+                {bodyVarSlots.map((_: any, idx: number) => (
+                  <div key={idx} style={{ marginBottom: '6px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span style={{ fontSize: '12px', color: '#6b7280', fontWeight: '600', minWidth: '36px' }}>{`{{${idx + 1}}}`}</span>
+                      <input
+                        className="input-field"
+                        value={bodyParams[idx] || ''}
+                        onChange={e => {
+                          const updated = [...bodyParams];
+                          updated[idx] = e.target.value;
+                          setBodyParams(updated);
+                        }}
+                        placeholder={`Value for {{${idx + 1}}}`}
+                        style={{ flex: 1 }}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Carousel Cards — shown when template has CAROUSEL component */}
+            {carouselComp && carouselCards.length > 0 && (
+              <div>
+                <label style={{ fontSize: '13px', fontWeight: '500', color: '#374151', display: 'block', marginBottom: '6px' }}>
+                  🎠 Carousel Cards
+                </label>
+                {carouselCards.map((card, cardIdx) => {
+                  const cardDef = carouselComp.cards?.[cardIdx];
+                  const cardHeaderDef = cardDef?.components?.find((c: any) => c.type === 'HEADER');
+                  const cardBodyDef = cardDef?.components?.find((c: any) => c.type === 'BODY');
+                  const cardBodyVars = cardBodyDef?.text?.match(/\{\{\d+\}\}/g) || [];
+                  return (
+                    <div key={cardIdx} style={{ background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '8px', padding: '10px', marginBottom: '8px' }}>
+                      <p style={{ margin: '0 0 8px', fontSize: '12px', fontWeight: '600', color: '#374151' }}>Card {cardIdx + 1}</p>
+                      {cardHeaderDef && ['IMAGE', 'VIDEO'].includes(cardHeaderDef.format) && (
+                        <input
+                          className="input-field"
+                          value={card.mediaUrl}
+                          onChange={e => {
+                            const updated = [...carouselCards];
+                            updated[cardIdx] = { ...updated[cardIdx], mediaUrl: e.target.value };
+                            setCarouselCards(updated);
+                          }}
+                          placeholder={`Media URL for card ${cardIdx + 1}`}
+                          style={{ marginBottom: '6px' }}
+                        />
+                      )}
+                      {cardBodyVars.map((_: any, varIdx: number) => (
+                        <div key={varIdx} style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                          <span style={{ fontSize: '11px', color: '#6b7280', minWidth: '30px' }}>{`{{${varIdx + 1}}}`}</span>
+                          <input
+                            className="input-field"
+                            value={card.bodyParams[varIdx] || ''}
+                            onChange={e => {
+                              const updated = [...carouselCards];
+                              const updatedParams = [...updated[cardIdx].bodyParams];
+                              updatedParams[varIdx] = e.target.value;
+                              updated[cardIdx] = { ...updated[cardIdx], bodyParams: updatedParams };
+                              setCarouselCards(updated);
+                            }}
+                            placeholder={`Value for {{${varIdx + 1}}}`}
+                            style={{ flex: 1 }}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
             <p style={{ margin: '0', fontSize: '11px', color: '#9ca3af' }}>
               Templates can be sent anytime — no 24-hour window restriction.
             </p>

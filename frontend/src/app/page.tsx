@@ -4,6 +4,7 @@ import { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/lib/store/authStore';
 import { useBranding, defaultBranding } from '@/lib/hooks/useBranding';
+import appLogo from '../../public/icon-512x512.png';
 
 type Stage = 'checking' | 'ready' | 'error';
 type ServiceStatus = 'waiting' | 'ok' | 'error';
@@ -21,6 +22,7 @@ interface ServiceState {
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
 const MAX_RETRIES = 25;       // 25 × 2 s = 50 s total wait
 const RETRY_INTERVAL_MS = 2000;
+const DEFAULT_LOGIN_BG = 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=1400&q=80';
 
 export default function SplashPage() {
   const router = useRouter();
@@ -117,7 +119,6 @@ export default function SplashPage() {
           align-items: center;
           justify-content: center;
           min-height: 100vh;
-          background: linear-gradient(145deg, ${BRANDING.darkColor} 0%, ${BRANDING.primaryColor} 55%, ${BRANDING.accentColor} 100%);
           font-family: 'Inter', sans-serif;
           color: white;
           padding: 24px;
@@ -125,16 +126,23 @@ export default function SplashPage() {
           overflow: hidden;
         }
 
-        /* Decorative blobs */
-        .blob {
+        .splash-bg {
           position: absolute;
-          border-radius: 50%;
-          filter: blur(90px);
-          opacity: 0.12;
-          pointer-events: none;
+          inset: -20px;
+          background-image: url('${BRANDING.loginBgPath || DEFAULT_LOGIN_BG}');
+          background-size: cover;
+          background-position: center;
+          filter: blur(12px);
+          z-index: 0;
+          transform: scale(1.05);
         }
-        .blob-1 { width: 420px; height: 420px; background: #25D366; top: -120px; right: -100px; }
-        .blob-2 { width: 320px; height: 320px; background: #128C7E; bottom: -90px; left: -90px; }
+
+        .splash-overlay {
+          position: absolute;
+          inset: 0;
+          background: linear-gradient(to bottom, rgba(0,0,0,0.4), rgba(0,0,0,0.7));
+          z-index: 0;
+        }
 
         .card {
           position: relative;
@@ -309,21 +317,17 @@ export default function SplashPage() {
       `}</style>
 
       <div className="splash-root">
-        <div className="blob blob-1" />
-        <div className="blob blob-2" />
+        <div className="splash-bg" />
+        <div className="splash-overlay" />
 
         <div className="card">
           {/* Logo & title */}
           <div className="logo-ring">
-            {BRANDING.logoPath ? (
-              <img
-                src={BRANDING.logoPath}
-                alt={BRANDING.appName}
-                style={{ width: '64px', height: '64px', objectFit: 'contain', borderRadius: '12px' }}
-              />
-            ) : (
-              <span>💬</span>
-            )}
+            <img
+              src={appLogo.src}
+              alt="App Logo"
+              style={{ width: '64px', height: '64px', objectFit: 'contain', borderRadius: '12px' }}
+            />
           </div>
           <div className="app-name">{BRANDING.appName}</div>
           <div className="app-tagline">{BRANDING.tagline}</div>

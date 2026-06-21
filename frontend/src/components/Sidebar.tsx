@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import appLogo from '../../public/icon-512x512.png';
 import { usePathname, useRouter } from 'next/navigation';
 import { useAuthStore } from '@/lib/store/authStore';
 import { useEffect, useState } from 'react';
@@ -32,6 +33,7 @@ const menuItems = [
   { href: '/reservations',  icon: CalendarDays,    label: 'Reservations' },
   { href: '/quick-replies', icon: Zap,             label: 'Quick Replies' },
   { href: '/menu',          icon: UtensilsCrossed, label: 'Menu' },
+  { href: '/templates',     icon: MessageCircle,   label: 'Templates' },
   { href: '/broadcasts',    icon: Megaphone,       label: 'Broadcasts' },
   { href: '/reports',       icon: BarChart3,       label: 'Reports' },
 ];
@@ -102,16 +104,13 @@ export function Sidebar() {
               flexShrink: 0,
               boxShadow: BRANDING ? `0 4px 12px ${BRANDING.primaryColor}4D` : 'none',
               overflow: 'hidden',
+              position: 'relative',
             }}>
-              {BRANDING?.logoPath ? (
-                <img
-                  src={BRANDING.logoPath}
-                  alt={BRANDING.appName}
-                  style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '12px' }}
-                />
-              ) : (
-                <MessageCircle size={20} color="white" />
-              )}
+              <img
+                src={appLogo.src}
+                alt="App Logo"
+                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+              />
             </div>
             <div>
               <div style={{ color: '#1a1a2e', fontWeight: '800', fontSize: '17px', letterSpacing: '-0.3px' }}>

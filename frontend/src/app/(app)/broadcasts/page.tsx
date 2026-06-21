@@ -7,7 +7,7 @@ import toast from 'react-hot-toast';
 import { format } from 'date-fns';
 import {
   Megaphone, FileText, Clock, Send, CheckCircle2, XCircle,
-  AlertTriangle, Trash2, Plus,
+  AlertTriangle, Trash2, Plus, Edit2
 } from 'lucide-react';
 
 const STATUS_MAP = {
@@ -24,6 +24,13 @@ function BroadcastModal({ broadcast, onClose, onSave }: any) {
   });
   const TAGS = ['Regular Customer', 'VIP Customer', 'Vegetarian', 'Birthday Customer', 'Catering Inquiry'];
 
+  const { data: templatesData, isLoading: templatesLoading } = useQuery({
+    queryKey: ['templates'],
+    queryFn: () => api.get('/api/messaging/templates').then(r => r.data)
+  });
+
+  const approvedTemplates = templatesData?.templates?.filter((t: any) => t.status === 'APPROVED') || [];
+
   const toggleTag = (tag: string) => {
     setForm((f: any) => ({
       ...f,
@@ -36,7 +43,7 @@ function BroadcastModal({ broadcast, onClose, onSave }: any) {
       <div className="modal-content" onClick={e => e.stopPropagation()}>
         <h3 style={{ margin: '0 0 20px', fontSize: '18px', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '10px' }}>
           <Megaphone size={20} style={{ color: '#1B5E37' }} />
-          New Broadcast Campaign
+          {broadcast ? 'Edit Broadcast Campaign' : 'New Broadcast Campaign'}
         </h3>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
           <div>
@@ -45,17 +52,35 @@ function BroadcastModal({ broadcast, onClose, onSave }: any) {
           </div>
           <div>
             <label style={{ fontSize: '13px', fontWeight: '500', color: '#374151', display: 'block', marginBottom: '6px' }}>Template Name *</label>
-            <input className="input-field" value={form.templateName} onChange={e => setForm({ ...form, templateName: e.target.value })} placeholder="hello_world (Meta approved template name)" />
+            <select
+              className="input-field"
+              value={form.templateName}
+              onChange={e => {
+                const selected = approvedTemplates.find((t: any) => t.name === e.target.value);
+                setForm({ ...form, templateName: e.target.value, templateLanguage: selected ? selected.language : form.templateLanguage });
+              }}
+            >
+              <option value="" disabled>Select a template</option>
+              {templatesLoading ? (
+                <option disabled>Loading templates...</option>
+              ) : approvedTemplates.length > 0 ? (
+                approvedTemplates.map((t: any) => (
+                  <option key={t.name} value={t.name}>{t.name} ({t.language})</option>
+                ))
+              ) : (
+                <option disabled>No approved templates found</option>
+              )}
+            </select>
             <p style={{ margin: '4px 0 0', fontSize: '11px', color: '#9ca3af' }}>Must be a Meta-approved template. Create at: business.facebook.com/wa/manage/message-templates</p>
           </div>
           <div>
             <label style={{ fontSize: '13px', fontWeight: '500', color: '#374151', display: 'block', marginBottom: '6px' }}>Language</label>
-            <select className="input-field" value={form.templateLanguage} onChange={e => setForm({ ...form, templateLanguage: e.target.value })}>
-              <option value="en">English</option>
-              <option value="en_US">English (US)</option>
-              <option value="hi">Hindi</option>
-              <option value="ar">Arabic</option>
-            </select>
+            <input 
+              className="input-field" 
+              value={form.templateLanguage} 
+              onChange={e => setForm({ ...form, templateLanguage: e.target.value })}
+              placeholder="e.g. en_US" 
+            />
           </div>
           <div>
             <label style={{ fontSize: '13px', fontWeight: '500', color: '#374151', display: 'block', marginBottom: '8px' }}>
@@ -81,7 +106,7 @@ function BroadcastModal({ broadcast, onClose, onSave }: any) {
         </div>
         <div style={{ display: 'flex', gap: '10px', marginTop: '24px', justifyContent: 'flex-end' }}>
           <button className="btn-secondary" onClick={onClose}>Cancel</button>
-          <button className="btn-primary" onClick={() => onSave(form)}>Create Campaign</button>
+          <button className="btn-primary" onClick={() => onSave(form)}>{broadcast ? 'Save Changes' : 'Create Campaign'}</button>
         </div>
       </div>
     </div>
@@ -90,7 +115,7 @@ function BroadcastModal({ broadcast, onClose, onSave }: any) {
 
 export default function BroadcastsPage() {
   const queryClient = useQueryClient();
-  const [modal, setModal] = useState(false);
+  const [modal, setModal] = useState<any>(null); // null, 'new', or broadcast object
 
   const { data: broadcasts, isLoading } = useQuery({
     queryKey: ['broadcasts'],
@@ -99,7 +124,12 @@ export default function BroadcastsPage() {
 
   const createMutation = useMutation({
     mutationFn: (d: any) => api.post('/api/broadcasts', d),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['broadcasts'] }); setModal(false); toast.success('Campaign created!'); },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['broadcasts'] }); setModal(null); toast.success('Campaign created!'); },
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: (d: any) => api.put(`/api/broadcasts/${d._id}`, d),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['broadcasts'] }); setModal(null); toast.success('Campaign updated!'); },
   });
 
   const sendMutation = useMutation({
@@ -121,7 +151,7 @@ export default function BroadcastsPage() {
             <h1 className="page-title">Broadcast Campaigns</h1>
             <p className="page-subtitle">Send promotional messages to your customers</p>
           </div>
-          <button className="btn-primary" onClick={() => setModal(true)}>
+          <button className="btn-primary" onClick={() => setModal('new')}>
             <Plus size={16} />
             New Campaign
           </button>
@@ -200,10 +230,15 @@ export default function BroadcastsPage() {
                       <td>
                         <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end' }}>
                           {b.status === 'draft' && (
-                            <button className="btn-primary" style={{ padding: '6px 12px', fontSize: '12px' }} onClick={() => { if (confirm(`Send to ${b.audienceTags?.join(', ') || 'all customers'}? This will send WhatsApp messages.`)) sendMutation.mutate(b._id); }}>
-                              <Send size={12} />
-                              Send
-                            </button>
+                            <>
+                              <button className="btn-secondary" style={{ padding: '6px 10px', fontSize: '12px' }} onClick={() => setModal(b)}>
+                                <Edit2 size={12} />
+                              </button>
+                              <button className="btn-primary" style={{ padding: '6px 12px', fontSize: '12px' }} onClick={() => { if (confirm(`Send to ${b.audienceTags?.join(', ') || 'all customers'}? This will send WhatsApp messages.`)) sendMutation.mutate(b._id); }}>
+                                <Send size={12} />
+                                Send
+                              </button>
+                            </>
                           )}
                           <button className="btn-danger" style={{ padding: '6px 10px', fontSize: '12px' }} onClick={() => { if (confirm('Delete?')) deleteMutation.mutate(b._id); }}>
                             <Trash2 size={12} />
@@ -220,7 +255,17 @@ export default function BroadcastsPage() {
       </div>
 
       {modal && (
-        <BroadcastModal onClose={() => setModal(false)} onSave={(form: any) => createMutation.mutate({ ...form, status: 'draft' })} />
+        <BroadcastModal 
+          broadcast={modal === 'new' ? null : modal} 
+          onClose={() => setModal(null)} 
+          onSave={(form: any) => {
+            if (form._id) {
+              updateMutation.mutate(form);
+            } else {
+              createMutation.mutate({ ...form, status: 'draft' });
+            }
+          }} 
+        />
       )}
     </div>
   );

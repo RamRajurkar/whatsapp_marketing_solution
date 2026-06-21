@@ -4,6 +4,7 @@ from pydantic import BaseModel
 from app.routes.auth import get_current_user
 from app.database import db
 from app.config import settings
+from app.utils.template_utils import build_template_components
 from datetime import datetime, timezone
 from bson import ObjectId
 import httpx
@@ -24,6 +25,11 @@ class SendTemplateInConvoRequest(BaseModel):
     templateName: str
     templateLanguage: str = "en_US"
     templateText: Optional[str] = None
+    templateComponents: Optional[List[dict]] = None  # Template component definitions from Meta API
+    headerMediaUrl: Optional[str] = None             # URL for image/video/document headers
+    headerMediaId: Optional[str] = None              # Media ID from WhatsApp API for image/video/document headers
+    bodyParams: Optional[List[str]] = None           # Values for body variables {{1}}, {{2}}, etc.
+    carouselCards: Optional[List[dict]] = None       # Per-card params: {mediaUrl, bodyParams}
 
 
 @router.get("/")
@@ -187,15 +193,29 @@ async def send_template_in_conversation(
             "Authorization": f"Bearer {wa_token}",
             "Content-Type":  "application/json",
         }
+        template_payload: dict = {
+            "name":     req.templateName,
+            "language": {"code": req.templateLanguage},
+        }
+
+        # Build components array for templates with media/variables/carousel
+        if req.templateComponents:
+            components = build_template_components(
+                template_components=req.templateComponents,
+                header_media_url=req.headerMediaUrl,
+                header_media_id=req.headerMediaId,
+                body_params=req.bodyParams,
+                carousel_cards=req.carouselCards,
+            )
+            if components:
+                template_payload["components"] = components
+
         payload = {
             "messaging_product": "whatsapp",
             "recipient_type":    "individual",
             "to":                customer_phone,
             "type":              "template",
-            "template": {
-                "name":     req.templateName,
-                "language": {"code": req.templateLanguage},
-            },
+            "template":          template_payload,
         }
 
         async with httpx.AsyncClient(timeout=30.0) as client:
