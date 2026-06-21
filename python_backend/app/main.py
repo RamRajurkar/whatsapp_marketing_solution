@@ -22,6 +22,19 @@ os.makedirs("uploads/branding", exist_ok=True)
 async def lifespan(app: FastAPI):
     # Startup
     await connect_to_mongo()
+
+    # Create MongoDB indexes for query performance
+    try:
+        await db.db.customers.create_index("tags")
+        await db.db.customers.create_index("phone", unique=True)
+        await db.db.messages.create_index("broadcastId")
+        await db.db.messages.create_index("conversationId")
+        await db.db.conversations.create_index("customerPhone", unique=True)
+        await db.db.conversations.create_index([("lastMessageTime", -1)])
+        print("MongoDB indexes created/verified")
+    except Exception as e:
+        print(f"Warning: Could not create some indexes: {e}")
+
     yield
     # Shutdown
     await close_mongo_connection()

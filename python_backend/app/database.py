@@ -1,6 +1,7 @@
 from motor.motor_asyncio import AsyncIOMotorClient
 from app.config import settings
 
+
 class DataBase:
     client: AsyncIOMotorClient = None
     db = None
@@ -19,3 +20,20 @@ async def close_mongo_connection():
     if db.client:
         db.client.close()
         print("MongoDB connection closed")
+
+
+def get_worker_db():
+    """
+    Create a standalone Motor client for use inside Celery workers.
+
+    Celery workers run in separate processes, so they cannot share
+    the FastAPI server's Motor client. This function creates a fresh
+    connection each time it's called. The caller is responsible for
+    closing the client when done.
+
+    Returns:
+        tuple: (client, database) — both Motor async objects.
+    """
+    client = AsyncIOMotorClient(settings.MONGODB_URI)
+    database = client[settings.DB_NAME]
+    return client, database

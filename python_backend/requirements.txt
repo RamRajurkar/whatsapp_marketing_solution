@@ -14,3 +14,4 @@ slowapi
 limits
 aiofiles
 pydantic[email]
+celery[redis]

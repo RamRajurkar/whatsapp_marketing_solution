@@ -1,21 +1,23 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '@/lib/api';
+import { getSocket } from '@/lib/socket';
 import toast from 'react-hot-toast';
 import { format } from 'date-fns';
 import {
   Megaphone, FileText, Clock, Send, CheckCircle2, XCircle,
-  AlertTriangle, Trash2, Plus, Edit2
+  AlertTriangle, Trash2, Plus, Edit2, Loader2
 } from 'lucide-react';
 
 const STATUS_MAP = {
   draft: { label: 'Draft', class: 'badge-draft', icon: FileText },
   scheduled: { label: 'Scheduled', class: 'badge-scheduled', icon: Clock },
-  sending: { label: 'Sending', class: 'badge-active', icon: Send },
+  sending: { label: 'Sending', class: 'badge-active', icon: Loader2 },
   sent: { label: 'Sent', class: 'badge-sent', icon: CheckCircle2 },
   failed: { label: 'Failed', class: 'badge-cancelled', icon: XCircle },
+  partial: { label: 'Partial', class: 'badge-scheduled', icon: AlertTriangle },
 };
 
 function BroadcastModal({ broadcast, onClose, onSave }: any) {
@@ -115,12 +117,34 @@ function BroadcastModal({ broadcast, onClose, onSave }: any) {
 
 export default function BroadcastsPage() {
   const queryClient = useQueryClient();
-  const [modal, setModal] = useState<any>(null); // null, 'new', or broadcast object
+  const [modal, setModal] = useState<any>(null);
+  const [progressMap, setProgressMap] = useState<Record<string, any>>({});
 
   const { data: broadcasts, isLoading } = useQuery({
     queryKey: ['broadcasts'],
     queryFn: () => api.get('/api/broadcasts').then(r => r.data),
   });
+
+  // Socket.IO for real-time broadcast progress
+  useEffect(() => {
+    const socket = getSocket();
+    socket.emit('join:broadcasts');
+
+    const handleProgress = (data: any) => {
+      setProgressMap(prev => ({ ...prev, [data.broadcastId]: data }));
+      // If broadcast finished, refresh the list
+      if (data.status && data.status !== 'sending') {
+        queryClient.invalidateQueries({ queryKey: ['broadcasts'] });
+      }
+    };
+
+    socket.on('broadcast:progress', handleProgress);
+
+    return () => {
+      socket.off('broadcast:progress', handleProgress);
+      socket.emit('leave:broadcasts');
+    };
+  }, [queryClient]);
 
   const createMutation = useMutation({
     mutationFn: (d: any) => api.post('/api/broadcasts', d),
@@ -218,10 +242,42 @@ export default function BroadcastsPage() {
                         </span>
                       </td>
                       <td>
-                        <div style={{ fontSize: '12px', color: '#6b7280', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                          {b.stats?.total > 0 ? (
-                            <><CheckCircle2 size={12} style={{ color: '#22C55E' }} /> {b.stats.sent} / {b.stats.total}</>
-                          ) : '—'}
+                        <div style={{ fontSize: '12px', color: '#6b7280' }}>
+                          {(() => {
+                            const progress = progressMap[b._id];
+                            const isSending = b.status === 'sending' || progress?.status === 'sending';
+                            const sent = progress?.sent ?? b.stats?.sent ?? 0;
+                            const failed = progress?.failed ?? b.stats?.failed ?? 0;
+                            const total = progress?.total ?? b.stats?.total ?? 0;
+                            const pct = total > 0 ? Math.round((sent + failed) / total * 100) : 0;
+
+                            if (isSending && total > 0) {
+                              return (
+                                <div style={{ minWidth: '140px' }}>
+                                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px', fontSize: '11px', fontWeight: '600' }}>
+                                    <span style={{ color: '#1B5E37' }}>{sent} sent</span>
+                                    <span style={{ color: '#6b7280' }}>{pct}%</span>
+                                  </div>
+                                  <div style={{ width: '100%', height: '6px', background: '#e5e7eb', borderRadius: '3px', overflow: 'hidden' }}>
+                                    <div style={{
+                                      width: `${pct}%`,
+                                      height: '100%',
+                                      background: 'linear-gradient(90deg, #1B5E37, #22C55E)',
+                                      borderRadius: '3px',
+                                      transition: 'width 0.5s ease',
+                                    }} />
+                                  </div>
+                                  {failed > 0 && (
+                                    <div style={{ fontSize: '10px', color: '#EF4444', marginTop: '2px' }}>{failed} failed</div>
+                                  )}
+                                </div>
+                              );
+                            }
+
+                            return total > 0 ? (
+                              <><CheckCircle2 size={12} style={{ color: '#22C55E', display: 'inline', verticalAlign: 'middle', marginRight: '4px' }} />{sent} / {total}</>
+                            ) : '—';
+                          })()}
                         </div>
                       </td>
                       <td style={{ color: '#6b7280', fontSize: '12px' }}>
