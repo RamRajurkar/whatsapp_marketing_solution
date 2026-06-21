@@ -231,7 +231,7 @@ async def send_template_in_conversation(
         "whatsappMessageId": message_id,
         "direction":         "outbound",
         "type":              "template",
-        "content":           {"text": display_text, "templateName": req.templateName, "mediaUrl": req.headerMediaUrl},
+        "content":           {"text": display_text, "templateName": req.templateName},
         "status":            "sent",
         "timestamp":         now,
         "createdAt":         now,
