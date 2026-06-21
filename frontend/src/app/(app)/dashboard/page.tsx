@@ -36,15 +36,20 @@ interface DashboardStats {
   recentConversations: any[];
 }
 
-function StatCard({ icon: Icon, label, value, color, subtitle, highlight }: any) {
+function StatCard({ icon: Icon, label, value, color, subtitle }: any) {
   return (
-    <div className={`stat-card ${highlight ? 'stat-highlight' : ''}`} style={{ animation: 'fadeIn 0.4s ease forwards' }}>
+    <div className="stat-card" style={{ 
+      animation: 'fadeIn 0.4s ease forwards',
+      border: `1.5px solid ${color}40`,
+      borderTop: `4px solid ${color}`,
+      boxShadow: `0 8px 24px ${color}15`
+    }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <div>
-          <p style={{ color: highlight ? 'rgba(255,255,255,0.75)' : '#6b7280', fontSize: '13px', fontWeight: '500', margin: '0 0 10px' }}>{label}</p>
-          <h3 style={{ fontSize: '34px', fontWeight: '800', margin: 0, color: highlight ? 'white' : '#1a1a2e', letterSpacing: '-1px', lineHeight: 1 }}>{value}</h3>
+          <p style={{ color: '#6b7280', fontSize: '13px', fontWeight: '600', margin: '0 0 10px' }}>{label}</p>
+          <h3 style={{ fontSize: '34px', fontWeight: '800', margin: 0, color: '#1a1a2e', letterSpacing: '-1px', lineHeight: 1 }}>{value}</h3>
           {subtitle && (
-            <div className="stat-trend" style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '10px', fontSize: '12px', color: highlight ? 'rgba(255,255,255,0.85)' : '#22C55E', fontWeight: '500' }}>
+            <div className="stat-trend" style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '10px', fontSize: '12px', color: color, fontWeight: '600' }}>
               <TrendingUp size={14} />
               <span>{subtitle}</span>
             </div>
@@ -52,11 +57,11 @@ function StatCard({ icon: Icon, label, value, color, subtitle, highlight }: any)
         </div>
         <div className="stat-icon-wrap" style={{
           width: '44px', height: '44px', borderRadius: '12px',
-          background: highlight ? 'rgba(255,255,255,0.2)' : `${color}12`,
+          background: `${color}15`,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          border: `1px solid ${highlight ? 'rgba(255,255,255,0.15)' : `${color}20`}`,
+          border: `1px solid ${color}30`,
         }}>
-          <ArrowUpRight size={20} style={{ color: highlight ? 'white' : color }} />
+          {Icon && <Icon size={22} style={{ color: color }} />}
         </div>
       </div>
     </div>
@@ -138,7 +143,6 @@ export default function DashboardPage() {
                 value={stats?.totalCustomers || 0}
                 color="#1B5E37"
                 subtitle="Increased from last month"
-                highlight
               />
               <StatCard
                 icon={UserPlus}
