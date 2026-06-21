@@ -438,8 +438,8 @@ export default function InboxPage() {
   return (
     <div style={{ display: 'flex', height: 'calc(100vh / 1.1 - 68px)', overflow: 'hidden' }}>
       {/* Chat List */}
-      <div style={{ width: '340px', borderRight: '1px solid #d1d5db', background: 'white', display: 'flex', flexDirection: 'column', flexShrink: 0, zIndex: 10 }}>
-        <div style={{ padding: '20px 16px 12px', borderBottom: '1px solid #d1d5db' }}>
+      <div style={{ width: '340px', borderRight: '1px solid #374151', background: 'white', display: 'flex', flexDirection: 'column', flexShrink: 0, zIndex: 10 }}>
+        <div style={{ padding: '20px 16px 12px', borderBottom: '1px solid #374151' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
             <h2 style={{ margin: 0, fontSize: '18px', fontWeight: '800', color: '#1a1a2e', display: 'flex', alignItems: 'center', gap: '8px' }}>
               <MessageSquare size={20} style={{ color: '#1B5E37' }} /> Inbox
@@ -504,7 +504,7 @@ export default function InboxPage() {
           </div>
         ) : (
           <>
-            <div style={{ background: 'white', padding: '14px 20px', borderBottom: '1px solid #d1d5db', display: 'flex', alignItems: 'center', gap: '12px', zIndex: 5 }}>
+            <div style={{ background: 'white', padding: '14px 20px', borderBottom: '1px solid #374151', display: 'flex', alignItems: 'center', gap: '12px', zIndex: 5 }}>
               {selectedConv && (<>
                 {(() => { const [bg, fg] = getAvatarColor(selectedConv.customerName); return <div className="avatar" style={{ background: bg, color: fg }}>{selectedConv.customerName?.[0]?.toUpperCase()}</div>; })()}
                 <div>
@@ -565,7 +565,7 @@ export default function InboxPage() {
                 </div>
               </div>
             )}
-            <div style={{ background: 'white', borderTop: '1px solid #d1d5db', padding: '12px 16px', zIndex: 5 }}>
+            <div style={{ background: 'white', borderTop: '1px solid #374151', padding: '12px 16px', zIndex: 5 }}>
               <form onSubmit={handleSend} style={{ display: 'flex', gap: '10px', alignItems: 'flex-end' }}>
                 <button type="button" onClick={() => setShowQuickReplies(!showQuickReplies)} style={{ padding: '10px', background: showQuickReplies ? '#E8F5E9' : '#f9fafb', border: `1px solid ${showQuickReplies ? '#A7D5B8' : '#e5e7eb'}`, borderRadius: '10px', cursor: 'pointer', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Zap size={18} style={{ color: showQuickReplies ? '#1B5E37' : '#6b7280' }} /></button>
                 <input type="file" ref={fileInputRef} style={{ display: 'none' }} accept="image/*,application/pdf" onChange={async (e) => { const file = e.target.files?.[0]; if (!file) return; toast('File upload requires Cloudinary setup.'); e.target.value = ''; }} />
