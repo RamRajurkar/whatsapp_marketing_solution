@@ -180,10 +180,17 @@ function SendTemplateModal({ conversationId, phone, customerName, onClose }: { c
         headerMediaId = uploadResp.data.id;
       }
 
+      let finalTemplateText = templateText;
+      if (finalTemplateText && bodyParams.length > 0) {
+        bodyParams.forEach((param, idx) => {
+          finalTemplateText = finalTemplateText.replace(new RegExp(`\\{\\{${idx + 1}\\}\\}`, 'g'), param);
+        });
+      }
+
       await api.post(`/api/conversations/${conversationId}/send-template`, {
         templateName,
         templateLanguage: templateLang,
-        templateText,
+        templateText: finalTemplateText || undefined,
         templateComponents: selectedComponents.length > 0 ? selectedComponents : undefined,
         headerMediaUrl: headerMediaUrl.trim() || undefined,
         headerMediaId: headerMediaId,
