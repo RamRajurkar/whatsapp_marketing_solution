@@ -436,7 +436,7 @@ export default function InboxPage() {
   const getMessageTime = (ts: string) => { try { return format(safeDate(ts), 'HH:mm'); } catch { return ''; } };
 
   return (
-    <div style={{ display: 'flex', height: 'calc(100vh / 1.1 - 68px)', overflow: 'hidden' }}>
+    <div style={{ display: 'flex', height: 'calc(100vh / 1.2 - 68px)', overflow: 'hidden' }}>
       {/* Chat List */}
       <div style={{ width: '340px', borderRight: '1px solid #374151', background: 'white', display: 'flex', flexDirection: 'column', flexShrink: 0, zIndex: 10 }}>
         <div style={{ padding: '20px 16px 12px', borderBottom: '1px solid #374151' }}>
