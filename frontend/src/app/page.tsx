@@ -4,6 +4,7 @@ import { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/lib/store/authStore';
 import { useBranding, defaultBranding } from '@/lib/hooks/useBranding';
+import { Server, Database, CheckCircle2, Loader2, AlertTriangle, RefreshCw } from 'lucide-react';
 import appLogo from '../../public/icon-512x512.png';
 
 type Stage = 'checking' | 'ready' | 'error';
@@ -200,11 +201,10 @@ export default function SplashPage() {
           display: flex;
           align-items: center;
           justify-content: center;
-          font-size: 18px;
+          background: rgba(255,255,255,0.1);
+          color: rgba(255,255,255,0.9);
           flex-shrink: 0;
         }
-        .service-icon.backend { background: rgba(59,130,246,0.25); }
-        .service-icon.mongodb { background: rgba(34,197,94,0.2); }
 
         .service-info { flex: 1; }
         .service-name { font-size: 13px; font-weight: 600; color: rgba(255,255,255,0.9); }
@@ -212,13 +212,13 @@ export default function SplashPage() {
 
         /* Status dot */
         .status-dot {
-          width: 10px;
-          height: 10px;
+          width: 8px;
+          height: 8px;
           border-radius: 50%;
           flex-shrink: 0;
         }
         .status-dot.waiting { background: rgba(255,255,255,0.3); }
-        .status-dot.ok      { background: #22C55E; box-shadow: 0 0 8px rgba(34,197,94,0.6); animation: glow 1.5s ease infinite; }
+        .status-dot.ok      { background: #ffffff; box-shadow: 0 0 8px rgba(255,255,255,0.8); animation: glow 1.5s ease infinite; }
         .status-dot.error   { background: #EF4444; box-shadow: 0 0 8px rgba(239,68,68,0.6); }
 
         @keyframes glow {
@@ -234,8 +234,8 @@ export default function SplashPage() {
           border-radius: 20px;
           flex-shrink: 0;
         }
-        .status-label.waiting { background: rgba(255,255,255,0.1); color: rgba(255,255,255,0.5); }
-        .status-label.ok      { background: rgba(34,197,94,0.2);   color: #86EFAC; }
+        .status-label.waiting { background: rgba(255,255,255,0.1); color: rgba(255,255,255,0.6); }
+        .status-label.ok      { background: rgba(255,255,255,0.15); color: #ffffff; }
         .status-label.error   { background: rgba(239,68,68,0.2);   color: #FCA5A5; }
 
         /* Mini spinner for waiting items */
@@ -282,8 +282,8 @@ export default function SplashPage() {
 
         /* Ready state */
         @keyframes pop { 0%{transform:scale(0.7);opacity:0} 80%{transform:scale(1.08)} 100%{transform:scale(1);opacity:1} }
-        .ready-icon  { font-size: 44px; animation: pop 0.4s ease forwards; margin-bottom: 14px; }
-        .ready-text  { font-size: 17px; font-weight: 700; color: #86EFAC; }
+        .ready-icon  { display: flex; justify-content: center; animation: pop 0.4s ease forwards; margin-bottom: 14px; color: white; }
+        .ready-text  { font-size: 16px; font-weight: 600; color: white; }
 
         /* Error state */
         .error-box   { text-align: center; width: 100%; }
@@ -297,7 +297,10 @@ export default function SplashPage() {
           border-radius: 12px;
           font-weight: 700;
           font-size: 15px;
-          cursor: pointer;
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          margin: 0 auto;
           transition: transform 0.15s, box-shadow 0.15s;
           font-family: 'Inter', sans-serif;
         }
@@ -336,18 +339,16 @@ export default function SplashPage() {
           {(stage === 'checking' || stage === 'error') && (
             <div className="services-panel">
               <ServiceRow
-                icon="⚡"
-                iconClass="backend"
+                icon={<Server size={18} strokeWidth={2.5} />}
                 name="Backend Server"
-                sub="FastAPI · Port 5000"
+                sub="System Core"
                 status={services.backend}
               />
               <div className="service-divider" />
               <ServiceRow
-                icon="🍃"
-                iconClass="mongodb"
-                name="MongoDB Database"
-                sub="Motor · Local Instance"
+                icon={<Database size={18} strokeWidth={2.5} />}
+                name="Database"
+                sub="Local Storage"
                 status={services.mongodb}
               />
             </div>
@@ -356,24 +357,34 @@ export default function SplashPage() {
           {/* Checking state */}
           {stage === 'checking' && (
             <>
+              <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', marginBottom: '6px' }}>
+                <span style={{ fontSize: '12px', fontWeight: '500', color: 'rgba(255,255,255,0.8)' }}>
+                  Loading System
+                </span>
+                <span style={{ fontSize: '12px', fontWeight: '600', color: 'white' }}>
+                  {Math.round(progressPct)}%
+                </span>
+              </div>
               <div className="progress-wrap">
                 <div className="progress-fill" style={{ width: `${progressPct}%` }} />
               </div>
-              <div className="status-text">Starting services{dots}</div>
             </>
           )}
 
           {/* Ready state */}
           {stage === 'ready' && (
             <>
-              <div className="ready-icon">✅</div>
-              <div className="ready-text">All systems ready! Launching…</div>
+              <div className="ready-icon"><CheckCircle2 size={48} strokeWidth={2} /></div>
+              <div className="ready-text">All systems ready! Launching...</div>
             </>
           )}
 
           {/* Error state */}
           {stage === 'error' && (
             <div className="error-box">
+              <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '12px', color: '#FCA5A5' }}>
+                <AlertTriangle size={36} />
+              </div>
               <div className="error-title">Startup Failed</div>
               <div className="error-sub">
                 {services.backend === 'error'
@@ -381,7 +392,7 @@ export default function SplashPage() {
                   : 'MongoDB is not responding.\nCheck if the mongo container is healthy.'}
               </div>
               <button className="retry-btn" onClick={handleRetry}>
-                🔄 Retry
+                <RefreshCw size={16} /> Retry Launch
               </button>
             </div>
           )}
@@ -396,33 +407,31 @@ export default function SplashPage() {
 // ── Service Row Component ───────────────────────────────────────────────────
 function ServiceRow({
   icon,
-  iconClass,
   name,
   sub,
   status,
 }: {
-  icon: string;
-  iconClass: string;
+  icon: React.ReactNode;
   name: string;
   sub: string;
   status: ServiceStatus;
 }) {
   const labelMap: Record<ServiceStatus, string> = {
-    waiting: 'Starting…',
+    waiting: 'Starting...',
     ok:      'Running',
     error:   'Failed',
   };
 
   return (
     <div className="service-row">
-      <div className={`service-icon ${iconClass}`}>{icon}</div>
+      <div className="service-icon">{icon}</div>
       <div className="service-info">
         <div className="service-name">{name}</div>
         <div className="service-sub">{sub}</div>
       </div>
       {/* Spinner while waiting, dot when resolved */}
       {status === 'waiting' ? (
-        <div className="mini-spin" />
+        <Loader2 className="mini-spin" size={14} style={{ border: 'none', animation: 'spin 2s linear infinite', color: 'rgba(255,255,255,0.7)' }} />
       ) : (
         <div className={`status-dot ${status}`} />
       )}
