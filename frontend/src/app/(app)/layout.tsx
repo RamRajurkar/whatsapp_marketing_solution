@@ -17,11 +17,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   if (!token) return null;
 
   return (
-    <div style={{ display: 'flex', zoom: 1.1, width: 'calc(100% / 1.1)' }}>
+    <div style={{ zoom: 1.1, width: 'calc(100vw / 1.1)', overflowX: 'hidden' }}>
       <Sidebar />
-      <main className="main-layout" style={{ flex: 1, minHeight: 'calc(100vh / 1.1)', display: 'flex', flexDirection: 'column', maxWidth: '100%', overflowX: 'hidden' }}>
+      <main className="main-layout" style={{ width: 'calc(100% - var(--sidebar-width))', minHeight: 'calc(100vh / 1.1)', display: 'flex', flexDirection: 'column' }}>
         <TopHeader />
-        <div style={{ flex: 1, maxWidth: '100%' }}>
+        <div style={{ flex: 1 }}>
           {children}
         </div>
       </main>
