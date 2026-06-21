@@ -54,6 +54,7 @@ services:
     ports:
       - "5000:5000"
     environment:
+      TZ: Asia/Kolkata
       PORT: 5000
       MONGODB_URI: mongodb://mongodb:27017
       DB_NAME: whatsapp_saas
@@ -102,6 +103,7 @@ services:
     restart: unless-stopped
     command: celery -A app.celery_app:celery_app worker --loglevel=info --concurrency=4 --max-memory-per-child=200000
     environment:
+      TZ: Asia/Kolkata
       MONGODB_URI: mongodb://mongodb:27017
       DB_NAME: whatsapp_saas
       REDIS_URL: redis://redis:6379/0
@@ -136,6 +138,8 @@ services:
     ports:
       - "3000:3000"
     environment:
+      TZ: Asia/Kolkata
+      PORT: 3000
       NEXT_PUBLIC_API_URL: http://localhost:5000
       NEXT_PUBLIC_SOCKET_URL: http://localhost:5000
     depends_on:
