@@ -11,7 +11,16 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { token } = useAuthStore();
 
   useEffect(() => {
-    if (!token) router.replace('/login');
+    if (!token) {
+      router.replace('/login');
+    } else {
+      // Zoom the entire body only when inside the authenticated dashboard to avoid breaking flex math
+      document.body.style.zoom = '1.1';
+    }
+
+    return () => {
+      document.body.style.zoom = '1';
+    };
   }, [token, router]);
 
   if (!token) return null;

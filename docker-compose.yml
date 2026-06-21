@@ -141,6 +141,7 @@ services:
       TZ: Asia/Kolkata
       PORT: 3000
       NEXT_PUBLIC_API_URL: http://localhost:5000
+      BACKEND_URL: http://backend:5000
       NEXT_PUBLIC_SOCKET_URL: http://localhost:5000
     depends_on:
       backend:

@@ -216,10 +216,8 @@ html, body {
 
 /* ============ MAIN LAYOUT ============ */
 .main-layout {
-  zoom: 1.1;
-  margin-left: calc(var(--sidebar-width) / 1.1);
-  width: calc((100% - var(--sidebar-width)) / 1.1);
-  min-height: calc(100vh / 1.1);
+  margin-left: var(--sidebar-width);
+  min-height: 100vh;
   background: var(--bg-primary);
 }
 
