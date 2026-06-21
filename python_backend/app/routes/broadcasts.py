@@ -135,6 +135,61 @@ async def send_broadcast(
             detail="No customers found for the selected audience",
         )
 
+    # Handle local media URLs that Meta cannot download
+    header_media_url = broadcast.get("headerMediaUrl")
+    header_media_id = broadcast.get("headerMediaId")
+
+    if header_media_url and ("localhost" in header_media_url or header_media_url.startswith("/uploads/")):
+        import os
+        import httpx
+        import mimetypes
+        filename = header_media_url.split("/")[-1]
+        local_path = os.path.join("uploads", "media", filename)
+        
+        if os.path.exists(local_path):
+            file_type, _ = mimetypes.guess_type(local_path)
+            file_type = file_type or "image/jpeg"
+            
+            try:
+                with open(local_path, "rb") as f:
+                    file_bytes = f.read()
+                
+                upload_url = f"https://graph.facebook.com/v19.0/{wa_phone_id}/media"
+                upload_files = {
+                    "file": (filename, file_bytes, file_type)
+                }
+                upload_data = {
+                    "messaging_product": "whatsapp"
+                }
+                upload_headers = {
+                    "Authorization": f"Bearer {wa_token}"
+                }
+                async with httpx.AsyncClient(timeout=60.0) as u_client:
+                    u_resp = await u_client.post(upload_url, headers=upload_headers, data=upload_data, files=upload_files)
+                    if u_resp.status_code in (200, 201):
+                        header_media_id = u_resp.json().get("id")
+                        header_media_url = None # Unset URL since we have ID
+                        # Persist to MongoDB
+                        await db.db.broadcasts.update_one(
+                            {"_id": obj_id},
+                            {"$set": {
+                                "headerMediaId": header_media_id,
+                                "headerMediaUrl": None
+                            }}
+                        )
+                    else:
+                        raise HTTPException(
+                            status_code=400,
+                            detail=f"Failed to auto-upload template media to WhatsApp API: {u_resp.text}"
+                        )
+            except Exception as e:
+                if isinstance(e, HTTPException):
+                    raise e
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"Error uploading media file: {str(e)}"
+                )
+
     # Mark as "sending" immediately for UI
     await db.db.broadcasts.update_one(
         {"_id": obj_id},
@@ -157,8 +212,8 @@ async def send_broadcast(
         template_name=broadcast["templateName"],
         template_lang=broadcast.get("templateLanguage", "en"),
         template_components=broadcast.get("templateComponents"),
-        header_media_url=broadcast.get("headerMediaUrl"),
-        header_media_id=broadcast.get("headerMediaId"),
+        header_media_url=header_media_url,
+        header_media_id=header_media_id,
         body_params=broadcast.get("bodyParams"),
         carousel_cards=broadcast.get("carouselCards"),
         audience_tags=audience_tags,

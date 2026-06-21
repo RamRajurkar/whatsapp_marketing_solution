@@ -205,8 +205,11 @@ async def send_template_direct(req: SendTemplateRequest, current_user: dict = De
                 upload_data = {
                     "messaging_product": "whatsapp"
                 }
+                upload_headers = {
+                    "Authorization": f"Bearer {wa_token}"
+                }
                 async with httpx.AsyncClient(timeout=60.0) as u_client:
-                    u_resp = await u_client.post(upload_url, headers=headers, data=upload_data, files=upload_files)
+                    u_resp = await u_client.post(upload_url, headers=upload_headers, data=upload_data, files=upload_files)
                     if u_resp.status_code in (200, 201):
                         final_header_id = u_resp.json().get("id")
                         final_header_url = None # Unset URL since we have ID

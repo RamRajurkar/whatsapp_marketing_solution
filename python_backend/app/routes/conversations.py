@@ -198,12 +198,46 @@ async def send_template_in_conversation(
             "language": {"code": req.templateLanguage},
         }
 
+        # Handle local media URLs that Meta cannot download
+        final_header_url = req.headerMediaUrl
+        final_header_id = req.headerMediaId
+
+        if final_header_url and ("localhost" in final_header_url or final_header_url.startswith("/uploads/")):
+            # It's a local file. We must upload it to Meta first to get a media_id
+            import os
+            filename = final_header_url.split("/")[-1]
+            local_path = os.path.join("uploads", "media", filename)
+            
+            if os.path.exists(local_path):
+                import mimetypes
+                file_type, _ = mimetypes.guess_type(local_path)
+                file_type = file_type or "image/jpeg"
+                
+                with open(local_path, "rb") as f:
+                    file_bytes = f.read()
+                
+                upload_url = f"https://graph.facebook.com/v19.0/{wa_phone_id}/media"
+                upload_files = {
+                    "file": (filename, file_bytes, file_type)
+                }
+                upload_data = {
+                    "messaging_product": "whatsapp"
+                }
+                upload_headers = {
+                    "Authorization": f"Bearer {wa_token}"
+                }
+                async with httpx.AsyncClient(timeout=60.0) as u_client:
+                    u_resp = await u_client.post(upload_url, headers=upload_headers, data=upload_data, files=upload_files)
+                    if u_resp.status_code in (200, 201):
+                        final_header_id = u_resp.json().get("id")
+                        final_header_url = None # Unset URL since we have ID
+
         # Build components array for templates with media/variables/carousel
         if req.templateComponents:
             components = build_template_components(
                 template_components=req.templateComponents,
-                header_media_url=req.headerMediaUrl,
-                header_media_id=req.headerMediaId,
+                header_media_url=final_header_url,
+                header_media_id=final_header_id,
                 body_params=req.bodyParams,
                 carousel_cards=req.carouselCards,
             )
