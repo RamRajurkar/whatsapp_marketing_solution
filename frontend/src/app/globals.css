@@ -133,9 +133,7 @@ html, body {
 /* ============ SIDEBAR ============ */
 .sidebar {
   background: var(--sidebar-bg);
-  height: 100vh;
-  position: sticky;
-  top: 0;
+  height: 100%;
   width: var(--sidebar-width);
   min-width: var(--sidebar-width);
   overflow-y: auto;
