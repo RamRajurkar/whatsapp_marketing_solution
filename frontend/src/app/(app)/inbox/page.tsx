@@ -425,6 +425,7 @@ export default function InboxPage() {
   const [newConvModal, setNewConvModal] = useState(false);
   const [templateModal, setTemplateModal] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -460,13 +461,21 @@ export default function InboxPage() {
   }, [queryClient]);
 
   useEffect(() => { if (selectedConvId) { getSocket().emit('join:conversation', selectedConvId); } }, [selectedConvId]);
-  useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messagesData]);
+  useEffect(() => { 
+    if (messagesContainerRef.current) {
+      messagesContainerRef.current.scrollTo({
+        top: messagesContainerRef.current.scrollHeight,
+        behavior: 'smooth'
+      });
+    }
+  }, [messagesData]);
 
   const selectedConv = convData?.conversations?.find((c: any) => c._id === selectedConvId);
   const messages = messagesData?.messages || [];
   const conversations = convData?.conversations || [];
-  const handleSend = (e: React.FormEvent) => { e.preventDefault(); if (!messageText.trim() || !selectedConvId) return; sendText.mutate(messageText.trim()); };
   
+  const handleSend = (e: React.FormEvent) => { e.preventDefault(); if (!messageText.trim() || !selectedConvId) return; sendText.mutate(messageText.trim()); };
+
   const safeDate = (ts: string) => {
     if (!ts) return new Date();
     // If string lacks a timezone offset (+00:00, -05:00, or Z), append Z so browser treats it as UTC
@@ -560,7 +569,7 @@ export default function InboxPage() {
                 </div>
               </>)}
             </div>
-            <div style={{ flex: 1, overflowY: 'auto', padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: '8px', backgroundColor: '#efeae2', backgroundImage: 'url("https://user-images.githubusercontent.com/15075759/28719144-86dc0f70-73b1-11e7-911d-60d70fcded21.png")', backgroundRepeat: 'repeat' }}>
+            <div ref={messagesContainerRef} style={{ flex: 1, overflowY: 'auto', padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: '8px', backgroundColor: '#efeae2', backgroundImage: 'url("https://user-images.githubusercontent.com/15075759/28719144-86dc0f70-73b1-11e7-911d-60d70fcded21.png")', backgroundRepeat: 'repeat' }}>
               {msgLoading ? <div style={{ textAlign: 'center', color: '#9ca3af', paddingTop: '40px' }}>Loading...</div>
               : messages.length === 0 ? <div style={{ textAlign: 'center', color: '#9ca3af', paddingTop: '60px' }}><Hand size={40} style={{ color: '#d1d5db', marginBottom: '12px' }} /><div>No messages yet. Send the first message!</div></div>
               : messages.map((msg: any) => (
