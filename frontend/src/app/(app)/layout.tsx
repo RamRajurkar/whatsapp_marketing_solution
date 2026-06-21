@@ -14,11 +14,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     if (!token) {
       router.replace('/login');
     } else {
-      document.body.style.zoom = '1.1';
       document.body.style.overflow = 'hidden';
     }
     return () => { 
-      document.body.style.zoom = ''; 
       document.body.style.overflow = ''; 
     };
   }, [token, router]);
