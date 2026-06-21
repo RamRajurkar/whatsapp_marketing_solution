@@ -426,13 +426,20 @@ export default function InboxPage() {
   const messages = messagesData?.messages || [];
   const conversations = convData?.conversations || [];
   const handleSend = (e: React.FormEvent) => { e.preventDefault(); if (!messageText.trim() || !selectedConvId) return; sendText.mutate(messageText.trim()); };
-  const getMessageTime = (ts: string) => { try { return format(new Date(ts), 'HH:mm'); } catch { return ''; } };
+  
+  const safeDate = (ts: string) => {
+    if (!ts) return new Date();
+    // If string lacks a timezone offset (+00:00, -05:00, or Z), append Z so browser treats it as UTC
+    return new Date(ts.endsWith('Z') || ts.includes('+') ? ts : ts + 'Z');
+  };
+
+  const getMessageTime = (ts: string) => { try { return format(safeDate(ts), 'HH:mm'); } catch { return ''; } };
 
   return (
     <div style={{ display: 'flex', height: 'calc(100vh / 1.1 - 68px)', overflow: 'hidden' }}>
       {/* Chat List */}
-      <div style={{ width: '340px', borderRight: '1px solid #e5e7eb', background: 'white', display: 'flex', flexDirection: 'column', flexShrink: 0 }}>
-        <div style={{ padding: '20px 16px 12px', borderBottom: '1px solid #f3f4f6' }}>
+      <div style={{ width: '340px', borderRight: '2px solid #e5e7eb', background: 'white', display: 'flex', flexDirection: 'column', flexShrink: 0 }}>
+        <div style={{ padding: '20px 16px 12px', borderBottom: '2px solid #f3f4f6' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
             <h2 style={{ margin: 0, fontSize: '18px', fontWeight: '800', color: '#1a1a2e', display: 'flex', alignItems: 'center', gap: '8px' }}>
               <MessageSquare size={20} style={{ color: '#1B5E37' }} /> Inbox
@@ -472,7 +479,7 @@ export default function InboxPage() {
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
                     <span style={{ fontWeight: '600', fontSize: '14px', color: '#1a1a2e', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '160px' }}>{conv.customerName}</span>
-                    <span style={{ fontSize: '11px', color: '#9ca3af', flexShrink: 0 }}>{conv.lastMessageTime ? format(new Date(conv.lastMessageTime), 'HH:mm') : ''}</span>
+                    <span style={{ fontSize: '11px', color: '#9ca3af', flexShrink: 0 }}>{conv.lastMessageTime ? format(safeDate(conv.lastMessageTime), 'HH:mm') : ''}</span>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '2px' }}>
                     <span style={{ fontSize: '12px', color: '#9ca3af', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '190px' }}>{conv.lastMessage || 'No messages'}</span>
@@ -497,7 +504,7 @@ export default function InboxPage() {
           </div>
         ) : (
           <>
-            <div style={{ background: 'white', padding: '14px 20px', borderBottom: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div style={{ background: 'white', padding: '14px 20px', borderBottom: '2px solid #e5e7eb', display: 'flex', alignItems: 'center', gap: '12px' }}>
               {selectedConv && (<>
                 {(() => { const [bg, fg] = getAvatarColor(selectedConv.customerName); return <div className="avatar" style={{ background: bg, color: fg }}>{selectedConv.customerName?.[0]?.toUpperCase()}</div>; })()}
                 <div>
@@ -558,7 +565,7 @@ export default function InboxPage() {
                 </div>
               </div>
             )}
-            <div style={{ background: 'white', borderTop: '1px solid #e5e7eb', padding: '12px 16px' }}>
+            <div style={{ background: 'white', borderTop: '2px solid #e5e7eb', padding: '12px 16px' }}>
               <form onSubmit={handleSend} style={{ display: 'flex', gap: '10px', alignItems: 'flex-end' }}>
                 <button type="button" onClick={() => setShowQuickReplies(!showQuickReplies)} style={{ padding: '10px', background: showQuickReplies ? '#E8F5E9' : '#f9fafb', border: `1px solid ${showQuickReplies ? '#A7D5B8' : '#e5e7eb'}`, borderRadius: '10px', cursor: 'pointer', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Zap size={18} style={{ color: showQuickReplies ? '#1B5E37' : '#6b7280' }} /></button>
                 <input type="file" ref={fileInputRef} style={{ display: 'none' }} accept="image/*,application/pdf" onChange={async (e) => { const file = e.target.files?.[0]; if (!file) return; toast('File upload requires Cloudinary setup.'); e.target.value = ''; }} />
