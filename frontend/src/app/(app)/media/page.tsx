@@ -9,6 +9,7 @@ import toast from 'react-hot-toast';
 export default function MediaPage() {
   const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
 
   const { data, isLoading } = useQuery({
     queryKey: ['media'],
@@ -71,7 +72,7 @@ export default function MediaPage() {
           style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', background: 'rgba(0,0,0,0.8)', zIndex: 9999, display: 'flex', justifyContent: 'center', alignItems: 'center', cursor: 'pointer' }}
           onClick={() => setPreviewImage(null)}
         >
-          <img src={previewImage} style={{ maxWidth: '90%', maxHeight: '90%', objectFit: 'contain' }} alt="Preview" />
+          <img src={previewImage} style={{ maxWidth: '90%', maxHeight: '90%', objectFit: 'contain', borderRadius: '8px' }} alt="Preview" />
         </div>
       )}
       <div style={{ padding: '32px 40px', maxWidth: '1200px', margin: '0 auto', width: '100%' }}>
@@ -118,9 +119,9 @@ export default function MediaPage() {
                 <div key={item._id} style={{ position: 'relative', borderRadius: '12px', overflow: 'hidden', border: '1px solid #e5e7eb', backgroundColor: '#f9fafb', group: 'true' }}>
                   <div style={{ paddingBottom: '100%', position: 'relative' }}>
                     <img 
-                      src={item.url} 
+                      src={`${API_BASE}${item.url}`} 
                       alt={item.filename} 
-                      onClick={() => setPreviewImage(item.url)}
+                      onClick={() => setPreviewImage(`${API_BASE}${item.url}`)}
                       style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', objectFit: 'cover', cursor: 'zoom-in' }} 
                     />
                   </div>

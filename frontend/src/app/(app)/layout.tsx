@@ -11,26 +11,17 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { token } = useAuthStore();
 
   useEffect(() => {
-    if (!token) {
-      router.replace('/login');
-    } else {
-      // Zoom the entire body only when inside the authenticated dashboard to avoid breaking flex math
-      document.body.style.zoom = '1.1';
-    }
-
-    return () => {
-      document.body.style.zoom = '1';
-    };
+    if (!token) router.replace('/login');
   }, [token, router]);
 
   if (!token) return null;
 
   return (
-    <div style={{ display: 'flex' }}>
+    <div style={{ display: 'flex', minHeight: '100vh', width: '100vw', overflow: 'hidden' }}>
       <Sidebar />
-      <main className="main-layout" style={{ display: 'flex', flexDirection: 'column' }}>
+      <main className="main-layout" style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, overflow: 'auto' }}>
         <TopHeader />
-        <div style={{ flex: 1 }}>
+        <div style={{ flex: 1, overflow: 'auto' }}>
           {children}
         </div>
       </main>

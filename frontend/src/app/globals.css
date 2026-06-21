@@ -133,11 +133,11 @@ html, body {
 /* ============ SIDEBAR ============ */
 .sidebar {
   background: var(--sidebar-bg);
-  height: calc(100vh / 1.1);
-  position: fixed;
-  left: 0;
+  height: 100vh;
+  position: sticky;
   top: 0;
   width: var(--sidebar-width);
+  min-width: var(--sidebar-width);
   overflow-y: auto;
   z-index: 40;
   border-right: 1px solid #374151;
@@ -216,7 +216,6 @@ html, body {
 
 /* ============ MAIN LAYOUT ============ */
 .main-layout {
-  margin-left: var(--sidebar-width);
   min-height: 100vh;
   background: var(--bg-primary);
 }
@@ -602,8 +601,9 @@ html, body {
 /* ============ DASHBOARD SPECIFIC ============ */
 .dashboard-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr 320px;
+  grid-template-columns: 1fr 1fr minmax(200px, 280px);
   gap: 20px;
+  overflow: hidden;
 }
 
 .dashboard-widget {
