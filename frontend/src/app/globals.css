@@ -1,14 +1,14 @@
 @import "tailwindcss";
 
 :root {
-  --brand-green: #1B5E37;
-  --brand-green-dark: #14432A;
-  --brand-green-light: #E8F5E9;
-  --brand-green-accent: #2E7D4F;
+  --brand-green: #4ade80;
+  --brand-green-dark: #22c55e;
+  --brand-green-light: #dcfce7;
+  --brand-green-accent: #16a34a;
   --sidebar-bg: #ffffff;
   --sidebar-hover: #f1f5f1;
-  --sidebar-active: #E8F5E9;
-  --sidebar-active-text: #1B5E37;
+  --sidebar-active: #dcfce7;
+  --sidebar-active-text: #16a34a;
   --card-bg: #ffffff;
   --bg-primary: #F4F6F8;
   --bg-secondary: #ffffff;
@@ -399,11 +399,11 @@ html, body {
 /* ============ BUTTONS ============ */
 .btn-primary {
   background: var(--brand-green);
-  color: white;
-  border: none;
+  color: #000000;
+  border: 2px solid #000000;
   padding: 10px 20px;
   border-radius: var(--radius-md);
-  font-weight: 600;
+  font-weight: 700;
   font-size: 14px;
   cursor: pointer;
   transition: all 0.15s ease;
@@ -415,7 +415,8 @@ html, body {
 
 .btn-primary:hover {
   background: var(--brand-green-dark);
-  box-shadow: 0 4px 12px rgba(27, 94, 55, 0.25);
+  box-shadow: 2px 2px 0px #000000;
+  transform: translate(-1px, -1px);
 }
 
 .btn-primary:active { transform: scale(0.98); }

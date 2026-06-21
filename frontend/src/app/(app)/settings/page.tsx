@@ -163,12 +163,6 @@ export default function SettingsPage() {
               <div><label style={{ fontSize: '13px', fontWeight: '500', color: '#374151', display: 'block', marginBottom: '6px' }}>Tagline</label><input className="input-field" value={brandingForm.tagline || ''} onChange={e => setBrandingForm({ ...brandingForm, tagline: e.target.value })} placeholder="WhatsApp Marketing Solution" /></div>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px' }}>
-              <div><label style={{ fontSize: '13px', fontWeight: '500', color: '#374151', display: 'block', marginBottom: '6px' }}>Primary Color</label><input type="color" className="input-field" style={{ padding: '4px', height: '44px', cursor: 'pointer' }} value={brandingForm.primaryColor || '#1B5E37'} onChange={e => setBrandingForm({ ...brandingForm, primaryColor: e.target.value })} /></div>
-              <div><label style={{ fontSize: '13px', fontWeight: '500', color: '#374151', display: 'block', marginBottom: '6px' }}>Accent Color</label><input type="color" className="input-field" style={{ padding: '4px', height: '44px', cursor: 'pointer' }} value={brandingForm.accentColor || '#2E7D4F'} onChange={e => setBrandingForm({ ...brandingForm, accentColor: e.target.value })} /></div>
-              <div><label style={{ fontSize: '13px', fontWeight: '500', color: '#374151', display: 'block', marginBottom: '6px' }}>Dark Color</label><input type="color" className="input-field" style={{ padding: '4px', height: '44px', cursor: 'pointer' }} value={brandingForm.darkColor || '#0d2b1a'} onChange={e => setBrandingForm({ ...brandingForm, darkColor: e.target.value })} /></div>
-            </div>
-
             {/* File Uploaders */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '16px', marginTop: '8px' }}>
               {/* Login BG Upload */}

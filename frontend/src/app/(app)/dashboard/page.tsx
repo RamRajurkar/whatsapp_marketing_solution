@@ -40,8 +40,7 @@ function StatCard({ icon: Icon, label, value, color, subtitle }: any) {
   return (
     <div className="stat-card" style={{ 
       animation: 'fadeIn 0.4s ease forwards',
-      border: `1.5px solid ${color}40`,
-      borderTop: `4px solid ${color}`,
+      border: `2px solid ${color}`,
       boxShadow: `0 8px 24px ${color}15`
     }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
