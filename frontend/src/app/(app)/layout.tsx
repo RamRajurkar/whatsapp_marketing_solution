@@ -11,16 +11,23 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { token } = useAuthStore();
 
   useEffect(() => {
-    if (!token) router.replace('/login');
+    if (!token) {
+      router.replace('/login');
+    } else {
+      document.body.style.zoom = '1.1';
+      document.body.style.overflow = 'hidden';
+    }
+    return () => { 
+      document.body.style.zoom = ''; 
+      document.body.style.overflow = ''; 
+    };
   }, [token, router]);
 
   if (!token) return null;
 
   return (
-    <>
-      <style>{`body { overflow: hidden !important; }`}</style>
-      <div style={{ zoom: 1.1, display: 'flex', height: 'calc(100vh / 1.1)', width: 'calc(100vw / 1.1)', overflow: 'hidden' }}>
-        <Sidebar />
+    <div style={{ display: 'flex', height: '100vh', width: '100vw', overflow: 'hidden' }}>
+      <Sidebar />
       <main className="main-layout" style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, height: '100%', overflow: 'hidden' }}>
         <TopHeader />
         <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden' }}>
@@ -28,6 +35,5 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         </div>
       </main>
     </div>
-    </>
   );
 }
