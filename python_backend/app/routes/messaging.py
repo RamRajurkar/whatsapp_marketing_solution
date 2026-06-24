@@ -184,10 +184,10 @@ async def send_template_direct(req: SendTemplateRequest, current_user: dict = De
         final_header_url = req.headerMediaUrl
         final_header_id = req.headerMediaId
 
-        if final_header_url and ("localhost" in final_header_url or final_header_url.startswith("/uploads/")):
+        if final_header_url and ("localhost" in final_header_url or "/uploads/" in final_header_url):
             # It's a local file. We must upload it to Meta first to get a media_id
             import os
-            filename = final_header_url.split("/")[-1]
+            filename = final_header_url.split("/")[-1].split("?")[0]
             local_path = os.path.join("uploads", "media", filename)
             
             if os.path.exists(local_path):
@@ -197,6 +197,10 @@ async def send_template_direct(req: SendTemplateRequest, current_user: dict = De
                 
                 with open(local_path, "rb") as f:
                     file_bytes = f.read()
+                
+                # Compress image if too large for WhatsApp (5 MB limit)
+                from app.utils.image_utils import compress_image_bytes
+                file_bytes, filename, file_type = compress_image_bytes(file_bytes, filename, file_type)
                 
                 upload_url = f"https://graph.facebook.com/v19.0/{wa_phone_id}/media"
                 upload_files = {
@@ -213,6 +217,10 @@ async def send_template_direct(req: SendTemplateRequest, current_user: dict = De
                     if u_resp.status_code in (200, 201):
                         final_header_id = u_resp.json().get("id")
                         final_header_url = None # Unset URL since we have ID
+                    else:
+                        raise HTTPException(status_code=400, detail=f"Failed to auto-upload template media to WhatsApp: {u_resp.text}")
+            else:
+                raise HTTPException(status_code=400, detail=f"Local media file not found: {local_path}")
 
         # Build components array for templates with media/variables/carousel
         if req.templateComponents:

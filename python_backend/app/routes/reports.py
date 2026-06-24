@@ -62,14 +62,27 @@ async def get_analytics(days: int = 7, current_user: dict = Depends(get_current_
     
     total_messages = sum(d["count"] for d in daily_messages)
     
-    total_broadcasts = await db.db.broadcasts.count_documents({"status": "completed"})
+    broadcast_stats = await db.db.broadcasts.aggregate([
+        {"$group": {
+            "_id": None,
+            "total_campaigns": {"$sum": 1},
+            "total_targets": {"$sum": "$stats.total"},
+            "total_sent": {"$sum": "$stats.sent"},
+            "total_failed": {"$sum": "$stats.failed"}
+        }}
+    ]).to_list(length=1)
     
+    bc_stats = broadcast_stats[0] if broadcast_stats else {"total_campaigns": 0, "total_targets": 0, "total_sent": 0, "total_failed": 0}
+
     return {
         "totals": {
             "messages": total_messages,
             "reservations": 0,
             "broadcasts": {
-                "sent": total_broadcasts
+                "total": bc_stats.get("total_targets", 0),
+                "sent": bc_stats.get("total_sent", 0),
+                "failed": bc_stats.get("total_failed", 0),
+                "campaigns": bc_stats.get("total_campaigns", 0)
             }
         },
         "dailyMessages": daily_messages

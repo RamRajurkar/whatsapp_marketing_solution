@@ -95,9 +95,9 @@ export default function DashboardPage() {
   const totalBroadcasts = analytics?.totals?.broadcasts?.sent || 0;
   const totalSum = totalMessages + totalReservations + totalBroadcasts || 1;
   const pieData = [
-    { name: 'Messages', value: totalMessages, color: '#1B5E37' },
-    { name: 'Reservations', value: totalReservations, color: '#2E7D4F' },
-    { name: 'Broadcasts', value: totalBroadcasts, color: '#93C5A4' },
+    { name: 'Messages', value: totalMessages, color: '#3b82f6' }, // Blue
+    { name: 'Reservations', value: totalReservations, color: '#f59e0b' }, // Amber
+    { name: 'Broadcasts', value: totalBroadcasts, color: '#8b5cf6' }, // Purple
   ];
   const completionPct = totalMessages > 0 ? Math.round((totalReservations / (totalMessages || 1)) * 100) : 0;
 

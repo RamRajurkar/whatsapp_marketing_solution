@@ -15,17 +15,17 @@ sio = socketio.AsyncServer(
 
 @sio.on('join:conversation')
 async def on_join_conversation(sid, conversation_id):
-    sio.enter_room(sid, conversation_id)
+    await sio.enter_room(sid, conversation_id)
 
 @sio.on('leave:conversation')
 async def on_leave_conversation(sid, conversation_id):
-    sio.leave_room(sid, conversation_id)
+    await sio.leave_room(sid, conversation_id)
 
 # Broadcast progress rooms
 @sio.on('join:broadcasts')
 async def on_join_broadcasts(sid, data=None):
-    sio.enter_room(sid, 'broadcasts')
+    await sio.enter_room(sid, 'broadcasts')
 
 @sio.on('leave:broadcasts')
 async def on_leave_broadcasts(sid, data=None):
-    sio.leave_room(sid, 'broadcasts')
+    await sio.leave_room(sid, 'broadcasts')

@@ -423,11 +423,13 @@
   width: 38px;
   height: 38px;
   border-radius: 10px;
-  background: #f3f4f6;
+  background: #f0f4f8;
+  border: 1px solid #e2e8f0;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #6b7280;
+  color: #475569;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .tpl-card:hover .tpl-card-icon-wrap {

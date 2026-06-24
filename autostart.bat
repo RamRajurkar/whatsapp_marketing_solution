@@ -3,6 +3,13 @@ title RestoChat — AutoStart
 :: This script is called by Windows Task Scheduler on every login.
 :: It intelligently waits for Docker Desktop to be ready before launching.
 
+:: ── Check if Docker Desktop is running ───────────────────────────────────────
+docker info >nul 2>&1
+if %errorlevel% neq 0 (
+    echo Docker Desktop is not running. Starting it...
+    start "" "C:\Program Files\Docker\Docker\Docker Desktop.exe"
+)
+
 :: ── Smart-wait for Docker: poll every 5s instead of a blind timeout ──────────
 echo Waiting for Docker Desktop to start...
 set MAX_RETRIES=24

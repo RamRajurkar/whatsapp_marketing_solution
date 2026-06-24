@@ -24,9 +24,9 @@ REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
 
 # Concurrency controls
 SEMAPHORE_LIMIT = 10     # Max simultaneous WhatsApp API calls
-CHUNK_SIZE = 50          # Process customers in batches of 50
-DB_BATCH_SIZE = 100      # Batch DB inserts
-PROGRESS_INTERVAL = 50   # Emit progress every N messages
+CHUNK_SIZE = 10          # Process customers in batches of 10 for more live feedback
+DB_BATCH_SIZE = 50       # Batch DB inserts
+PROGRESS_INTERVAL = 10   # Emit progress every N messages
 
 
 def _now():
@@ -278,6 +278,9 @@ async def _async_send_broadcast(
                             message_batch.append(msg_doc)
                         else:
                             failed_count += 1
+                            
+                    # Emit progress for the partial chunk
+                    await _emit_progress(sio_mgr, database, obj_id, broadcast_id, sent_count, failed_count, total_count)
 
         # ── Flush remaining messages ─────────────────────────────────────
         if message_batch:

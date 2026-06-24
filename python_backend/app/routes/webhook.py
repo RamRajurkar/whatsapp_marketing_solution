@@ -28,6 +28,7 @@ def _now():
 
 
 @router.get("/")
+@router.get("")
 async def verify_webhook(request: Request):
     """Handle Meta webhook verification challenge."""
     mode      = request.query_params.get("hub.mode")
@@ -50,6 +51,7 @@ async def verify_webhook(request: Request):
 
 
 @router.post("/")
+@router.post("")
 async def receive_webhook(request: Request):
     """Handle incoming messages and delivery statuses from WhatsApp."""
 
@@ -85,11 +87,21 @@ async def receive_webhook(request: Request):
                             int(msg.get("timestamp", _now().timestamp()))
                         ).replace(tzinfo=timezone.utc)
                         msg_type      = msg.get("type")
-                        text_content  = (
-                            msg.get("text", {}).get("body", "")
-                            if msg_type == "text"
-                            else f"[{msg_type} message]"
-                        )
+
+                        # Extract text content based on message type
+                        if msg_type == "text":
+                            text_content = msg.get("text", {}).get("body", "")
+                        elif msg_type == "interactive":
+                            # Button reply — extract the button title the user tapped
+                            interactive_data = msg.get("interactive", {})
+                            if interactive_data.get("type") == "button_reply":
+                                text_content = interactive_data.get("button_reply", {}).get("title", "[button reply]")
+                            elif interactive_data.get("type") == "list_reply":
+                                text_content = interactive_data.get("list_reply", {}).get("title", "[list reply]")
+                            else:
+                                text_content = "[interactive message]"
+                        else:
+                            text_content = f"[{msg_type} message]"
 
                         # Find or create conversation
                         conversation = await db.db.conversations.find_one(
@@ -144,6 +156,113 @@ async def receive_webhook(request: Request):
                         }
                         await sio.emit("message:new", emit_doc, room=conv_id)
                         await sio.emit("conversation:updated", {"conversationId": conv_id})
+
+                        # ── Bot Logic ─────────────────────────────────────────
+                        try:
+                            bot_settings = await db.db.bot_settings.find_one({})
+                            if bot_settings and bot_settings.get("isActive"):
+                                import httpx
+                                user = await db.db.users.find_one({})
+                                wa_token = user.get("waAccessToken") if user else None
+                                wa_token = wa_token or settings.WA_ACCESS_TOKEN
+                                
+                                wa_phone_id = user.get("waPhoneNumberId") if user else None
+                                wa_phone_id = wa_phone_id or settings.WA_PHONE_NUMBER_ID
+                                
+                                api_version = settings.WA_API_VERSION
+                                if wa_token and wa_phone_id:
+                                    url = f"https://graph.facebook.com/{api_version}/{wa_phone_id}/messages"
+                                    headers = {"Authorization": f"Bearer {wa_token}", "Content-Type": "application/json"}
+                                    
+                                    bot_reply_text = None
+                                    payload = None
+
+                                    # 1. Greeting trigger
+                                    if msg_type == "text":
+                                        lower_text = text_content.lower().strip()
+                                        if lower_text in ["hi", "hello", "hey", "start", "menu", "help"]:
+                                            bot_reply_text = bot_settings.get("welcomeMessage", "Welcome!")
+                                            payload = {
+                                                "messaging_product": "whatsapp",
+                                                "recipient_type": "individual",
+                                                "to": phone_number,
+                                                "type": "interactive",
+                                                "interactive": {
+                                                    "type": "button",
+                                                    "body": {"text": bot_reply_text},
+                                                    "action": {
+                                                        "buttons": [
+                                                            {"type": "reply", "reply": {"id": "btn_address", "title": "📍 Address"}},
+                                                            {"type": "reply", "reply": {"id": "btn_menu", "title": "📜 Menu"}},
+                                                            {"type": "reply", "reply": {"id": "btn_timings", "title": "🕒 Timings"}}
+                                                        ]
+                                                    }
+                                                }
+                                            }
+
+                                    # 2. Button click handler
+                                    elif msg_type == "interactive":
+                                        interactive_data = msg.get("interactive", {})
+                                        if interactive_data.get("type") == "button_reply":
+                                            btn_id = interactive_data.get("button_reply", {}).get("id")
+                                            
+                                            if btn_id == "btn_address":
+                                                bot_reply_text = bot_settings.get("addressText", "Address not set.")
+                                            elif btn_id == "btn_menu":
+                                                menu_url = bot_settings.get("menuUrl", "")
+                                                bot_reply_text = f"Here is our menu:\n{menu_url}" if menu_url else "Menu not available right now."
+                                            elif btn_id == "btn_timings":
+                                                bot_reply_text = bot_settings.get("timingsText", "Timings not set.")
+                                                
+                                            if bot_reply_text:
+                                                payload = {
+                                                    "messaging_product": "whatsapp",
+                                                    "recipient_type": "individual",
+                                                    "to": phone_number,
+                                                    "type": "text",
+                                                    "text": {"preview_url": True, "body": bot_reply_text}
+                                                }
+
+                                    # Send the bot response
+                                    if payload:
+                                        print(f"[BOT] Sending auto-reply to {phone_number}: {bot_reply_text[:50]}...")
+                                        async with httpx.AsyncClient(timeout=30.0) as client:
+                                            resp = await client.post(url, json=payload, headers=headers)
+                                            if resp.status_code in (200, 201):
+                                                wa_msg_id = resp.json().get("messages", [{}])[0].get("id", "unknown")
+                                                outbound_doc = {
+                                                    "conversationId": conv_id,
+                                                    "whatsappMessageId": wa_msg_id,
+                                                    "direction": "outbound",
+                                                    "type": payload["type"],
+                                                    "content": {"text": bot_reply_text},
+                                                    "status": "sent",
+                                                    "timestamp": _now(),
+                                                    "createdAt": _now(),
+                                                }
+                                                await db.db.messages.insert_one(outbound_doc)
+                                                
+                                                outbound_doc["_id"] = str(outbound_doc["_id"])
+                                                outbound_doc["timestamp"] = outbound_doc["timestamp"].isoformat()
+                                                outbound_doc["createdAt"] = outbound_doc["createdAt"].isoformat()
+                                                
+                                                # Emit to frontend
+                                                await sio.emit("message:new", outbound_doc, room=conv_id)
+                                                
+                                                # Update conversation last message
+                                                from bson import ObjectId as BsonObjectId
+                                                conv_oid = BsonObjectId(conv_id)
+                                                await db.db.conversations.update_one(
+                                                    {"_id": conv_oid},
+                                                    {"$set": {"lastMessage": bot_reply_text, "lastMessageTime": _now()}}
+                                                )
+                                                await sio.emit("conversation:updated", {"conversationId": conv_id})
+                                                print(f"[BOT] Auto-reply sent successfully: {wa_msg_id}")
+                                            else:
+                                                print(f"[BOT] Auto-reply FAILED: {resp.status_code} {resp.text}")
+                        except Exception as bot_err:
+                            # Never let bot errors break the webhook — log and continue
+                            print(f"[BOT ERROR] {bot_err}")
 
                 # ── Delivery / read statuses ──────────────────────────────────
                 elif "statuses" in value:

@@ -349,10 +349,11 @@ export default function TemplatesPage() {
               {/* Card Header */}
               <div className="tpl-card-top">
                 <div className="tpl-card-icon-wrap">
-                  {headerFormat === 'IMAGE' && <ImageIcon size={18} />}
-                  {headerFormat === 'VIDEO' && <Video size={18} />}
-                  {headerFormat === 'DOCUMENT' && <FileDown size={18} />}
-                  {!headerFormat && <MessageSquare size={18} />}
+                  {headerFormat === 'IMAGE' ? <ImageIcon size={18} /> :
+                   headerFormat === 'VIDEO' ? <Video size={18} /> :
+                   headerFormat === 'DOCUMENT' ? <FileDown size={18} /> :
+                   headerFormat === 'TEXT' ? <FileText size={18} /> :
+                   <MessageSquare size={18} />}
                 </div>
                 <span className={`tpl-status-badge ${statusCfg.className}`}>
                   {statusCfg.label}

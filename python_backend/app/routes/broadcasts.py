@@ -139,11 +139,11 @@ async def send_broadcast(
     header_media_url = broadcast.get("headerMediaUrl")
     header_media_id = broadcast.get("headerMediaId")
 
-    if header_media_url and ("localhost" in header_media_url or header_media_url.startswith("/uploads/")):
+    if header_media_url and ("localhost" in header_media_url or "/uploads/" in header_media_url):
         import os
         import httpx
         import mimetypes
-        filename = header_media_url.split("/")[-1]
+        filename = header_media_url.split("/")[-1].split("?")[0]
         local_path = os.path.join("uploads", "media", filename)
         
         if os.path.exists(local_path):
@@ -153,6 +153,10 @@ async def send_broadcast(
             try:
                 with open(local_path, "rb") as f:
                     file_bytes = f.read()
+                
+                # Compress image if too large for WhatsApp (5 MB limit)
+                from app.utils.image_utils import compress_image_bytes
+                file_bytes, filename, file_type = compress_image_bytes(file_bytes, filename, file_type)
                 
                 upload_url = f"https://graph.facebook.com/v19.0/{wa_phone_id}/media"
                 upload_files = {

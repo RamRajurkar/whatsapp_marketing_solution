@@ -43,7 +43,7 @@ export default function ReportsPage() {
             { icon: Users, label: 'Total Customers', value: dashboard?.totalCustomers || 0, color: '#1B5E37', bg: '#E8F5E9' },
             { icon: MessageSquare, label: 'Total Messages', value: data?.totals?.messages || 0, color: '#1D4ED8', bg: '#DBEAFE' },
             { icon: CalendarDays, label: 'Total Reservations', value: data?.totals?.reservations || 0, color: '#B45309', bg: '#FEF3C7' },
-            { icon: Megaphone, label: 'Broadcasts Sent', value: data?.totals?.broadcasts?.sent || 0, color: '#6D28D9', bg: '#EDE9FE' },
+            { icon: Megaphone, label: 'Broadcasts Sent', value: data?.totals?.broadcasts?.campaigns || 0, color: '#6D28D9', bg: '#EDE9FE' },
           ].map(stat => {
             const Icon = stat.icon;
             return (

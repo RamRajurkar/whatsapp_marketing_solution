@@ -29,20 +29,126 @@ function getAvatarColor(name: string) {
 
 
 function NewConversationModal({ onClose, onCreated }: { onClose: () => void; onCreated: (convId: string) => void }) {
+  const queryClient = useQueryClient();
+  const [mode, setMode] = useState<'text' | 'template'>('text');
   const [phone, setPhone] = useState('');
   const [text, setText] = useState('');
   const [sending, setSending] = useState(false);
 
+  // Template state
+  const [templateName, setTemplateName] = useState('');
+  const [templateLang, setTemplateLang] = useState('en_US');
+  const [templateText, setTemplateText] = useState('');
+  const [headerMediaUrl, setHeaderMediaUrl] = useState('');
+  const [headerMediaFile, setHeaderMediaFile] = useState<File | null>(null);
+  const [bodyParams, setBodyParams] = useState<string[]>([]);
+  const [carouselCards, setCarouselCards] = useState<{ mediaUrl: string; bodyParams: string[] }[]>([]);
+
+  const { data: templatesData } = useQuery({
+    queryKey: ['templates'],
+    queryFn: () => api.get('/api/messaging/templates').then(r => r.data),
+  });
+  const { data: mediaData } = useQuery({
+    queryKey: ['media'],
+    queryFn: () => api.get('/api/media').then(r => r.data),
+  });
+
+  const templates = templatesData?.templates || [];
+  const mediaList = mediaData?.media || [];
+
+  const selectedTemplate = templates.find((t: any) => t.name === templateName);
+  const selectedComponents: any[] = selectedTemplate?.components || [];
+  const headerComp = selectedComponents.find((c: any) => c.type === 'HEADER');
+  const bodyComp = selectedComponents.find((c: any) => c.type === 'BODY');
+  const carouselComp = selectedComponents.find((c: any) => c.type === 'CAROUSEL');
+
+  const needsHeaderMedia = headerComp && ['IMAGE', 'VIDEO', 'DOCUMENT'].includes(headerComp.format);
+  const bodyVarSlots = bodyComp?.text?.match(/\{\{\d+\}\}/g) || [];
+  const needsBodyParams = bodyVarSlots.length > 0;
+
+  const handleTemplateSelect = (name: string) => {
+    const selected = templates.find((t: any) => t.name === name);
+    setTemplateName(name);
+    setTemplateText('');
+    setHeaderMediaUrl('');
+    setHeaderMediaFile(null);
+    setBodyParams([]);
+    setCarouselCards([]);
+
+    if (selected?.language) setTemplateLang(selected.language);
+    if (selected?.components) {
+      const body = selected.components.find((c: any) => c.type === 'BODY');
+      if (body?.text) setTemplateText(body.text);
+
+      const vars = body?.text?.match(/\{\{\d+\}\}/g) || [];
+      if (vars.length > 0) setBodyParams(new Array(vars.length).fill(''));
+
+      const carousel = selected.components.find((c: any) => c.type === 'CAROUSEL');
+      if (carousel?.cards?.length) {
+        setCarouselCards(
+          carousel.cards.map((card: any) => {
+            const cardBody = card.components?.find((c: any) => c.type === 'BODY');
+            const cardVars = cardBody?.text?.match(/\{\{\d+\}\}/g) || [];
+            return { mediaUrl: '', bodyParams: new Array(cardVars.length).fill('') };
+          })
+        );
+      }
+    }
+  };
+
   const handleSend = async () => {
-    if (!phone.trim() || !text.trim()) return;
+    const cleanPhone = phone.trim().replace('+', '').replace(/\s/g, '');
+    if (!cleanPhone) return;
+    if (mode === 'text' && !text.trim()) return;
+    if (mode === 'template' && !templateName.trim()) return;
+
+    if (mode === 'template' && needsHeaderMedia && !headerMediaUrl.trim() && !headerMediaFile) {
+      toast.error('Please provide the header media URL or upload a file');
+      return;
+    }
+
     setSending(true);
     try {
-      const resp = await api.post('/api/messaging/send-text', {
-        phone: phone.trim().replace('+', '').replace(/\s/g, ''),
-        text: text.trim(),
-      });
-      toast.success('Message sent!');
-      onCreated(resp.data.conversationId);
+      if (mode === 'text') {
+        const resp = await api.post('/api/messaging/send-text', {
+          phone: cleanPhone,
+          text: text.trim(),
+        });
+        toast.success('Message sent!');
+        onCreated(resp.data.conversationId);
+      } else {
+        let finalHeaderId = undefined;
+        if (headerMediaFile) {
+          const formData = new FormData();
+          formData.append('file', headerMediaFile);
+          const uploadResp = await api.post('/api/messaging/upload-media', formData, {
+            headers: { 'Content-Type': 'multipart/form-data' }
+          });
+          finalHeaderId = uploadResp.data.id;
+        }
+
+        let finalTemplateText = templateText;
+        if (finalTemplateText && bodyParams.length > 0) {
+          bodyParams.forEach((param, idx) => {
+            finalTemplateText = finalTemplateText.replace(new RegExp(`\\{\\{${idx + 1}\\}\\}`, 'g'), param);
+          });
+        }
+
+        const resp = await api.post('/api/messaging/send-template', {
+          phone: cleanPhone,
+          templateName,
+          templateLanguage: templateLang,
+          templateText: finalTemplateText || undefined,
+          templateComponents: selectedComponents.length > 0 ? selectedComponents : undefined,
+          headerMediaUrl: headerMediaUrl.trim() || undefined,
+          headerMediaId: finalHeaderId,
+          bodyParams: bodyParams.length > 0 ? bodyParams : undefined,
+          carouselCards: carouselCards.length > 0 ? carouselCards : undefined,
+        });
+        toast.success('Template sent!');
+        onCreated(resp.data.conversationId);
+      }
+      queryClient.invalidateQueries({ queryKey: ['conversations'] });
     } catch (err: any) {
       toast.error(err.response?.data?.detail || 'Failed to send');
     } finally {
@@ -52,7 +158,7 @@ function NewConversationModal({ onClose, onCreated }: { onClose: () => void; onC
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '440px' }}>
+      <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '540px', maxHeight: '85vh', overflowY: 'auto' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
           <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '10px' }}>
             <MessageSquare size={18} style={{ color: '#1B5E37' }} />
@@ -62,6 +168,7 @@ function NewConversationModal({ onClose, onCreated }: { onClose: () => void; onC
             <X size={20} />
           </button>
         </div>
+
         <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
           <div>
             <label style={{ fontSize: '13px', fontWeight: '500', color: '#374151', display: 'block', marginBottom: '6px' }}>WhatsApp Number *</label>
@@ -70,14 +177,184 @@ function NewConversationModal({ onClose, onCreated }: { onClose: () => void; onC
               <input className="input-field" value={phone} onChange={e => setPhone(e.target.value.replace(/\D/g, ''))} placeholder="9876543210" style={{ flex: 1 }} maxLength={10} />
             </div>
           </div>
-          <div>
-            <label style={{ fontSize: '13px', fontWeight: '500', color: '#374151', display: 'block', marginBottom: '6px' }}>Message *</label>
-            <textarea className="input-field" value={text} onChange={e => setText(e.target.value)} placeholder="Type your first message..." rows={3} style={{ resize: 'none', fontFamily: 'Inter, sans-serif' }} />
+
+          <div style={{ display: 'flex', gap: '0', marginTop: '4px', background: '#f3f4f6', borderRadius: '10px', padding: '3px' }}>
+            <button onClick={() => setMode('text')} style={{ flex: 1, padding: '8px 16px', borderRadius: '8px', border: 'none', cursor: 'pointer', fontSize: '13px', fontWeight: '600', fontFamily: 'Inter, sans-serif', transition: 'all 0.15s', background: mode === 'text' ? 'white' : 'transparent', color: mode === 'text' ? '#1B5E37' : '#6b7280', boxShadow: mode === 'text' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+              <MessageSquare size={14} /> Text Message
+            </button>
+            <button onClick={() => setMode('template')} style={{ flex: 1, padding: '8px 16px', borderRadius: '8px', border: 'none', cursor: 'pointer', fontSize: '13px', fontWeight: '600', fontFamily: 'Inter, sans-serif', transition: 'all 0.15s', background: mode === 'template' ? 'white' : 'transparent', color: mode === 'template' ? '#1B5E37' : '#6b7280', boxShadow: mode === 'template' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+              <FileText size={14} /> Template Message
+            </button>
           </div>
+
+          {mode === 'text' ? (
+            <div>
+              <label style={{ fontSize: '13px', fontWeight: '500', color: '#374151', display: 'block', marginBottom: '6px' }}>Message *</label>
+              <textarea className="input-field" value={text} onChange={e => setText(e.target.value)} placeholder="Type your first message..." rows={3} style={{ resize: 'none', fontFamily: 'Inter, sans-serif' }} />
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              <div>
+                <label style={{ fontSize: '13px', fontWeight: '500', color: '#374151', display: 'block', marginBottom: '6px' }}>Select Template *</label>
+                {templates.length > 0 ? (
+                  <select className="input-field" style={{ padding: '10px 14px', fontSize: '14px', backgroundColor: '#f9fafb', cursor: 'pointer' }} value={templateName} onChange={e => handleTemplateSelect(e.target.value)}>
+                    <option value="">✨ Choose a template...</option>
+                    {templates.map((t: any) => (
+                      <option key={t.name + t.language} value={t.name}>{t.name} — {t.category || 'MARKETING'} ({t.status})</option>
+                    ))}
+                  </select>
+                ) : (
+                  <input className="input-field" value={templateName} onChange={e => setTemplateName(e.target.value)} placeholder="hello_world" />
+                )}
+              </div>
+              
+              {templateName && (
+                <div>
+                  <label style={{ fontSize: '13px', fontWeight: '500', color: '#374151', display: 'block', marginBottom: '6px' }}>Language</label>
+                  <select className="input-field" value={templateLang} onChange={e => setTemplateLang(e.target.value)}>
+                    <option value="en_US">English (US)</option>
+                    <option value="en">English</option>
+                    <option value="en_GB">English (UK)</option>
+                    <option value="hi">Hindi</option>
+                    <option value="ar">Arabic</option>
+                  </select>
+                </div>
+              )}
+
+              {needsHeaderMedia && (
+                <div style={{ background: '#f8fafc', padding: '16px', borderRadius: '12px', border: '1px dashed #cbd5e1' }}>
+                  <label style={{ fontSize: '14px', fontWeight: '600', color: '#1e293b', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '12px' }}>
+                    {headerComp.format === 'IMAGE' ? '🖼️ Header Image' : headerComp.format === 'VIDEO' ? '🎬 Header Video' : '📄 Header Document'}
+                  </label>
+                  
+                  {headerComp.format === 'IMAGE' && mediaList.length > 0 && (
+                    <div style={{ marginBottom: '16px' }}>
+                      <label style={{ fontSize: '13px', color: '#475569', display: 'block', marginBottom: '8px', fontWeight: '500' }}>Select from Media Library</label>
+                      <div style={{ display: 'flex', gap: '10px', overflowX: 'auto', paddingBottom: '8px' }}>
+                        {mediaList.map((m: any) => {
+                          const fullUrl = m.url.startsWith('http') ? m.url : `${API_BASE}${m.url}`;
+                          const isSelected = headerMediaUrl === fullUrl;
+                          return (
+                            <div 
+                              key={m._id} 
+                              onClick={() => { setHeaderMediaUrl(fullUrl); setHeaderMediaFile(null); }}
+                              style={{ 
+                                width: '100px', height: '100px', flexShrink: 0, borderRadius: '8px', cursor: 'pointer',
+                                border: isSelected ? '3px solid #22c55e' : '1px solid #e2e8f0',
+                                backgroundImage: `url(${fullUrl})`,
+                                backgroundSize: 'cover', backgroundPosition: 'center',
+                                opacity: isSelected ? 1 : 0.8, transition: 'all 0.2s'
+                              }}
+                            />
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  <div style={{ marginBottom: '12px' }}>
+                    <label style={{ fontSize: '12px', color: '#64748b', display: 'block', marginBottom: '4px' }}>Upload File</label>
+                    <input 
+                      type="file" 
+                      className="input-field" 
+                      style={{ padding: '8px' }}
+                      onChange={e => {
+                        if (e.target.files?.[0]) {
+                          setHeaderMediaFile(e.target.files[0]);
+                          setHeaderMediaUrl('');
+                        }
+                      }} 
+                      accept={headerComp.format === 'IMAGE' ? 'image/*' : headerComp.format === 'VIDEO' ? 'video/*' : '*/*'}
+                    />
+                  </div>
+                  
+                  <div style={{ textAlign: 'center', fontSize: '12px', color: '#94a3b8', margin: '8px 0' }}>— OR —</div>
+
+                  <div>
+                    <label style={{ fontSize: '12px', color: '#64748b', display: 'block', marginBottom: '4px' }}>Paste Public URL</label>
+                    <input
+                      className="input-field"
+                      value={headerMediaUrl}
+                      onChange={e => {
+                        setHeaderMediaUrl(e.target.value);
+                        if (e.target.value) setHeaderMediaFile(null);
+                      }}
+                      placeholder={`https://example.com/media.${headerComp.format === 'IMAGE' ? 'jpg' : headerComp.format === 'VIDEO' ? 'mp4' : 'pdf'}`}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {needsBodyParams && (
+                <div>
+                  <label style={{ fontSize: '13px', fontWeight: '500', color: '#374151', display: 'block', marginBottom: '6px' }}>📝 Body Variables</label>
+                  {bodyVarSlots.map((_: any, idx: number) => (
+                    <div key={idx} style={{ marginBottom: '6px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span style={{ fontSize: '12px', color: '#6b7280', fontWeight: '600', minWidth: '36px' }}>{`{{${idx + 1}}}`}</span>
+                        <input
+                          className="input-field"
+                          value={bodyParams[idx] || ''}
+                          onChange={e => {
+                            const updated = [...bodyParams];
+                            updated[idx] = e.target.value;
+                            setBodyParams(updated);
+                          }}
+                          placeholder={`Value for {{${idx + 1}}}`}
+                          style={{ flex: 1 }}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {carouselComp && carouselCards.length > 0 && (
+                <div>
+                  <label style={{ fontSize: '13px', fontWeight: '500', color: '#374151', display: 'block', marginBottom: '6px' }}>🎠 Carousel Cards</label>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    {carouselCards.map((card, idx) => (
+                      <div key={idx} style={{ background: '#f8fafc', padding: '12px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                        <div style={{ fontSize: '12px', fontWeight: '600', color: '#475569', marginBottom: '8px' }}>Card {idx + 1}</div>
+                        <input
+                          className="input-field"
+                          placeholder="Header Media URL (Optional)"
+                          value={card.mediaUrl}
+                          onChange={e => {
+                            const updated = [...carouselCards];
+                            updated[idx].mediaUrl = e.target.value;
+                            setCarouselCards(updated);
+                          }}
+                          style={{ marginBottom: '8px', fontSize: '13px' }}
+                        />
+                        {card.bodyParams.map((_, pIdx) => (
+                          <div key={pIdx} style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '6px' }}>
+                            <span style={{ fontSize: '11px', color: '#6b7280', fontWeight: '600' }}>{`{{${pIdx + 1}}}`}</span>
+                            <input
+                              className="input-field"
+                              placeholder={`Variable ${pIdx + 1}`}
+                              value={card.bodyParams[pIdx] || ''}
+                              onChange={e => {
+                                const updated = [...carouselCards];
+                                updated[idx].bodyParams[pIdx] = e.target.value;
+                                setCarouselCards(updated);
+                              }}
+                              style={{ fontSize: '13px', padding: '6px 10px' }}
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
         </div>
         <div style={{ display: 'flex', gap: '10px', marginTop: '24px', justifyContent: 'flex-end' }}>
           <button className="btn-secondary" onClick={onClose}>Cancel</button>
-          <button className="btn-primary" onClick={handleSend} disabled={sending || !phone.trim() || !text.trim()} style={{ opacity: (sending || !phone.trim() || !text.trim()) ? 0.6 : 1 }}>
+          <button className="btn-primary" onClick={handleSend} disabled={sending || !phone.trim() || (mode === 'text' && !text.trim()) || (mode === 'template' && !templateName.trim())} style={{ opacity: (sending || !phone.trim() || (mode === 'text' && !text.trim()) || (mode === 'template' && !templateName.trim())) ? 0.6 : 1 }}>
             {sending ? <><Loader2 size={14} /> Sending...</> : <><Send size={14} /> Send</>}
           </button>
         </div>

@@ -174,7 +174,9 @@ services:
     image: cloudflare/cloudflared:latest
     container_name: wa_tunnel
     restart: unless-stopped
-    command: tunnel --url http://backend:5000
+    command: tunnel --no-autoupdate run
+    environment:
+      - TUNNEL_TOKEN=${CLOUDFLARE_TUNNEL_TOKEN}
     networks:
       - wa_network
 

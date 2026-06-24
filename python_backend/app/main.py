@@ -11,11 +11,11 @@ from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from app.database import connect_to_mongo, close_mongo_connection, db
 from app.utils.auth import get_password_hash
-from app.routes import auth, settings, customers, webhook, conversations, broadcasts, messaging
 import os
 
 # Ensure uploads directory exists
 os.makedirs("uploads/branding", exist_ok=True)
+os.makedirs("uploads/menu", exist_ok=True)
 
 
 @asynccontextmanager
@@ -69,7 +69,7 @@ from app.socket import sio
 
 socket_app = socketio.ASGIApp(sio, app)
 
-from app.routes import auth, settings, customers, webhook, conversations, broadcasts, messaging, reports, media
+from app.routes import auth, settings, customers, webhook, conversations, broadcasts, messaging, reports, media, bot, quick_replies, menu
 
 app.include_router(auth.router,          prefix="/api/auth",          tags=["auth"])
 app.include_router(settings.router,      prefix="/api/settings",      tags=["settings"])
@@ -80,6 +80,9 @@ app.include_router(broadcasts.router,    prefix="/api/broadcasts",    tags=["bro
 app.include_router(messaging.router,     prefix="/api/messaging",     tags=["messaging"])
 app.include_router(reports.router,       prefix="/api/reports",       tags=["reports"])
 app.include_router(media.router,         prefix="/api/media",         tags=["media"])
+app.include_router(bot.router,           prefix="/api/bot",           tags=["bot"])
+app.include_router(quick_replies.router, prefix="/api/quick-replies", tags=["quick-replies"])
+app.include_router(menu.router,          prefix="/api/menu",          tags=["menu"])
 
 @app.get("/")
 async def root():
