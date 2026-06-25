@@ -170,7 +170,7 @@ async def fetch_template_components(
     Returns the `components` list for the matching template, or an empty list
     if the template is not found.
     """
-    url = f"https://graph.facebook.com/v19.0/{wa_business_id}/message_templates"
+    url = f"https://graph.facebook.com/{settings.WA_API_VERSION}/{wa_business_id}/message_templates"
     headers = {"Authorization": f"Bearer {wa_token}"}
     params = {"name": template_name}
 

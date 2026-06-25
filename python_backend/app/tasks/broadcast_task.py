@@ -171,7 +171,7 @@ async def _async_send_broadcast(
                 return {"success": False, "customer": customer, "error": "no_phone"}
 
             async with semaphore:
-                url = f"https://graph.facebook.com/v19.0/{wa_phone_id}/messages"
+                url = f"https://graph.facebook.com/{settings.WA_API_VERSION}/{wa_phone_id}/messages"
                 headers = {
                     "Authorization": f"Bearer {wa_token}",
                     "Content-Type": "application/json",

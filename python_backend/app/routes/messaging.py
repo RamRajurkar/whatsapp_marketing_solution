@@ -55,7 +55,7 @@ async def send_text_direct(req: SendTextRequest, current_user: dict = Depends(ge
         wa_msg_id = f"mock_msg_{int(now.timestamp())}"
     else:
         # Send via Graph API
-        url = f"https://graph.facebook.com/v19.0/{wa_phone_id}/messages"
+        url = f"https://graph.facebook.com/{settings.WA_API_VERSION}/{wa_phone_id}/messages"
         headers = {
             "Authorization": f"Bearer {wa_token}",
             "Content-Type": "application/json"
@@ -170,7 +170,7 @@ async def send_template_direct(req: SendTemplateRequest, current_user: dict = De
         wa_msg_id = f"mock_tpl_{int(now.timestamp())}"
     else:
         # Send via Graph API
-        url = f"https://graph.facebook.com/v19.0/{wa_phone_id}/messages"
+        url = f"https://graph.facebook.com/{settings.WA_API_VERSION}/{wa_phone_id}/messages"
         headers = {
             "Authorization": f"Bearer {wa_token}",
             "Content-Type": "application/json"
@@ -202,7 +202,7 @@ async def send_template_direct(req: SendTemplateRequest, current_user: dict = De
                 from app.utils.image_utils import compress_image_bytes
                 file_bytes, filename, file_type = compress_image_bytes(file_bytes, filename, file_type)
                 
-                upload_url = f"https://graph.facebook.com/v19.0/{wa_phone_id}/media"
+                upload_url = f"https://graph.facebook.com/{settings.WA_API_VERSION}/{wa_phone_id}/media"
                 upload_files = {
                     "file": (filename, file_bytes, file_type)
                 }
@@ -320,7 +320,7 @@ async def get_templates(current_user: dict = Depends(get_current_user)):
             {"name": "hello_world", "language": "en_US", "status": "APPROVED", "category": "UTILITY"},
         ]}
 
-    url = f"https://graph.facebook.com/v19.0/{wa_business_id}/message_templates"
+    url = f"https://graph.facebook.com/{settings.WA_API_VERSION}/{wa_business_id}/message_templates"
     headers = {"Authorization": f"Bearer {wa_token}"}
 
     async with httpx.AsyncClient(timeout=30.0) as client:
@@ -368,7 +368,7 @@ async def create_template(
 
         async with httpx.AsyncClient(timeout=60.0) as client:
             # Step A: Get upload session
-            session_url = f"https://graph.facebook.com/v19.0/{wa_app_id}/uploads"
+            session_url = f"https://graph.facebook.com/{settings.WA_API_VERSION}/{wa_app_id}/uploads"
             session_params = {"file_length": file_length, "file_type": file_type}
             session_headers = {"Authorization": f"Bearer {wa_token}"}
             session_resp = await client.post(session_url, params=session_params, headers=session_headers)
@@ -377,7 +377,7 @@ async def create_template(
             session_id = session_resp.json().get("id")
 
             # Step B: Upload file
-            upload_url = f"https://graph.facebook.com/v19.0/{session_id}"
+            upload_url = f"https://graph.facebook.com/{settings.WA_API_VERSION}/{session_id}"
             upload_headers = {"Authorization": f"OAuth {wa_token}", "file_offset": "0"}
             upload_resp = await client.post(upload_url, headers=upload_headers, content=file_bytes)
             if upload_resp.status_code != 200:
@@ -408,7 +408,7 @@ async def create_template(
     components.append(body_component)
 
     # 3. Create Template
-    create_url = f"https://graph.facebook.com/v19.0/{wa_business_id}/message_templates"
+    create_url = f"https://graph.facebook.com/{settings.WA_API_VERSION}/{wa_business_id}/message_templates"
     create_payload = {
         "name": name,
         "language": language,
@@ -438,7 +438,7 @@ async def upload_media(
     file_bytes = await file.read()
     file_type = file.content_type or "image/jpeg"
 
-    upload_url = f"https://graph.facebook.com/v19.0/{wa_phone_id}/media"
+    upload_url = f"https://graph.facebook.com/{settings.WA_API_VERSION}/{wa_phone_id}/media"
     headers = {"Authorization": f"Bearer {wa_token}"}
     
     # We must use multipart/form-data for the media API

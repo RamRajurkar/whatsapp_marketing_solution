@@ -31,6 +31,7 @@ async def lifespan(app: FastAPI):
         await db.db.messages.create_index("conversationId")
         await db.db.conversations.create_index("customerPhone", unique=True)
         await db.db.conversations.create_index([("lastMessageTime", -1)])
+        await db.db.reservation_states.create_index("updatedAt", expireAfterSeconds=600)
         print("MongoDB indexes created/verified")
     except Exception as e:
         print(f"Warning: Could not create some indexes: {e}")
@@ -69,7 +70,7 @@ from app.socket import sio
 
 socket_app = socketio.ASGIApp(sio, app)
 
-from app.routes import auth, settings, customers, webhook, conversations, broadcasts, messaging, reports, media, bot, quick_replies, menu
+from app.routes import auth, settings, customers, webhook, conversations, broadcasts, messaging, reports, media, bot, quick_replies, menu, reservations, faq, feedback
 
 app.include_router(auth.router,          prefix="/api/auth",          tags=["auth"])
 app.include_router(settings.router,      prefix="/api/settings",      tags=["settings"])
@@ -83,6 +84,9 @@ app.include_router(media.router,         prefix="/api/media",         tags=["med
 app.include_router(bot.router,           prefix="/api/bot",           tags=["bot"])
 app.include_router(quick_replies.router, prefix="/api/quick-replies", tags=["quick-replies"])
 app.include_router(menu.router,          prefix="/api/menu",          tags=["menu"])
+app.include_router(reservations.router,  prefix="/api/reservations",  tags=["reservations"])
+app.include_router(faq.router,           prefix="/api/faq",           tags=["faq"])
+app.include_router(feedback.router,      prefix="/api/feedback",      tags=["feedback"])
 
 @app.get("/")
 async def root():

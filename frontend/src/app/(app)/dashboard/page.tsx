@@ -82,6 +82,12 @@ export default function DashboardPage() {
     refetchInterval: 60000,
   });
 
+  const { data: feedbackStats } = useQuery({
+    queryKey: ['feedback_stats'],
+    queryFn: () => api.get('/api/feedback/stats').then(r => r.data.data),
+    refetchInterval: 60000,
+  });
+
   const chartData = analytics?.dailyMessages?.map((d: any, i: number) => ({
     day: DAYS_OF_WEEK[new Date(d._id).getDay()],
     total: d.count,
@@ -355,8 +361,8 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* Bottom Stats Row */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px', marginTop: '24px' }}>
+      {/* Bottom Stats Row */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px', marginTop: '24px' }}>
           <div className="dashboard-widget" style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
             <div style={{
               width: '48px', height: '48px', borderRadius: '14px',
@@ -397,6 +403,20 @@ export default function DashboardPage() {
                 {analytics?.totals?.broadcasts?.sent || 0}
               </div>
               <div style={{ fontSize: '13px', color: '#6b7280' }}>Broadcasts Sent</div>
+            </div>
+          </div>
+          <div className="dashboard-widget" style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+            <div style={{
+              width: '48px', height: '48px', borderRadius: '14px',
+              background: '#DBEAFE', display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}>
+              <span style={{ fontSize: '22px' }}>⭐</span>
+            </div>
+            <div>
+              <div style={{ fontSize: '24px', fontWeight: '800', color: '#1a1a2e', letterSpacing: '-0.5px' }}>
+                {feedbackStats?.averageRating || 0} <span style={{ fontSize: '14px', color: '#9CA3AF' }}>({feedbackStats?.totalCount || 0})</span>
+              </div>
+              <div style={{ fontSize: '13px', color: '#6b7280' }}>Avg Rating</div>
             </div>
           </div>
         </div>

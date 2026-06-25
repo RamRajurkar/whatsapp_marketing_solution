@@ -16,3 +16,4 @@ aiofiles
 pydantic[email]
 celery[redis]
 Pillow
+pytz

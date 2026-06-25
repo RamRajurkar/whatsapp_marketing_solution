@@ -25,14 +25,17 @@ import {
   WifiOff,
   Loader2,
   Image,
+  Star,
 } from 'lucide-react';
 
 const menuItems = [
   { href: '/dashboard',     icon: LayoutDashboard, label: 'Dashboard' },
   { href: '/inbox',         icon: MessageSquare,   label: 'Inbox' },
   { href: '/chatbot',       icon: MessageCircle,   label: 'Chatbot' },
+  { href: '/faq',           icon: HelpCircle,      label: 'Smart FAQ' },
   { href: '/customers',     icon: Users,           label: 'Customers' },
   { href: '/reservations',  icon: CalendarDays,    label: 'Reservations' },
+  { href: '/feedback',      icon: Star,            label: 'Feedback' },
   { href: '/quick-replies', icon: Zap,             label: 'Quick Replies' },
   { href: '/menu',          icon: UtensilsCrossed, label: 'Menu' },
   { href: '/templates',     icon: MessageCircle,   label: 'Templates' },

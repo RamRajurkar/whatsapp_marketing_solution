@@ -12,6 +12,8 @@ class BotSettingsUpdate(BaseModel):
     addressText: str
     menuUrl: str
     timingsText: str
+    openHour: int = 11
+    closeHour: int = 23
 
 @router.get("/")
 async def get_bot_settings(current_user: dict = Depends(get_current_user)):
@@ -24,7 +26,9 @@ async def get_bot_settings(current_user: dict = Depends(get_current_user)):
             "welcomeMessage": "Welcome to our Restaurant! 🍔 How can we help you today?",
             "addressText": "We are located at 123 Food Street. 📍",
             "menuUrl": "",
-            "timingsText": "We are open Monday to Sunday from 10 AM to 11 PM. 🕒"
+            "timingsText": "We are open Monday to Sunday from 10 AM to 11 PM. 🕒",
+            "openHour": 11,
+            "closeHour": 23
         }
     settings["_id"] = str(settings["_id"])
     return settings

@@ -9,6 +9,7 @@ import {
   Smartphone, MessageCircle, CheckCircle2, AlertCircle, Sparkles,
   Info, ChevronRight
 } from 'lucide-react';
+import { SimulatorPanel } from '@/components/SimulatorPanel';
 
 /* ── Phone Preview Component ──────────────────────────────────────────────── */
 function PhonePreview({ form }: { form: any }) {
@@ -179,6 +180,8 @@ export default function ChatbotPage() {
     addressText: '',
     menuUrl: '',
     timingsText: '',
+    openHour: 11,
+    closeHour: 23,
   });
 
   const { data: settings, isLoading } = useQuery({
@@ -194,6 +197,8 @@ export default function ChatbotPage() {
         addressText: settings.addressText || '',
         menuUrl: settings.menuUrl || '',
         timingsText: settings.timingsText || '',
+        openHour: settings.openHour ?? 11,
+        closeHour: settings.closeHour ?? 23,
       });
     }
   }, [settings]);
@@ -308,6 +313,39 @@ export default function ChatbotPage() {
 
           {/* Settings Fields */}
           <div style={{ opacity: form.isActive ? 1 : 0.5, pointerEvents: form.isActive ? 'auto' : 'none', transition: 'opacity 0.3s' }}>
+            {/* Restaurant Hours */}
+            <div className="glass-card" style={{ padding: '20px', marginBottom: '16px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
+                <Clock size={16} style={{ color: '#F59E0B' }} />
+                <h4 style={{ margin: 0, fontSize: '14px', fontWeight: '700', color: '#1a1a2e' }}>Operating Hours</h4>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                <div>
+                  <label style={{ fontSize: '12px', fontWeight: '600', color: '#374151', display: 'block', marginBottom: '6px' }}>Opening Hour (24H)</label>
+                  <input
+                    type="number"
+                    min="0" max="23"
+                    className="input-field"
+                    value={form.openHour}
+                    onChange={(e) => setForm({ ...form, openHour: parseInt(e.target.value) || 0 })}
+                  />
+                </div>
+                <div>
+                  <label style={{ fontSize: '12px', fontWeight: '600', color: '#374151', display: 'block', marginBottom: '6px' }}>Closing Hour (24H)</label>
+                  <input
+                    type="number"
+                    min="0" max="23"
+                    className="input-field"
+                    value={form.closeHour}
+                    onChange={(e) => setForm({ ...form, closeHour: parseInt(e.target.value) || 0 })}
+                  />
+                </div>
+              </div>
+              <p style={{ fontSize: '11px', color: '#9ca3af', marginTop: '8px', marginBottom: 0 }}>
+                Used by the bot to send "We're open for lunch/dinner" or "We're currently closed" automatically based on the time of day.
+              </p>
+            </div>
+
             {/* Welcome Message */}
             <div className="glass-card" style={{ padding: '20px', marginBottom: '16px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
@@ -424,6 +462,7 @@ export default function ChatbotPage() {
               </div>
             </div>
           </div>
+          <SimulatorPanel />
         </div>
 
         {/* ── Right Column: Phone Preview ── */}

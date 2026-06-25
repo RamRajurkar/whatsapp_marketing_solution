@@ -158,7 +158,7 @@ async def send_broadcast(
                 from app.utils.image_utils import compress_image_bytes
                 file_bytes, filename, file_type = compress_image_bytes(file_bytes, filename, file_type)
                 
-                upload_url = f"https://graph.facebook.com/v19.0/{wa_phone_id}/media"
+                upload_url = f"https://graph.facebook.com/{settings.WA_API_VERSION}/{wa_phone_id}/media"
                 upload_files = {
                     "file": (filename, file_bytes, file_type)
                 }

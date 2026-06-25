@@ -114,7 +114,7 @@ async def test_connection(current_user: dict = Depends(get_current_user)):
 
     # In a real app we'd make a request to Graph API here
     import httpx
-    url = f"https://graph.facebook.com/v19.0/{wa_phone_number_id}"
+    url = f"https://graph.facebook.com/{settings.WA_API_VERSION}/{wa_phone_number_id}"
     headers = {"Authorization": f"Bearer {wa_access_token}"}
     
     async with httpx.AsyncClient() as client:
