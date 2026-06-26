@@ -22,6 +22,10 @@ class Settings(BaseSettings):
     CLOUDINARY_API_KEY: Optional[str] = None
     CLOUDINARY_API_SECRET: Optional[str] = None
 
+    # Supabase (missed-message catchup queue)
+    SUPABASE_URL: str = ""
+    SUPABASE_ANON_KEY: str = ""
+
     class Config:
         env_file = ".env"
 

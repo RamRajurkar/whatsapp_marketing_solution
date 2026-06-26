@@ -36,6 +36,15 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         print(f"Warning: Could not create some indexes: {e}")
 
+    # ── Missed-message catchup (Supabase queue) ──────────────────────────
+    try:
+        from app.services.message_poller import catchup_missed_messages
+        print("[STARTUP] Running missed-message catchup …")
+        await catchup_missed_messages()
+        print("[STARTUP] Missed-message catchup complete")
+    except Exception as e:
+        print(f"[STARTUP] Missed-message catchup error (non-fatal): {e}")
+
     yield
     # Shutdown
     await close_mongo_connection()

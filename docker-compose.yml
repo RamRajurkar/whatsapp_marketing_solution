@@ -73,6 +73,8 @@ services:
       CLOUDINARY_API_KEY: ${CLOUDINARY_API_KEY}
       CLOUDINARY_API_SECRET: ${CLOUDINARY_API_SECRET}
       FRONTEND_URL: http://localhost:3000
+      SUPABASE_URL: ${SUPABASE_URL}
+      SUPABASE_ANON_KEY: ${SUPABASE_ANON_KEY}
     volumes:
       - ./python_backend/uploads:/app/uploads
     depends_on:
