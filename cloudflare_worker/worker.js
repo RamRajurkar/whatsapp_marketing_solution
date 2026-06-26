@@ -12,6 +12,21 @@
  */
 
 export default {
+  // ── Cron: Ping Supabase every 3 days to prevent free-tier pause ──────
+  async scheduled(event, env, ctx) {
+    try {
+      const resp = await fetch(`${env.SUPABASE_URL}/rest/v1/pending_messages?limit=1`, {
+        headers: {
+          apikey: env.SUPABASE_ANON_KEY,
+          Authorization: `Bearer ${env.SUPABASE_ANON_KEY}`,
+        },
+      });
+      console.log(`[CRON] Supabase keep-alive ping: ${resp.status}`);
+    } catch (err) {
+      console.error("[CRON] Supabase ping failed:", err.message);
+    }
+  },
+
   async fetch(request, env) {
     const url = new URL(request.url);
 
