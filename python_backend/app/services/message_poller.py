@@ -9,6 +9,7 @@ them through the existing webhook processing pipeline.
 import httpx
 from app.config import settings
 from app.routes.webhook import _process_webhook_body
+from app.http_client import get_http_client
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -34,22 +35,22 @@ async def fetch_pending_messages() -> list[dict]:
         "?processed=eq.false"
         "&order=received_at.asc"
     )
-    async with httpx.AsyncClient(timeout=30.0) as client:
-        resp = await client.get(url, headers=_supabase_headers())
-        resp.raise_for_status()
-        return resp.json()
+    client = get_http_client()
+    resp = await client.get(url, headers=_supabase_headers())
+    resp.raise_for_status()
+    return resp.json()
 
 
 async def mark_as_processed(message_id: str) -> None:
     """Set ``processed = true`` for the given ``pending_messages`` row."""
     url = f"{settings.SUPABASE_URL}/rest/v1/pending_messages?id=eq.{message_id}"
-    async with httpx.AsyncClient(timeout=30.0) as client:
-        resp = await client.patch(
-            url,
-            json={"processed": True},
-            headers={**_supabase_headers(), "Prefer": "return=minimal"},
-        )
-        resp.raise_for_status()
+    client = get_http_client()
+    resp = await client.patch(
+        url,
+        json={"processed": True},
+        headers={**_supabase_headers(), "Prefer": "return=minimal"},
+    )
+    resp.raise_for_status()
 
 
 # ─────────────────────────────────────────────────────────────────────────────

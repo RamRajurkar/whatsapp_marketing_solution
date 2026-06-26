@@ -13,6 +13,7 @@ to produce the correct `components` list for the Messages API.
 import re
 from typing import Optional, List, Dict, Any
 import httpx
+from app.http_client import get_http_client
 
 
 def build_template_components(
@@ -174,11 +175,11 @@ async def fetch_template_components(
     headers = {"Authorization": f"Bearer {wa_token}"}
     params = {"name": template_name}
 
-    async with httpx.AsyncClient(timeout=30.0) as client:
-        resp = await client.get(url, headers=headers, params=params)
-        if resp.status_code != 200:
-            return []
-        data = resp.json()
+    client = get_http_client()
+    resp = await client.get(url, headers=headers, params=params)
+    if resp.status_code != 200:
+        return []
+    data = resp.json()
 
     for t in data.get("data", []):
         if t.get("name") == template_name:

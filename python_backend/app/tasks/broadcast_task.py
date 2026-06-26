@@ -19,6 +19,7 @@ from bson import ObjectId
 from app.celery_app import celery_app
 from app.database import get_worker_db
 from app.utils.template_utils import build_template_components
+from app.http_client import get_http_client
 
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
 
@@ -239,37 +240,13 @@ async def _async_send_broadcast(
 
         else:
             # ── Real API — stream and chunk ──────────────────────────────
-            async with httpx.AsyncClient(timeout=30.0) as http_client:
-                chunk: list = []
+            http_client = get_http_client()
+            chunk: list = []
 
-                async for customer in database.customers.find(customer_query):
-                    chunk.append(customer)
+            async for customer in database.customers.find(customer_query):
+                chunk.append(customer)
 
-                    if len(chunk) >= CHUNK_SIZE:
-                        results = await asyncio.gather(*[send_one(c, http_client) for c in chunk])
-                        for r in results:
-                            if r["success"]:
-                                sent_count += 1
-                                msg_doc = _build_message_doc(r["customer"], r["wa_msg_id"], template_name, broadcast_id)
-                                message_batch.append(msg_doc)
-                            else:
-                                failed_count += 1
-
-                        # Batch insert messages
-                        if len(message_batch) >= DB_BATCH_SIZE:
-                            await _flush_message_batch(database, message_batch)
-                            message_batch = []
-
-                        # Emit progress
-                        await _emit_progress(sio_mgr, database, obj_id, broadcast_id, sent_count, failed_count, total_count)
-
-                        chunk = []
-
-                        # Small breathing room between chunks
-                        await asyncio.sleep(0.5)
-
-                # Process remaining customers in the last partial chunk
-                if chunk:
+                if len(chunk) >= CHUNK_SIZE:
                     results = await asyncio.gather(*[send_one(c, http_client) for c in chunk])
                     for r in results:
                         if r["success"]:
@@ -278,9 +255,33 @@ async def _async_send_broadcast(
                             message_batch.append(msg_doc)
                         else:
                             failed_count += 1
-                            
-                    # Emit progress for the partial chunk
+
+                    # Batch insert messages
+                    if len(message_batch) >= DB_BATCH_SIZE:
+                        await _flush_message_batch(database, message_batch)
+                        message_batch = []
+
+                    # Emit progress
                     await _emit_progress(sio_mgr, database, obj_id, broadcast_id, sent_count, failed_count, total_count)
+
+                    chunk = []
+
+                    # Small breathing room between chunks
+                    await asyncio.sleep(0.5)
+
+            # Process remaining customers in the last partial chunk
+            if chunk:
+                results = await asyncio.gather(*[send_one(c, http_client) for c in chunk])
+                for r in results:
+                    if r["success"]:
+                        sent_count += 1
+                        msg_doc = _build_message_doc(r["customer"], r["wa_msg_id"], template_name, broadcast_id)
+                        message_batch.append(msg_doc)
+                    else:
+                        failed_count += 1
+                        
+                # Emit progress for the partial chunk
+                await _emit_progress(sio_mgr, database, obj_id, broadcast_id, sent_count, failed_count, total_count)
 
         # ── Flush remaining messages ─────────────────────────────────────
         if message_batch:

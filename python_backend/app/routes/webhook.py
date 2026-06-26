@@ -3,16 +3,18 @@ import hashlib
 import json
 import os
 import httpx
-from fastapi import APIRouter, Request, Response, HTTPException
+from fastapi import APIRouter, Request, Response, HTTPException, BackgroundTasks
 from pydantic import BaseModel
 from typing import Optional
 from app.database import db
 from app.socket import sio
 from app.utils.phone import normalize_indian_phone
 from app.config import settings
+from app.services.bot_cache import get_bot_settings, get_greeting_payload
 from bson import ObjectId
 from datetime import datetime, timezone
 import pytz
+from app.http_client import get_http_client
 
 router = APIRouter()
 
@@ -210,11 +212,16 @@ async def _run_bot_logic(msg: dict, msg_type: str, text_content: str, phone_numb
     Execute chatbot auto-reply logic for an incoming message.
     Returns a result dict if a reply was sent, or None if no reply was triggered.
     """
-    bot_settings = await db.db.bot_settings.find_one({})
+    import asyncio
+    bot_settings, user, fb_state, state_doc = await asyncio.gather(
+        get_bot_settings(db.db),
+        db.db.users.find_one({}),
+        db.db.feedback_states.find_one({"phone": phone_number}),
+        db.db.reservation_states.find_one({"phone": phone_number})
+    )
+
     if not bot_settings or not bot_settings.get("isActive"):
         return None
-
-    user = await db.db.users.find_one({})
     wa_token    = (user.get("waAccessToken") if user else None) or settings.WA_ACCESS_TOKEN
     wa_phone_id = (user.get("waPhoneNumberId") if user else None) or settings.WA_PHONE_NUMBER_ID
     api_version = settings.WA_API_VERSION
@@ -243,7 +250,6 @@ async def _run_bot_logic(msg: dict, msg_type: str, text_content: str, phone_numb
     }
 
     # Check for active feedback state
-    fb_state = await db.db.feedback_states.find_one({"phone": phone_number})
     if fb_state and msg_type == "text":
         text_val = text_content.strip()
         rating = None
@@ -270,30 +276,28 @@ async def _run_bot_logic(msg: dict, msg_type: str, text_content: str, phone_numb
             }
             # We skip normal logic by returning here since we handled it
             # But we must send the message first
-            async with httpx.AsyncClient(timeout=30.0) as client:
-                resp = await client.post(url, json=payload, headers=headers)
-                if resp.status_code in (200, 201):
-                    wa_msg_id = resp.json().get("messages", [{}])[0].get("id", "unknown")
-                    outbound_doc = {
-                        "conversationId": conv_id,
-                        "whatsappMessageId": wa_msg_id,
-                        "direction": "outbound",
-                        "type": "text",
-                        "content": {"text": bot_reply_text},
-                        "status": "sent",
-                        "timestamp": _now(),
-                        "createdAt": _now(),
-                    }
-                    await db.db.messages.insert_one(outbound_doc)
-                    outbound_doc["_id"] = str(outbound_doc["_id"])
-                    outbound_doc["timestamp"] = outbound_doc["timestamp"].isoformat()
-                    outbound_doc["createdAt"] = outbound_doc["createdAt"].isoformat()
-                    await sio.emit("message:new", outbound_doc, room=conv_id)
+            client = get_http_client()
+            resp = await client.post(url, json=payload, headers=headers)
+            if resp.status_code in (200, 201):
+                wa_msg_id = resp.json().get("messages", [{}])[0].get("id", "unknown")
+                outbound_doc = {
+                    "conversationId": conv_id,
+                    "whatsappMessageId": wa_msg_id,
+                    "direction": "outbound",
+                    "type": "text",
+                    "content": {"text": bot_reply_text},
+                    "status": "sent",
+                    "timestamp": _now(),
+                    "createdAt": _now(),
+                }
+                await db.db.messages.insert_one(outbound_doc)
+                outbound_doc["_id"] = str(outbound_doc["_id"])
+                outbound_doc["timestamp"] = outbound_doc["timestamp"].isoformat()
+                outbound_doc["createdAt"] = outbound_doc["createdAt"].isoformat()
+                await sio.emit("message:new", outbound_doc, room=conv_id)
             return {"to": phone_number, "text": bot_reply_text, "type": "feedback"}
             
     # Check for active reservation state
-    state_doc = await db.db.reservation_states.find_one({"phone": phone_number})
-    
     if state_doc and msg_type == "text":
         step = state_doc.get("step")
         text_val = text_content.strip()
@@ -414,23 +418,12 @@ async def _run_bot_logic(msg: dict, msg_type: str, text_content: str, phone_numb
                     base_welcome = bot_settings.get("welcomeMessage", "Welcome!")
                     bot_reply_text = f"{time_prefix}\n{base_welcome}"
                     
-                    payload = {
-                        "messaging_product": "whatsapp",
-                        "recipient_type": "individual",
-                        "to": phone_number,
-                        "type": "interactive",
-                        "interactive": {
-                            "type": "button",
-                            "body": {"text": bot_reply_text},
-                            "action": {
-                                "buttons": [
-                                    {"type": "reply", "reply": {"id": "btn_address", "title": "📍 Address"}},
-                                    {"type": "reply", "reply": {"id": "btn_menu", "title": "📜 Menu"}},
-                                    {"type": "reply", "reply": {"id": "btn_timings", "title": "🕒 Timings"}}
-                                ]
-                            }
-                        }
-                    }
+                    buttons = [
+                        {"id": "btn_address", "title": "📍 Address"},
+                        {"id": "btn_menu", "title": "📜 Menu"},
+                        {"id": "btn_timings", "title": "🕒 Timings"}
+                    ]
+                    payload = get_greeting_payload(phone_number, bot_reply_text, buttons)
             elif intent == "menu":
                 menu_url = bot_settings.get("menuUrl", "")
                 bot_reply_text = f"Here is our menu:\n{menu_url}" if menu_url else "Menu not available right now."
@@ -502,41 +495,41 @@ async def _run_bot_logic(msg: dict, msg_type: str, text_content: str, phone_numb
         return None
 
     print(f"[BOT] Sending auto-reply to {phone_number}: {bot_reply_text[:50]}...")
-    async with httpx.AsyncClient(timeout=30.0) as client:
-        resp = await client.post(url, json=payload, headers=headers)
-        if resp.status_code in (200, 201):
-            wa_msg_id = resp.json().get("messages", [{}])[0].get("id", "unknown")
-            outbound_doc = {
-                "conversationId": conv_id,
-                "whatsappMessageId": wa_msg_id,
-                "direction": "outbound",
-                "type": payload["type"],
-                "content": {"text": bot_reply_text},
-                "status": "sent",
-                "timestamp": _now(),
-                "createdAt": _now(),
-            }
-            await db.db.messages.insert_one(outbound_doc)
+    client = get_http_client()
+    resp = await client.post(url, json=payload, headers=headers)
+    if resp.status_code in (200, 201):
+        wa_msg_id = resp.json().get("messages", [{}])[0].get("id", "unknown")
+        outbound_doc = {
+            "conversationId": conv_id,
+            "whatsappMessageId": wa_msg_id,
+            "direction": "outbound",
+            "type": payload["type"],
+            "content": {"text": bot_reply_text},
+            "status": "sent",
+            "timestamp": _now(),
+            "createdAt": _now(),
+        }
+        await db.db.messages.insert_one(outbound_doc)
 
-            outbound_doc["_id"] = str(outbound_doc["_id"])
-            outbound_doc["timestamp"] = outbound_doc["timestamp"].isoformat()
-            outbound_doc["createdAt"] = outbound_doc["createdAt"].isoformat()
+        outbound_doc["_id"] = str(outbound_doc["_id"])
+        outbound_doc["timestamp"] = outbound_doc["timestamp"].isoformat()
+        outbound_doc["createdAt"] = outbound_doc["createdAt"].isoformat()
 
-            # Emit to frontend
-            await sio.emit("message:new", outbound_doc, room=conv_id)
+        # Emit to frontend
+        await sio.emit("message:new", outbound_doc, room=conv_id)
 
-            # Update conversation last message
-            conv_oid = ObjectId(conv_id)
-            await db.db.conversations.update_one(
-                {"_id": conv_oid},
-                {"$set": {"lastMessage": bot_reply_text, "lastMessageTime": _now()}}
-            )
-            await sio.emit("conversation:updated", {"conversationId": conv_id})
-            print(f"[BOT] Auto-reply sent successfully: {wa_msg_id}")
-            return {"to": phone_number, "text": bot_reply_text, "wa_msg_id": wa_msg_id}
-        else:
-            print(f"[BOT] Auto-reply FAILED: {resp.status_code} {resp.text}")
-            return {"to": phone_number, "text": bot_reply_text, "error": resp.text}
+        # Update conversation last message
+        conv_oid = ObjectId(conv_id)
+        await db.db.conversations.update_one(
+            {"_id": conv_oid},
+            {"$set": {"lastMessage": bot_reply_text, "lastMessageTime": _now()}}
+        )
+        await sio.emit("conversation:updated", {"conversationId": conv_id})
+        print(f"[BOT] Auto-reply sent successfully: {wa_msg_id}")
+        return {"to": phone_number, "text": bot_reply_text, "wa_msg_id": wa_msg_id}
+    else:
+        print(f"[BOT] Auto-reply FAILED: {resp.status_code} {resp.text}")
+        return {"to": phone_number, "text": bot_reply_text, "error": resp.text}
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -545,7 +538,7 @@ async def _run_bot_logic(msg: dict, msg_type: str, text_content: str, phone_numb
 
 @router.post("/")
 @router.post("")
-async def receive_webhook(request: Request):
+async def receive_webhook(request: Request, background_tasks: BackgroundTasks):
     """Handle incoming messages and delivery statuses from WhatsApp."""
 
     raw_body = await request.body()
@@ -557,7 +550,7 @@ async def receive_webhook(request: Request):
             raise HTTPException(status_code=403, detail="Invalid webhook signature")
 
     body = json.loads(raw_body)
-    await _process_webhook_body(body)
+    background_tasks.add_task(_process_webhook_body, body)
 
     return Response(content="EVENT_RECEIVED", status_code=200)
 

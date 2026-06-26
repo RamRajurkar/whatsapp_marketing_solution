@@ -1,5 +1,6 @@
 from pydantic_settings import BaseSettings
 from typing import Optional
+import warnings
 
 class Settings(BaseSettings):
     MONGODB_URI: str = "mongodb://localhost:27017"
@@ -33,7 +34,6 @@ settings = Settings()
 
 # Warn at startup if JWT_SECRET is still the insecure default
 if settings.JWT_SECRET == "your-super-secret-jwt-key":
-    import warnings
     warnings.warn(
         "⚠️  JWT_SECRET is using the insecure default value. "
         "Set a strong random secret in your .env file before going to production!",

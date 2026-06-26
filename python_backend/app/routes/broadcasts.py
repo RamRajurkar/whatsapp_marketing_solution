@@ -6,6 +6,12 @@ from app.database import db
 from app.config import settings
 from bson import ObjectId
 from datetime import datetime, timezone
+import os
+import httpx
+import mimetypes
+from app.utils.image_utils import compress_image_bytes
+from app.tasks.broadcast_task import send_broadcast as send_broadcast_task
+from app.http_client import get_http_client
 
 router = APIRouter()
 
@@ -140,9 +146,6 @@ async def send_broadcast(
     header_media_id = broadcast.get("headerMediaId")
 
     if header_media_url and ("localhost" in header_media_url or "/uploads/" in header_media_url):
-        import os
-        import httpx
-        import mimetypes
         filename = header_media_url.split("/")[-1].split("?")[0]
         local_path = os.path.join("uploads", "media", filename)
         
@@ -155,7 +158,6 @@ async def send_broadcast(
                     file_bytes = f.read()
                 
                 # Compress image if too large for WhatsApp (5 MB limit)
-                from app.utils.image_utils import compress_image_bytes
                 file_bytes, filename, file_type = compress_image_bytes(file_bytes, filename, file_type)
                 
                 upload_url = f"https://graph.facebook.com/{settings.WA_API_VERSION}/{wa_phone_id}/media"
@@ -168,24 +170,24 @@ async def send_broadcast(
                 upload_headers = {
                     "Authorization": f"Bearer {wa_token}"
                 }
-                async with httpx.AsyncClient(timeout=60.0) as u_client:
-                    u_resp = await u_client.post(upload_url, headers=upload_headers, data=upload_data, files=upload_files)
-                    if u_resp.status_code in (200, 201):
-                        header_media_id = u_resp.json().get("id")
-                        header_media_url = None # Unset URL since we have ID
-                        # Persist to MongoDB
-                        await db.db.broadcasts.update_one(
-                            {"_id": obj_id},
-                            {"$set": {
-                                "headerMediaId": header_media_id,
-                                "headerMediaUrl": None
-                            }}
-                        )
-                    else:
-                        raise HTTPException(
-                            status_code=400,
-                            detail=f"Failed to auto-upload template media to WhatsApp API: {u_resp.text}"
-                        )
+                u_client = get_http_client()
+                u_resp = await u_client.post(upload_url, headers=upload_headers, data=upload_data, files=upload_files)
+                if u_resp.status_code in (200, 201):
+                    header_media_id = u_resp.json().get("id")
+                    header_media_url = None # Unset URL since we have ID
+                    # Persist to MongoDB
+                    await db.db.broadcasts.update_one(
+                        {"_id": obj_id},
+                        {"$set": {
+                            "headerMediaId": header_media_id,
+                            "headerMediaUrl": None
+                        }}
+                    )
+                else:
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"Failed to auto-upload template media to WhatsApp API: {u_resp.text}"
+                    )
             except Exception as e:
                 if isinstance(e, HTTPException):
                     raise e
@@ -207,7 +209,6 @@ async def send_broadcast(
     )
 
     # Dispatch to Celery worker
-    from app.tasks.broadcast_task import send_broadcast as send_broadcast_task
     
     task = send_broadcast_task.delay(
         broadcast_id=broadcast_id,

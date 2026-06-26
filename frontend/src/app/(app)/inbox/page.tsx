@@ -1,17 +1,18 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useSearchParams } from 'next/navigation';
 import api from '@/lib/api';
 import { getSocket } from '@/lib/socket';
 import toast from 'react-hot-toast';
-import { format } from 'date-fns';
+import { format, isToday, isYesterday } from 'date-fns';
 import { formatIndianPhone } from '@/lib/phone';
 import {
   MessageSquare, Search, User, CalendarDays, Zap, Paperclip,
   Send, Loader2, Image, FileText, Check, CheckCheck,
   Inbox as InboxIcon, Hand, Plus, X, AlertCircle, Clock, Smile,
+  Trash2, Video, UserCircle,
 } from 'lucide-react';
 import EmojiPicker from 'emoji-picker-react';
 
@@ -702,6 +703,9 @@ export default function InboxPage() {
   const [newConvModal, setNewConvModal] = useState(false);
   const [templateModal, setTemplateModal] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [showProfilePanel, setShowProfilePanel] = useState(false);
+  const [profileData, setProfileData] = useState<any>(null);
+  const [uploadingFile, setUploadingFile] = useState(false);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -729,15 +733,57 @@ export default function InboxPage() {
     },
     onError: (err: any) => toast.error(err.response?.data?.detail || 'Failed to send'),
   });
+  const deleteConv = useMutation({
+    mutationFn: (id: string) => api.delete(`/api/conversations/${id}`),
+    onSuccess: () => {
+      setSelectedConvId(null);
+      queryClient.invalidateQueries({ queryKey: ['conversations'] });
+      toast.success('Chat deleted');
+    },
+    onError: (err: any) => toast.error(err.response?.data?.detail || 'Failed to delete'),
+  });
 
+  // Socket event handling — handle message:new, message:status, conversation:updated, conversation:deleted
   useEffect(() => {
     const socket = getSocket();
-    socket.on('message:new', (msg: any) => { queryClient.invalidateQueries({ queryKey: ['messages', msg.conversationId] }); queryClient.invalidateQueries({ queryKey: ['conversations'] }); });
-    socket.on('conversation:updated', () => { queryClient.invalidateQueries({ queryKey: ['conversations'] }); });
-    return () => { socket.off('message:new'); socket.off('conversation:updated'); };
-  }, [queryClient]);
+    const onNewMsg = (msg: any) => {
+      queryClient.invalidateQueries({ queryKey: ['messages', msg.conversationId] });
+      queryClient.invalidateQueries({ queryKey: ['conversations'] });
+    };
+    const onStatus = (msg: any) => {
+      queryClient.invalidateQueries({ queryKey: ['messages', msg.conversationId] });
+    };
+    const onConvUpdated = () => {
+      queryClient.invalidateQueries({ queryKey: ['conversations'] });
+    };
+    const onConvDeleted = (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ['conversations'] });
+      if (data.conversationId === selectedConvId) setSelectedConvId(null);
+    };
+    socket.on('message:new', onNewMsg);
+    socket.on('message:status', onStatus);
+    socket.on('conversation:updated', onConvUpdated);
+    socket.on('conversation:deleted', onConvDeleted);
+    return () => { socket.off('message:new', onNewMsg); socket.off('message:status', onStatus); socket.off('conversation:updated', onConvUpdated); socket.off('conversation:deleted', onConvDeleted); };
+  }, [queryClient, selectedConvId]);
 
-  useEffect(() => { if (selectedConvId) { getSocket().emit('join:conversation', selectedConvId); } }, [selectedConvId]);
+  // Join conversation room + mark as read
+  useEffect(() => {
+    if (selectedConvId) {
+      getSocket().emit('join:conversation', selectedConvId);
+      // Optimistically clear unread badge in local cache
+      queryClient.setQueryData(['conversations', search], (old: any) => {
+        if (!old?.conversations) return old;
+        return {
+          ...old,
+          conversations: old.conversations.map((c: any) =>
+            c._id === selectedConvId ? { ...c, unreadCount: 0 } : c
+          ),
+        };
+      });
+    }
+  }, [selectedConvId, queryClient, search]);
+
   useEffect(() => { 
     if (messagesContainerRef.current) {
       messagesContainerRef.current.scrollTo({
@@ -753,13 +799,65 @@ export default function InboxPage() {
   
   const handleSend = (e: React.FormEvent) => { e.preventDefault(); if (!messageText.trim() || !selectedConvId) return; sendText.mutate(messageText.trim()); };
 
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !selectedConvId) return;
+    e.target.value = '';
+    setUploadingFile(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('caption', '');
+      await api.post(`/api/conversations/${selectedConvId}/upload-and-send`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      toast.success('File sent!');
+      queryClient.refetchQueries({ queryKey: ['messages', selectedConvId] });
+      queryClient.refetchQueries({ queryKey: ['conversations'] });
+    } catch (err: any) {
+      toast.error(err.response?.data?.detail || 'Failed to send file');
+    } finally {
+      setUploadingFile(false);
+    }
+  };
+
+  const handleShowProfile = async () => {
+    if (!selectedConv) return;
+    try {
+      const resp = await api.get(`/api/customers?search=${selectedConv.customerPhone}&limit=1`);
+      const cust = resp.data?.customers?.[0];
+      setProfileData(cust || { name: selectedConv.customerName, phone: selectedConv.customerPhone });
+      setShowProfilePanel(true);
+    } catch {
+      setProfileData({ name: selectedConv.customerName, phone: selectedConv.customerPhone });
+      setShowProfilePanel(true);
+    }
+  };
+
   const safeDate = (ts: string) => {
     if (!ts) return new Date();
-    // If string lacks a timezone offset (+00:00, -05:00, or Z), append Z so browser treats it as UTC
     return new Date(ts.endsWith('Z') || ts.includes('+') ? ts : ts + 'Z');
   };
 
   const getMessageTime = (ts: string) => { try { return format(safeDate(ts), 'HH:mm'); } catch { return ''; } };
+
+  const getDateLabel = (ts: string) => {
+    try {
+      const d = safeDate(ts);
+      if (isToday(d)) return 'Today';
+      if (isYesterday(d)) return 'Yesterday';
+      return format(d, 'dd/MM/yyyy');
+    } catch { return ''; }
+  };
+
+  const getConvDateLabel = (ts: string) => {
+    try {
+      const d = safeDate(ts);
+      if (isToday(d)) return format(d, 'HH:mm');
+      if (isYesterday(d)) return 'Yesterday';
+      return format(d, 'dd/MM/yy');
+    } catch { return ''; }
+  };
 
   return (
     <div style={{ display: 'flex', height: '100%', overflow: 'hidden' }}>
@@ -800,16 +898,19 @@ export default function InboxPage() {
           ) : conversations.map((conv: any) => {
             const [bg, fg] = getAvatarColor(conv.customerName);
             return (
-              <div key={conv._id} className={`chat-item ${selectedConvId === conv._id ? 'active' : ''}`} onClick={() => setSelectedConvId(conv._id)}>
+              <div key={conv._id} className={`chat-item ${selectedConvId === conv._id ? 'active' : ''}`} onClick={() => setSelectedConvId(conv._id)} style={{ position: 'relative' }}>
                 <div className="avatar" style={{ background: bg, color: fg }}>{conv.customerName?.[0]?.toUpperCase() || '?'}</div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-                    <span style={{ fontWeight: '600', fontSize: '14px', color: '#1a1a2e', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '160px' }}>{conv.customerName}</span>
-                    <span style={{ fontSize: '11px', color: '#9ca3af', flexShrink: 0 }}>{conv.lastMessageTime ? format(safeDate(conv.lastMessageTime), 'HH:mm') : ''}</span>
+                    <span style={{ fontWeight: '600', fontSize: '14px', color: '#1a1a2e', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '150px' }}>{conv.customerName}</span>
+                    <span style={{ fontSize: '11px', color: conv.unreadCount > 0 ? '#1B5E37' : '#9ca3af', fontWeight: conv.unreadCount > 0 ? '600' : '400', flexShrink: 0 }}>{conv.lastMessageTime ? getConvDateLabel(conv.lastMessageTime) : ''}</span>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '2px' }}>
-                    <span style={{ fontSize: '12px', color: '#9ca3af', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '190px' }}>{conv.lastMessage || 'No messages'}</span>
-                    {conv.unreadCount > 0 && <div className="unread-badge" style={{ flexShrink: 0 }}>{conv.unreadCount}</div>}
+                    <span style={{ fontSize: '12px', color: '#9ca3af', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '180px' }}>{conv.lastMessage || 'No messages'}</span>
+                    <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexShrink: 0 }}>
+                      {conv.unreadCount > 0 && <div className="unread-badge">{conv.unreadCount}</div>}
+                      <button onClick={(e) => { e.stopPropagation(); if (confirm('Delete this chat and all messages?')) deleteConv.mutate(conv._id); }} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px', color: '#d1d5db', display: 'flex', alignItems: 'center', opacity: 0.5, transition: 'opacity 0.15s' }} onMouseEnter={e => (e.currentTarget.style.opacity = '1', e.currentTarget.style.color = '#ef4444')} onMouseLeave={e => (e.currentTarget.style.opacity = '0.5', e.currentTarget.style.color = '#d1d5db')} title="Delete chat"><Trash2 size={14} /></button>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -841,16 +942,28 @@ export default function InboxPage() {
                   <button className="btn-secondary" style={{ padding: '8px 14px', fontSize: '13px' }} onClick={() => setTemplateModal(true)}>
                     <FileText size={14} /> Template
                   </button>
-                  <a href={`/customers?search=${selectedConv.customerPhone}`}><button className="btn-secondary" style={{ padding: '8px 14px', fontSize: '13px' }}><User size={14} /> Profile</button></a>
+                  <button className="btn-secondary" style={{ padding: '8px 14px', fontSize: '13px' }} onClick={handleShowProfile}><User size={14} /> Profile</button>
                   <a href="/reservations"><button className="btn-secondary" style={{ padding: '8px 14px', fontSize: '13px' }}><CalendarDays size={14} /> Reserve</button></a>
+                  <button className="btn-secondary" style={{ padding: '8px 14px', fontSize: '13px', color: '#ef4444', borderColor: '#fecaca' }} onClick={() => { if (confirm('Delete this chat?')) deleteConv.mutate(selectedConvId!); }}><Trash2 size={14} /></button>
                 </div>
               </>)}
             </div>
             <div ref={messagesContainerRef} style={{ flex: 1, overflowY: 'auto', padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: '8px', backgroundColor: '#efeae2', backgroundImage: 'url("https://user-images.githubusercontent.com/15075759/28719144-86dc0f70-73b1-11e7-911d-60d70fcded21.png")', backgroundRepeat: 'repeat' }}>
               {msgLoading ? <div style={{ textAlign: 'center', color: '#9ca3af', paddingTop: '40px' }}>Loading...</div>
               : messages.length === 0 ? <div style={{ textAlign: 'center', color: '#9ca3af', paddingTop: '60px' }}><Hand size={40} style={{ color: '#d1d5db', marginBottom: '12px' }} /><div>No messages yet. Send the first message!</div></div>
-              : messages.map((msg: any) => (
-                <div key={msg._id} style={{ display: 'flex', justifyContent: msg.direction === 'outbound' ? 'flex-end' : 'flex-start', animation: 'fadeIn 0.2s ease' }}>
+              : messages.map((msg: any, idx: number) => {
+                const prevMsg = idx > 0 ? messages[idx - 1] : null;
+                const curLabel = getDateLabel(msg.timestamp);
+                const prevLabel = prevMsg ? getDateLabel(prevMsg.timestamp) : '';
+                const showDateSep = curLabel !== prevLabel;
+                return (
+                <div key={msg._id}>
+                  {showDateSep && curLabel && (
+                    <div style={{ display: 'flex', justifyContent: 'center', margin: '12px 0' }}>
+                      <span style={{ background: '#e2dacc', color: '#54656f', fontSize: '12px', fontWeight: '600', padding: '4px 14px', borderRadius: '8px', boxShadow: '0 1px 1px rgba(0,0,0,0.08)' }}>{curLabel}</span>
+                    </div>
+                  )}
+                  <div style={{ display: 'flex', justifyContent: msg.direction === 'outbound' ? 'flex-end' : 'flex-start', animation: 'fadeIn 0.2s ease', marginBottom: '4px' }}>
                   <div style={{ maxWidth: '68%' }}>
                     <div className={msg.direction === 'outbound' ? 'msg-outbound' : 'msg-inbound'} style={{ padding: '10px 14px' }}>
                       {msg.type === 'text' && <p style={{ margin: 0, fontSize: '14px', lineHeight: '1.5', wordBreak: 'break-word' }}>{msg.content?.text}</p>}
@@ -864,17 +977,20 @@ export default function InboxPage() {
                         </div>
                       )}
                       {msg.type === 'image' && <div>{msg.content?.mediaUrl ? <img src={msg.content.mediaUrl} alt="Image" style={{ maxWidth: '240px', borderRadius: '8px' }} /> : <p style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '6px' }}><Image size={16} /> Image</p>}</div>}
+                      {msg.type === 'video' && <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><Video size={20} style={{ color: '#6b7280' }} /><span style={{ fontSize: '13px', color: '#6b7280' }}>{msg.content?.text || '[Video]'}</span></div>}
                       {msg.type === 'document' && <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}><FileText size={24} /><div><div style={{ fontSize: '13px', fontWeight: '600' }}>{msg.content?.filename || 'Document'}</div></div></div>}
-                      {!['text', 'image', 'document', 'template'].includes(msg.type) && <p style={{ margin: 0 }}>{msg.content?.text || `[${msg.type}]`}</p>}
+                      {!['text', 'image', 'video', 'document', 'template'].includes(msg.type) && <p style={{ margin: 0 }}>{msg.content?.text || `[${msg.type}]`}</p>}
                     </div>
                     <div style={{ fontSize: '11px', color: '#9ca3af', marginTop: '3px', textAlign: msg.direction === 'outbound' ? 'right' : 'left', display: 'flex', gap: '4px', justifyContent: msg.direction === 'outbound' ? 'flex-end' : 'flex-start', alignItems: 'center' }}>
                       {getMessageTime(msg.timestamp)}
                       {msg.direction === 'outbound' && (
                         <span style={{ 
-                          color: msg.status === 'read' ? '#34B7F1' : 
+                          color: msg.status === 'read' ? '#53bdeb' : 
+                                 msg.status === 'delivered' ? '#9ca3af' :
                                  msg.status === 'failed' ? '#ef4444' : '#9ca3af' 
                         }}>
-                          {msg.status === 'read' || msg.status === 'delivered' ? <CheckCheck size={14} /> : 
+                          {msg.status === 'read' ? <CheckCheck size={14} /> : 
+                           msg.status === 'delivered' ? <CheckCheck size={14} /> :
                            msg.status === 'sent' ? <Check size={14} /> : 
                            msg.status === 'failed' ? <AlertCircle size={14} /> : 
                            <Clock size={12} />}
@@ -883,7 +999,9 @@ export default function InboxPage() {
                     </div>
                   </div>
                 </div>
-              ))}
+                </div>
+                );
+              })}
               <div ref={messagesEndRef} />
             </div>
             {showQuickReplies && (
@@ -897,8 +1015,8 @@ export default function InboxPage() {
             <div style={{ background: 'white', borderTop: '1px solid #374151', padding: '12px 16px', zIndex: 5 }}>
               <form onSubmit={handleSend} style={{ display: 'flex', gap: '10px', alignItems: 'flex-end' }}>
                 <button type="button" onClick={() => setShowQuickReplies(!showQuickReplies)} style={{ padding: '10px', background: showQuickReplies ? '#E8F5E9' : '#f9fafb', border: `1px solid ${showQuickReplies ? '#A7D5B8' : '#e5e7eb'}`, borderRadius: '10px', cursor: 'pointer', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Zap size={18} style={{ color: showQuickReplies ? '#1B5E37' : '#6b7280' }} /></button>
-                <input type="file" ref={fileInputRef} style={{ display: 'none' }} accept="image/*,application/pdf" onChange={async (e) => { const file = e.target.files?.[0]; if (!file) return; toast('File upload requires Cloudinary setup.'); e.target.value = ''; }} />
-                <button type="button" onClick={() => fileInputRef.current?.click()} style={{ padding: '10px', background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '10px', cursor: 'pointer', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Paperclip size={18} style={{ color: '#6b7280' }} /></button>
+                <input type="file" ref={fileInputRef} style={{ display: 'none' }} accept="image/*,video/*,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document" onChange={handleFileUpload} />
+                <button type="button" onClick={() => fileInputRef.current?.click()} disabled={uploadingFile} style={{ padding: '10px', background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '10px', cursor: 'pointer', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{uploadingFile ? <Loader2 size={18} style={{ color: '#6b7280', animation: 'spin 1s linear infinite' }} /> : <Paperclip size={18} style={{ color: '#6b7280' }} />}</button>
                 <div style={{ position: 'relative' }}>
                   <button type="button" onClick={() => setShowEmojiPicker(!showEmojiPicker)} style={{ padding: '10px', background: showEmojiPicker ? '#E8F5E9' : '#f9fafb', border: `1px solid ${showEmojiPicker ? '#A7D5B8' : '#e5e7eb'}`, borderRadius: '10px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     <Smile size={18} style={{ color: showEmojiPicker ? '#1B5E37' : '#6b7280' }} />
@@ -940,6 +1058,38 @@ export default function InboxPage() {
           customerName={selectedConv.customerName || ''}
           onClose={() => setTemplateModal(false)}
         />
+      )}
+
+      {showProfilePanel && profileData && (
+        <div className="modal-overlay" onClick={() => setShowProfilePanel(false)}>
+          <div onClick={e => e.stopPropagation()} style={{ background: 'white', borderRadius: '16px', padding: '28px', maxWidth: '400px', width: '90%', border: '2px solid #1a1a2e', boxShadow: '0 20px 60px rgba(0,0,0,0.2)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+              <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <UserCircle size={20} style={{ color: '#1B5E37' }} /> Customer Profile
+              </h3>
+              <button onClick={() => setShowProfilePanel(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af', padding: '4px' }}><X size={20} /></button>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                {(() => { const [bg, fg] = getAvatarColor(profileData.name || ''); return <div className="avatar" style={{ width: '56px', height: '56px', fontSize: '22px', background: bg, color: fg }}>{(profileData.name || '?')[0]?.toUpperCase()}</div>; })()}
+                <div>
+                  <div style={{ fontWeight: '700', fontSize: '18px', color: '#1a1a2e' }}>{profileData.name || 'Unknown'}</div>
+                  <div style={{ fontSize: '13px', color: '#1B5E37', fontWeight: '500' }}>{formatIndianPhone(profileData.phone)}</div>
+                </div>
+              </div>
+              <div style={{ background: '#f9fafb', borderRadius: '12px', padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px', border: '1px solid #e5e7eb' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ fontSize: '13px', color: '#6b7280' }}>Phone</span><span style={{ fontSize: '13px', fontWeight: '600', color: '#1a1a2e' }}>{formatIndianPhone(profileData.phone)}</span></div>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ fontSize: '13px', color: '#6b7280' }}>WhatsApp ID</span><span style={{ fontSize: '13px', fontWeight: '600', color: '#1a1a2e' }}>{profileData.waId || profileData.phone}</span></div>
+                {profileData.tags?.length > 0 && (
+                  <div><span style={{ fontSize: '13px', color: '#6b7280', display: 'block', marginBottom: '6px' }}>Tags</span><div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>{profileData.tags.map((t: string, i: number) => <span key={i} className="tag-pill" style={{ background: '#E8F5E9', color: '#1B5E37' }}>{t}</span>)}</div></div>
+                )}
+                {profileData.notes && <div><span style={{ fontSize: '13px', color: '#6b7280', display: 'block', marginBottom: '4px' }}>Notes</span><span style={{ fontSize: '13px', color: '#374151' }}>{profileData.notes}</span></div>}
+                {profileData.lastSeen && <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ fontSize: '13px', color: '#6b7280' }}>Last Seen</span><span style={{ fontSize: '13px', fontWeight: '600', color: '#1a1a2e' }}>{format(safeDate(profileData.lastSeen), 'dd MMM yyyy, HH:mm')}</span></div>}
+                {profileData.createdAt && <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ fontSize: '13px', color: '#6b7280' }}>Customer Since</span><span style={{ fontSize: '13px', fontWeight: '600', color: '#1a1a2e' }}>{format(safeDate(profileData.createdAt), 'dd MMM yyyy')}</span></div>}
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

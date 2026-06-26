@@ -9,6 +9,9 @@ from datetime import datetime, timezone
 from bson import ObjectId
 import httpx
 from app.socket import sio
+import os
+import mimetypes
+from app.utils.image_utils import compress_image_bytes
 
 router = APIRouter()
 
@@ -134,11 +137,11 @@ async def send_text(
             "text":              {"preview_url": False, "body": req.text},
         }
 
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            resp = await client.post(url, json=payload, headers=headers)
-            if resp.status_code not in (200, 201):
-                raise HTTPException(status_code=400, detail=f"Failed to send message: {resp.text}")
-            message_id = resp.json().get("messages", [{}])[0].get("id", "unknown")
+        client = get_http_client()
+        resp = await client.post(url, json=payload, headers=headers)
+        if resp.status_code not in (200, 201):
+            raise HTTPException(status_code=400, detail=f"Failed to send message: {resp.text}")
+        message_id = resp.json().get("messages", [{}])[0].get("id", "unknown")
 
     now         = _now()
     message_doc = {
@@ -162,6 +165,139 @@ async def send_text(
     emit_doc = {**message_doc, "timestamp": now.isoformat(), "createdAt": now.isoformat()}
     await sio.emit("message:new",            emit_doc,                        room=conversation_id)
     await sio.emit("conversation:updated",   {"conversationId": conversation_id})
+
+    return message_doc
+
+
+@router.delete("/{conversation_id}")
+async def delete_conversation(
+    conversation_id: str,
+    current_user: dict = Depends(get_current_user),
+):
+    """Delete a conversation and all its messages."""
+    try:
+        obj_id = ObjectId(conversation_id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid conversation ID")
+
+    conv = await db.db.conversations.find_one({"_id": obj_id})
+    if not conv:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+
+    # Delete all messages in this conversation
+    await db.db.messages.delete_many({"conversationId": conversation_id})
+    # Delete the conversation itself
+    await db.db.conversations.delete_one({"_id": obj_id})
+
+    await sio.emit("conversation:deleted", {"conversationId": conversation_id})
+
+    return {"message": "Conversation deleted successfully"}
+
+
+
+
+from fastapi import UploadFile, File, Form
+from app.http_client import get_http_client
+
+
+@router.post("/{conversation_id}/upload-and-send")
+async def upload_and_send_media(
+    conversation_id: str,
+    file: UploadFile = File(...),
+    caption: str = Form(""),
+    current_user: dict = Depends(get_current_user),
+):
+    """Upload a file and send it as a media message in a conversation."""
+    wa_phone_id = current_user.get("waPhoneNumberId") or settings.WA_PHONE_NUMBER_ID
+    wa_token    = current_user.get("waAccessToken")    or settings.WA_ACCESS_TOKEN
+
+    if not wa_phone_id or not wa_token:
+        raise HTTPException(status_code=400, detail="WhatsApp credentials not configured")
+
+    conversation = await db.db.conversations.find_one({"_id": ObjectId(conversation_id)})
+    if not conversation:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+
+    customer_phone = conversation["customerPhone"]
+    file_bytes = await file.read()
+    file_type = file.content_type or "application/octet-stream"
+    filename = file.filename or "file"
+
+    # Determine WhatsApp media type
+    if file_type.startswith("image/"):
+        wa_media_type = "image"
+    elif file_type.startswith("video/"):
+        wa_media_type = "video"
+    elif file_type.startswith("audio/"):
+        wa_media_type = "audio"
+    else:
+        wa_media_type = "document"
+
+    now = _now()
+
+    if wa_token == "test_token":
+        message_id = f"mock_media_{int(now.timestamp())}"
+    else:
+        # Step 1: Upload media to WhatsApp
+        upload_url = f"https://graph.facebook.com/{settings.WA_API_VERSION}/{wa_phone_id}/media"
+        upload_headers = {"Authorization": f"Bearer {wa_token}"}
+        upload_files = {"file": (filename, file_bytes, file_type)}
+        upload_data = {"messaging_product": "whatsapp"}
+
+        client = get_http_client()
+        upload_resp = await client.post(upload_url, headers=upload_headers, data=upload_data, files=upload_files)
+        if upload_resp.status_code not in (200, 201):
+            raise HTTPException(status_code=400, detail=f"Failed to upload media: {upload_resp.text}")
+        media_id = upload_resp.json().get("id")
+
+        # Step 2: Send media message
+        send_url = f"https://graph.facebook.com/{settings.WA_API_VERSION}/{wa_phone_id}/messages"
+        send_headers = {
+            "Authorization": f"Bearer {wa_token}",
+            "Content-Type": "application/json",
+        }
+        media_obj = {"id": media_id}
+        if caption and wa_media_type in ("image", "video", "document"):
+            media_obj["caption"] = caption
+        if wa_media_type == "document":
+            media_obj["filename"] = filename
+
+        send_payload = {
+            "messaging_product": "whatsapp",
+            "recipient_type": "individual",
+            "to": customer_phone,
+            "type": wa_media_type,
+            wa_media_type: media_obj,
+        }
+
+        client = get_http_client()
+        resp = await client.post(send_url, json=send_payload, headers=send_headers)
+        if resp.status_code not in (200, 201):
+            raise HTTPException(status_code=400, detail=f"Failed to send media: {resp.text}")
+        message_id = resp.json().get("messages", [{}])[0].get("id", "unknown")
+
+    display_text = caption if caption else f"[{wa_media_type.capitalize()}]"
+    message_doc = {
+        "conversationId":    conversation_id,
+        "whatsappMessageId": message_id,
+        "direction":         "outbound",
+        "type":              wa_media_type,
+        "content":           {"text": display_text, "filename": filename, "mimeType": file_type},
+        "status":            "sent",
+        "timestamp":         now,
+        "createdAt":         now,
+    }
+    result = await db.db.messages.insert_one(message_doc)
+    message_doc["_id"] = str(result.inserted_id)
+
+    await db.db.conversations.update_one(
+        {"_id": ObjectId(conversation_id)},
+        {"$set": {"lastMessage": display_text, "lastMessageTime": now, "updatedAt": now}},
+    )
+
+    emit_doc = {**message_doc, "timestamp": now.isoformat(), "createdAt": now.isoformat()}
+    await sio.emit("message:new",          emit_doc,                        room=conversation_id)
+    await sio.emit("conversation:updated", {"conversationId": conversation_id})
 
     return message_doc
 
@@ -204,12 +340,10 @@ async def send_template_in_conversation(
 
         if final_header_url and ("localhost" in final_header_url or "/uploads/" in final_header_url):
             # It's a local file. We must upload it to Meta first to get a media_id
-            import os
             filename = final_header_url.split("/")[-1].split("?")[0]
             local_path = os.path.join("uploads", "media", filename)
             
             if os.path.exists(local_path):
-                import mimetypes
                 file_type, _ = mimetypes.guess_type(local_path)
                 file_type = file_type or "image/jpeg"
                 
@@ -217,7 +351,6 @@ async def send_template_in_conversation(
                     file_bytes = f.read()
                 
                 # Compress image if too large for WhatsApp (5 MB limit)
-                from app.utils.image_utils import compress_image_bytes
                 file_bytes, filename, file_type = compress_image_bytes(file_bytes, filename, file_type)
                 
                 upload_url = f"https://graph.facebook.com/{settings.WA_API_VERSION}/{wa_phone_id}/media"
@@ -230,13 +363,13 @@ async def send_template_in_conversation(
                 upload_headers = {
                     "Authorization": f"Bearer {wa_token}"
                 }
-                async with httpx.AsyncClient(timeout=60.0) as u_client:
-                    u_resp = await u_client.post(upload_url, headers=upload_headers, data=upload_data, files=upload_files)
-                    if u_resp.status_code in (200, 201):
-                        final_header_id = u_resp.json().get("id")
-                        final_header_url = None # Unset URL since we have ID
-                    else:
-                        raise HTTPException(status_code=400, detail=f"Failed to auto-upload template media to WhatsApp: {u_resp.text}")
+                u_client = get_http_client()
+                u_resp = await u_client.post(upload_url, headers=upload_headers, data=upload_data, files=upload_files)
+                if u_resp.status_code in (200, 201):
+                    final_header_id = u_resp.json().get("id")
+                    final_header_url = None # Unset URL since we have ID
+                else:
+                    raise HTTPException(status_code=400, detail=f"Failed to auto-upload template media to WhatsApp: {u_resp.text}")
             else:
                 raise HTTPException(status_code=400, detail=f"Local media file not found: {local_path}")
 
@@ -260,11 +393,11 @@ async def send_template_in_conversation(
             "template":          template_payload,
         }
 
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            resp = await client.post(url, json=payload, headers=headers)
-            if resp.status_code not in (200, 201):
-                raise HTTPException(status_code=400, detail=f"Failed to send template: {resp.text}")
-            message_id = resp.json().get("messages", [{}])[0].get("id", "unknown")
+        client = get_http_client()
+        resp = await client.post(url, json=payload, headers=headers)
+        if resp.status_code not in (200, 201):
+            raise HTTPException(status_code=400, detail=f"Failed to send template: {resp.text}")
+        message_id = resp.json().get("messages", [{}])[0].get("id", "unknown")
 
     now          = _now()
     display_text = req.templateText if req.templateText else f"[Template: {req.templateName}]"

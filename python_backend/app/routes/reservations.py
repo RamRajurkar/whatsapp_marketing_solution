@@ -5,6 +5,9 @@ from app.routes.auth import get_current_user
 from app.database import db
 from bson import ObjectId
 from datetime import datetime
+from app.config import settings
+from app.http_client import get_http_client
+import httpx
 
 router = APIRouter()
 
@@ -52,8 +55,6 @@ async def update_reservation_status(
         
         # Trigger feedback message if completed
         if data.status == "Completed":
-            from app.config import settings
-            import httpx
             
             wa_token = current_user.get("waAccessToken") or settings.WA_ACCESS_TOKEN
             wa_phone_id = current_user.get("waPhoneNumberId") or settings.WA_PHONE_NUMBER_ID
@@ -74,15 +75,15 @@ async def update_reservation_status(
                     "text": {"preview_url": False, "body": feedback_msg}
                 }
                 
-                async with httpx.AsyncClient(timeout=30.0) as client:
-                    resp = await client.post(url, json=payload, headers=headers)
-                    if resp.status_code in (200, 201):
-                        # Save feedback state
-                        await db.db.feedback_states.update_one(
-                            {"phone": updated_res["phone"]},
-                            {"$set": {"reservationId": res_id, "updatedAt": datetime.utcnow()}},
-                            upsert=True
-                        )
+                client = get_http_client()
+                resp = await client.post(url, json=payload, headers=headers)
+                if resp.status_code in (200, 201):
+                    # Save feedback state
+                    await db.db.feedback_states.update_one(
+                        {"phone": updated_res["phone"]},
+                        {"$set": {"reservationId": res_id, "updatedAt": datetime.utcnow()}},
+                        upsert=True
+                    )
 
     return {"message": "Status updated", "data": updated_res}
 

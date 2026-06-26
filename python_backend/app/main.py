@@ -12,15 +12,38 @@ from datetime import datetime, timezone
 from app.database import connect_to_mongo, close_mongo_connection, db
 from app.utils.auth import get_password_hash
 import os
+from app.services.message_poller import catchup_missed_messages
+from app.http_client import get_http_client, close_http_client
 
 # Ensure uploads directory exists
 os.makedirs("uploads/branding", exist_ok=True)
 os.makedirs("uploads/menu", exist_ok=True)
 
 
+async def create_indexes(db):
+    # conversations — queried by phone number on every message
+    await db.db.conversations.create_index("phone_number")
+    await db.db.conversations.create_index("user_id")
+
+    # messages — queried by conversation_id sorted by created_at
+    await db.db.messages.create_index([("conversation_id", 1), ("created_at", -1)])
+
+    # customers — queried by phone on every message
+    await db.db.customers.create_index("phone")
+    await db.db.customers.create_index("user_id")
+
+    # bot_settings — queried by user_id on every message
+    await db.db.bot_settings.create_index("user_id")
+
+    # broadcasts — queried by status and scheduled_at
+    await db.db.broadcasts.create_index([("status", 1), ("scheduled_at", 1)])
+
+    print("[STARTUP] MongoDB indexes created")
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
+    get_http_client()  # Initialize the persistent HTTP client
     await connect_to_mongo()
 
     # Create MongoDB indexes for query performance
@@ -32,13 +55,13 @@ async def lifespan(app: FastAPI):
         await db.db.conversations.create_index("customerPhone", unique=True)
         await db.db.conversations.create_index([("lastMessageTime", -1)])
         await db.db.reservation_states.create_index("updatedAt", expireAfterSeconds=600)
+        await create_indexes(db)
         print("MongoDB indexes created/verified")
     except Exception as e:
         print(f"Warning: Could not create some indexes: {e}")
 
     # ── Missed-message catchup (Supabase queue) ──────────────────────────
     try:
-        from app.services.message_poller import catchup_missed_messages
         print("[STARTUP] Running missed-message catchup …")
         await catchup_missed_messages()
         print("[STARTUP] Missed-message catchup complete")
@@ -47,6 +70,7 @@ async def lifespan(app: FastAPI):
 
     yield
     # Shutdown
+    await close_http_client()
     await close_mongo_connection()
 
 app = FastAPI(title="RestoChat API", lifespan=lifespan)

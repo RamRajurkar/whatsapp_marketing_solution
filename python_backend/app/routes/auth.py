@@ -6,6 +6,7 @@ from app.database import db
 from pydantic import BaseModel
 from fastapi.security import OAuth2PasswordBearer
 from app.limiter import limiter
+from bson import ObjectId
 
 router = APIRouter()
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/auth/login")
@@ -18,7 +19,6 @@ async def get_current_user(token: str = Depends(oauth2_scheme)):
 
     user = await db.db.users.find_one({"_id": payload.get("id")})
     if not user:
-        from bson import ObjectId
         try:
             user = await db.db.users.find_one({"_id": ObjectId(payload.get("id"))})
         except Exception:

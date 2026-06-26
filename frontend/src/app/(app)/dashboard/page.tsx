@@ -67,7 +67,7 @@ function StatCard({ icon: Icon, label, value, color, subtitle }: any) {
   );
 }
 
-const DAYS_OF_WEEK = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+const DAYS_OF_WEEK_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
 export default function DashboardPage() {
   const { data: stats, isLoading } = useQuery<DashboardStats>({
@@ -88,12 +88,21 @@ export default function DashboardPage() {
     refetchInterval: 60000,
   });
 
-  const chartData = analytics?.dailyMessages?.map((d: any, i: number) => ({
-    day: DAYS_OF_WEEK[new Date(d._id).getDay()],
-    total: d.count,
-    inbound: d.inbound,
-    outbound: d.outbound,
-  })) || [];
+  // Build chart data — fill all 7 days so there are no gaps
+  const rawDaily = analytics?.dailyMessages || [];
+  const dailyMap: Record<string, { inbound: number; outbound: number; total: number }> = {};
+  for (const d of rawDaily) {
+    dailyMap[d._id] = { inbound: d.inbound || 0, outbound: d.outbound || 0, total: d.count || 0 };
+  }
+  const chartData: { day: string; date: string; total: number; inbound: number; outbound: number }[] = [];
+  for (let i = 6; i >= 0; i--) {
+    const dt = new Date();
+    dt.setDate(dt.getDate() - i);
+    const key = dt.toISOString().slice(0, 10); // YYYY-MM-DD
+    const dayName = DAYS_OF_WEEK_SHORT[dt.getDay()];
+    const entry = dailyMap[key] || { inbound: 0, outbound: 0, total: 0 };
+    chartData.push({ day: dayName, date: key, total: entry.total, inbound: entry.inbound, outbound: entry.outbound });
+  }
 
   // Pie chart for project progress-like widget
   const totalMessages = analytics?.totals?.messages || 0;
@@ -184,7 +193,7 @@ export default function DashboardPage() {
                 Message Analytics
               </h3>
             </div>
-            {chartData.length > 0 ? (
+            {chartData.some(d => d.total > 0) ? (
               <ResponsiveContainer width="100%" height={220}>
                 <BarChart data={chartData} barCategoryGap="30%">
                   <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" vertical={false} />
@@ -198,6 +207,7 @@ export default function DashboardPage() {
                     tick={{ fontSize: 12, fill: '#9ca3af' }}
                     axisLine={false}
                     tickLine={false}
+                    allowDecimals={false}
                   />
                   <Tooltip
                     contentStyle={{

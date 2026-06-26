@@ -7,6 +7,10 @@ import aiofiles
 from app.routes.auth import get_current_user
 from app.database import db
 from app.config import settings
+from app.utils.auth import get_password_hash
+from app.http_client import get_http_client
+import httpx
+import time
 
 router = APIRouter()
 
@@ -75,7 +79,6 @@ async def update_settings(settings_data: SettingsUpdate, current_user: dict = De
         return {"message": "No fields to update"}
     
     if "password" in update_data:
-        from app.utils.auth import get_password_hash
         update_data["password"] = get_password_hash(update_data["password"])
         
     # Convert string _id back to ObjectId for MongoDB query
@@ -113,14 +116,13 @@ async def test_connection(current_user: dict = Depends(get_current_user)):
         }
 
     # In a real app we'd make a request to Graph API here
-    import httpx
     url = f"https://graph.facebook.com/{settings.WA_API_VERSION}/{wa_phone_number_id}"
     headers = {"Authorization": f"Bearer {wa_access_token}"}
     
-    async with httpx.AsyncClient() as client:
-        response = await client.get(url, headers=headers)
-        if response.status_code != 200:
-            raise HTTPException(status_code=400, detail=f"Meta API Error: {response.text}")
+    client = get_http_client()
+    response = await client.get(url, headers=headers)
+    if response.status_code != 200:
+        raise HTTPException(status_code=400, detail=f"Meta API Error: {response.text}")
             
     return {"message": "Connection successful", "phoneInfo": response.json()}
 
@@ -178,7 +180,6 @@ async def upload_branding_image(
         content = await file.read()
         await out_file.write(content)
         
-    import time
     url_path = f"http://localhost:5000/uploads/branding/{filename}?v={int(time.time())}"
     
     # Update db

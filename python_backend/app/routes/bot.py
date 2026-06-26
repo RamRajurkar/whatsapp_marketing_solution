@@ -3,6 +3,7 @@ from pydantic import BaseModel
 from typing import Optional
 from app.routes.auth import get_current_user
 from app.database import db
+from app.services.bot_cache import invalidate_cache
 
 router = APIRouter()
 
@@ -44,5 +45,8 @@ async def update_bot_settings(data: BotSettingsUpdate, current_user: dict = Depe
         {"$set": doc},
         upsert=True
     )
+    
+    # Invalidate the cache to apply new settings immediately
+    invalidate_cache()
     
     return {"message": "Settings updated successfully", "data": doc}

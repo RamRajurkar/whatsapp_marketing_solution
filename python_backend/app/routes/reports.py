@@ -38,14 +38,15 @@ async def get_dashboard_stats(current_user: dict = Depends(get_current_user)):
 async def get_analytics(days: int = 7, current_user: dict = Depends(get_current_user)):
     start_date = _now() - timedelta(days=days)
     
-    # Aggregate messages by day
+    # Aggregate messages by day — use createdAt if available, fall back to timestamp
     messages_pipeline = [
-        {"$match": {"createdAt": {"$gte": start_date}}},
+        {"$addFields": {"_dateField": {"$ifNull": ["$createdAt", "$timestamp"]}}},
+        {"$match": {"_dateField": {"$gte": start_date}}},
         {"$group": {
             "_id": {
                 "$dateToString": {
                     "format": "%Y-%m-%d",
-                    "date": "$createdAt"
+                    "date": "$_dateField"
                 }
             },
             "count": {"$sum": 1},

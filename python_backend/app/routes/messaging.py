@@ -10,6 +10,11 @@ from app.utils.template_utils import build_template_components
 from bson import ObjectId
 from datetime import datetime, timezone
 import httpx
+import os
+import mimetypes
+import re
+from app.utils.image_utils import compress_image_bytes
+from app.http_client import get_http_client
 
 
 def _now():
@@ -68,12 +73,12 @@ async def send_text_direct(req: SendTextRequest, current_user: dict = Depends(ge
             "text": {"preview_url": False, "body": req.text}
         }
     
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            resp = await client.post(url, json=payload, headers=headers)
-            if resp.status_code not in (200, 201):
-                raise HTTPException(status_code=400, detail=f"Failed to send: {resp.text}")
-            data = resp.json()
-            wa_msg_id = data.get("messages", [{}])[0].get("id", "unknown")
+        client = get_http_client()
+        resp = await client.post(url, json=payload, headers=headers)
+        if resp.status_code not in (200, 201):
+            raise HTTPException(status_code=400, detail=f"Failed to send: {resp.text}")
+        data = resp.json()
+        wa_msg_id = data.get("messages", [{}])[0].get("id", "unknown")
 
     # Auto-create customer if not exists
     customer = await db.db.customers.find_one({"phone": phone})
@@ -186,12 +191,10 @@ async def send_template_direct(req: SendTemplateRequest, current_user: dict = De
 
         if final_header_url and ("localhost" in final_header_url or "/uploads/" in final_header_url):
             # It's a local file. We must upload it to Meta first to get a media_id
-            import os
             filename = final_header_url.split("/")[-1].split("?")[0]
             local_path = os.path.join("uploads", "media", filename)
             
             if os.path.exists(local_path):
-                import mimetypes
                 file_type, _ = mimetypes.guess_type(local_path)
                 file_type = file_type or "image/jpeg"
                 
@@ -199,7 +202,6 @@ async def send_template_direct(req: SendTemplateRequest, current_user: dict = De
                     file_bytes = f.read()
                 
                 # Compress image if too large for WhatsApp (5 MB limit)
-                from app.utils.image_utils import compress_image_bytes
                 file_bytes, filename, file_type = compress_image_bytes(file_bytes, filename, file_type)
                 
                 upload_url = f"https://graph.facebook.com/{settings.WA_API_VERSION}/{wa_phone_id}/media"
@@ -212,13 +214,13 @@ async def send_template_direct(req: SendTemplateRequest, current_user: dict = De
                 upload_headers = {
                     "Authorization": f"Bearer {wa_token}"
                 }
-                async with httpx.AsyncClient(timeout=60.0) as u_client:
-                    u_resp = await u_client.post(upload_url, headers=upload_headers, data=upload_data, files=upload_files)
-                    if u_resp.status_code in (200, 201):
-                        final_header_id = u_resp.json().get("id")
-                        final_header_url = None # Unset URL since we have ID
-                    else:
-                        raise HTTPException(status_code=400, detail=f"Failed to auto-upload template media to WhatsApp: {u_resp.text}")
+                u_client = get_http_client()
+                u_resp = await u_client.post(upload_url, headers=upload_headers, data=upload_data, files=upload_files)
+                if u_resp.status_code in (200, 201):
+                    final_header_id = u_resp.json().get("id")
+                    final_header_url = None # Unset URL since we have ID
+                else:
+                    raise HTTPException(status_code=400, detail=f"Failed to auto-upload template media to WhatsApp: {u_resp.text}")
             else:
                 raise HTTPException(status_code=400, detail=f"Local media file not found: {local_path}")
 
@@ -242,12 +244,12 @@ async def send_template_direct(req: SendTemplateRequest, current_user: dict = De
             "template": template_payload
         }
     
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            resp = await client.post(url, json=payload, headers=headers)
-            if resp.status_code not in (200, 201):
-                raise HTTPException(status_code=400, detail=f"Failed to send template: {resp.text}")
-            data = resp.json()
-            wa_msg_id = data.get("messages", [{}])[0].get("id", "unknown")
+        client = get_http_client()
+        resp = await client.post(url, json=payload, headers=headers)
+        if resp.status_code not in (200, 201):
+            raise HTTPException(status_code=400, detail=f"Failed to send template: {resp.text}")
+        data = resp.json()
+        wa_msg_id = data.get("messages", [{}])[0].get("id", "unknown")
 
     # Auto-create customer if not exists
     customer = await db.db.customers.find_one({"phone": phone})
@@ -323,11 +325,11 @@ async def get_templates(current_user: dict = Depends(get_current_user)):
     url = f"https://graph.facebook.com/{settings.WA_API_VERSION}/{wa_business_id}/message_templates"
     headers = {"Authorization": f"Bearer {wa_token}"}
 
-    async with httpx.AsyncClient(timeout=30.0) as client:
-        resp = await client.get(url, headers=headers)
-        if resp.status_code != 200:
-            raise HTTPException(status_code=400, detail=f"Failed to fetch templates: {resp.text}")
-        data = resp.json()
+    client = get_http_client()
+    resp = await client.get(url, headers=headers)
+    if resp.status_code != 200:
+        raise HTTPException(status_code=400, detail=f"Failed to fetch templates: {resp.text}")
+    data = resp.json()
 
     templates = []
     for t in data.get("data", []):
@@ -366,34 +368,33 @@ async def create_template(
         file_length = len(file_bytes)
         file_type = file.content_type or "image/jpeg"
 
-        async with httpx.AsyncClient(timeout=60.0) as client:
-            # Step A: Get upload session
-            session_url = f"https://graph.facebook.com/{settings.WA_API_VERSION}/{wa_app_id}/uploads"
-            session_params = {"file_length": file_length, "file_type": file_type}
-            session_headers = {"Authorization": f"Bearer {wa_token}"}
-            session_resp = await client.post(session_url, params=session_params, headers=session_headers)
-            if session_resp.status_code != 200:
-                raise HTTPException(status_code=400, detail=f"Failed to create upload session: {session_resp.text}")
-            session_id = session_resp.json().get("id")
+        client = get_http_client()
+        # Step A: Get upload session
+        session_url = f"https://graph.facebook.com/{settings.WA_API_VERSION}/{wa_app_id}/uploads"
+        session_params = {"file_length": file_length, "file_type": file_type}
+        session_headers = {"Authorization": f"Bearer {wa_token}"}
+        session_resp = await client.post(session_url, params=session_params, headers=session_headers)
+        if session_resp.status_code != 200:
+            raise HTTPException(status_code=400, detail=f"Failed to create upload session: {session_resp.text}")
+        session_id = session_resp.json().get("id")
 
-            # Step B: Upload file
-            upload_url = f"https://graph.facebook.com/{settings.WA_API_VERSION}/{session_id}"
-            upload_headers = {"Authorization": f"OAuth {wa_token}", "file_offset": "0"}
-            upload_resp = await client.post(upload_url, headers=upload_headers, content=file_bytes)
-            if upload_resp.status_code != 200:
-                raise HTTPException(status_code=400, detail=f"Failed to upload image: {upload_resp.text}")
-            header_handle = upload_resp.json().get("h")
+        # Step B: Upload file
+        upload_url = f"https://graph.facebook.com/{settings.WA_API_VERSION}/{session_id}"
+        upload_headers = {"Authorization": f"OAuth {wa_token}", "file_offset": "0"}
+        upload_resp = await client.post(upload_url, headers=upload_headers, content=file_bytes)
+        if upload_resp.status_code != 200:
+            raise HTTPException(status_code=400, detail=f"Failed to upload image: {upload_resp.text}")
+        header_handle = upload_resp.json().get("h")
 
-            components.append({
-                "type": "HEADER",
-                "format": "IMAGE",
-                "example": {
-                    "header_handle": [header_handle]
-                }
-            })
+        components.append({
+            "type": "HEADER",
+            "format": "IMAGE",
+            "example": {
+                "header_handle": [header_handle]
+            }
+        })
 
     # 2. Add Body component
-    import re
     body_component = {
         "type": "BODY",
         "text": bodyText
@@ -417,11 +418,11 @@ async def create_template(
     }
     create_headers = {"Authorization": f"Bearer {wa_token}", "Content-Type": "application/json"}
 
-    async with httpx.AsyncClient(timeout=30.0) as client:
-        resp = await client.post(create_url, json=create_payload, headers=create_headers)
-        if resp.status_code not in (200, 201):
-            raise HTTPException(status_code=400, detail=f"Failed to create template: {resp.text}")
-        return resp.json()
+    client = get_http_client()
+    resp = await client.post(create_url, json=create_payload, headers=create_headers)
+    if resp.status_code not in (200, 201):
+        raise HTTPException(status_code=400, detail=f"Failed to create template: {resp.text}")
+    return resp.json()
 
 @router.post("/upload-media")
 async def upload_media(
@@ -449,9 +450,9 @@ async def upload_media(
         "messaging_product": "whatsapp"
     }
 
-    async with httpx.AsyncClient(timeout=60.0) as client:
-        resp = await client.post(upload_url, headers=headers, data=data, files=files)
-        if resp.status_code not in (200, 201):
-            raise HTTPException(status_code=400, detail=f"Failed to upload media to WhatsApp: {resp.text}")
-            
-        return {"id": resp.json().get("id")}
+    client = get_http_client()
+    resp = await client.post(upload_url, headers=headers, data=data, files=files)
+    if resp.status_code not in (200, 201):
+        raise HTTPException(status_code=400, detail=f"Failed to upload media to WhatsApp: {resp.text}")
+        
+    return {"id": resp.json().get("id")}
