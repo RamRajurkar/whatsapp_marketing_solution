@@ -95,9 +95,9 @@ async def _process_webhook_body(body: dict) -> dict:
 
                     customer_name = contact.get("profile", {}).get("name", "Unknown")
                     message_id    = msg.get("id")
-                    timestamp     = datetime.utcfromtimestamp(
-                        int(msg.get("timestamp", _now().timestamp()))
-                    ).replace(tzinfo=timezone.utc)
+                    # We use server time instead of Meta's timestamp to prevent clock skew 
+                    # from sorting bot replies above customer messages.
+                    timestamp = _now()
                     msg_type      = msg.get("type")
 
                     # Extract text content based on message type
