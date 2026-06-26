@@ -726,10 +726,13 @@ export default function InboxPage() {
   });
   const sendText = useMutation({
     mutationFn: (text: string) => api.post(`/api/conversations/${selectedConvId}/send-text`, { text }),
-    onSuccess: () => {
+    onSuccess: (res) => {
       setMessageText('');
-      queryClient.refetchQueries({ queryKey: ['messages', selectedConvId] });
-      queryClient.refetchQueries({ queryKey: ['conversations'] });
+      queryClient.setQueryData(['messages', selectedConvId], (old: any) => {
+        if (!old) return { messages: [res.data] };
+        return { ...old, messages: [...old.messages, res.data] };
+      });
+      queryClient.invalidateQueries({ queryKey: ['conversations'] });
     },
     onError: (err: any) => toast.error(err.response?.data?.detail || 'Failed to send'),
   });
@@ -808,12 +811,15 @@ export default function InboxPage() {
       const formData = new FormData();
       formData.append('file', file);
       formData.append('caption', '');
-      await api.post(`/api/conversations/${selectedConvId}/upload-and-send`, formData, {
+      const res = await api.post(`/api/conversations/${selectedConvId}/upload-and-send`, formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
       toast.success('File sent!');
-      queryClient.refetchQueries({ queryKey: ['messages', selectedConvId] });
-      queryClient.refetchQueries({ queryKey: ['conversations'] });
+      queryClient.setQueryData(['messages', selectedConvId], (old: any) => {
+        if (!old) return { messages: [res.data] };
+        return { ...old, messages: [...old.messages, res.data] };
+      });
+      queryClient.invalidateQueries({ queryKey: ['conversations'] });
     } catch (err: any) {
       toast.error(err.response?.data?.detail || 'Failed to send file');
     } finally {

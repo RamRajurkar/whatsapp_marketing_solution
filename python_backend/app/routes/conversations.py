@@ -83,11 +83,15 @@ async def get_messages(
     skip   = (page - 1) * page_size
     cursor = (
         db.db.messages.find({"conversationId": conversation_id})
-        .sort("timestamp", 1)
+        .sort("timestamp", -1)
         .skip(skip)
         .limit(page_size)
     )
     messages = await cursor.to_list(length=page_size)
+    
+    # Reverse to return in chronological order (oldest first in the array) for the UI
+    messages.reverse()
+    
     total    = await db.db.messages.count_documents({"conversationId": conversation_id})
 
     for msg in messages:
