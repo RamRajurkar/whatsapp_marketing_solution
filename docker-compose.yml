@@ -29,7 +29,7 @@ services:
     container_name: wa_redis
     restart: unless-stopped
     ports:
-      - "6379:6379"
+      - "6389:6379"
     command: redis-server --maxmemory 128mb --maxmemory-policy allkeys-lru
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]

@@ -34,6 +34,7 @@ class SendTemplateRequest(BaseModel):
     templateLanguage: str = "en"
     templateComponents: Optional[List[dict]] = None  # Template component definitions from Meta API
     headerMediaUrl: Optional[str] = None             # URL for image/video/document headers
+    headerMediaId: Optional[str] = None              # Direct WhatsApp Media ID (e.g. from upload-media)
     bodyParams: Optional[List[str]] = None           # Values for body variables {{1}}, {{2}}, etc.
     carouselCards: Optional[List[dict]] = None       # Per-card params: {mediaUrl, bodyParams}
 
