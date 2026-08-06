@@ -4,7 +4,8 @@ from typing import List, Optional
 from app.routes.auth import get_current_user
 from app.database import db
 from bson import ObjectId
-from datetime import datetime
+from datetime import datetime, timezone
+from app.utils.tenant import get_tenant_filter, inject_tenant_id
 
 router = APIRouter()
 
@@ -21,8 +22,9 @@ class FAQItemUpdate(BaseModel):
 @router.get("/")
 async def get_faqs(current_user: dict = Depends(get_current_user)):
     """Get all FAQ items."""
+    tenant_filter = get_tenant_filter(current_user)
     faqs = []
-    cursor = db.db.faq_items.find().sort("createdAt", -1)
+    cursor = db.db.faq_items.find(tenant_filter).sort("createdAt", -1)
     async for faq in cursor:
         faq["_id"] = str(faq["_id"])
         faqs.append(faq)
@@ -35,11 +37,12 @@ async def create_faq(
 ):
     """Create a new FAQ item."""
     doc = data.model_dump()
-    doc["createdAt"] = datetime.utcnow()
-    doc["updatedAt"] = datetime.utcnow()
+    doc["createdAt"] = datetime.now(timezone.utc)
+    doc["updatedAt"] = datetime.now(timezone.utc)
     
     # Normalize keywords to lowercase
     doc["keywords"] = [k.lower().strip() for k in doc["keywords"] if k.strip()]
+    inject_tenant_id(doc, current_user)
     
     result = await db.db.faq_items.insert_one(doc)
     doc["_id"] = str(result.inserted_id)
@@ -52,14 +55,19 @@ async def update_faq(
     current_user: dict = Depends(get_current_user)
 ):
     """Update an FAQ item."""
+    tenant_filter = get_tenant_filter(current_user)
+    query = {"_id": ObjectId(faq_id)}
+    if tenant_filter:
+        query = {"$and": [query, tenant_filter]}
+
     update_data = data.model_dump(exclude_unset=True)
-    update_data["updatedAt"] = datetime.utcnow()
+    update_data["updatedAt"] = datetime.now(timezone.utc)
     
     if "keywords" in update_data:
         update_data["keywords"] = [k.lower().strip() for k in update_data["keywords"] if k.strip()]
 
     result = await db.db.faq_items.update_one(
-        {"_id": ObjectId(faq_id)},
+        query,
         {"$set": update_data}
     )
     
@@ -74,7 +82,12 @@ async def delete_faq(
     current_user: dict = Depends(get_current_user)
 ):
     """Delete an FAQ item."""
-    result = await db.db.faq_items.delete_one({"_id": ObjectId(faq_id)})
+    tenant_filter = get_tenant_filter(current_user)
+    query = {"_id": ObjectId(faq_id)}
+    if tenant_filter:
+        query = {"$and": [query, tenant_filter]}
+
+    result = await db.db.faq_items.delete_one(query)
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="FAQ not found")
     return {"message": "FAQ deleted"}

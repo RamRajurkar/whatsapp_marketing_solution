@@ -1,0 +1,525 @@
+{
+  "flowId": "rathod_wholesale_flow",
+  "startNode": "node_language",
+  "nodes": {
+
+    "node_language": {
+      "type": "interactive_button",
+      "text": "Welcome to Rathod Creation! 🧵\nPlease choose your preferred language to continue / अपनी भाषा चुनें / आपली भाषा निवडा:\n\n(Type 'stop' anytime to end conversation)",
+      "buttons": [
+        { "id": "lang_en", "title": "English", "nextNode": "node_welcome_en" },
+        { "id": "lang_hi", "title": "हिंदी", "nextNode": "node_welcome_hi" },
+        { "id": "lang_mr", "title": "मराठी", "nextNode": "node_welcome_mr" }
+      ]
+    },
+
+    "node_welcome_en": {
+      "type": "interactive_list",
+      "text": "Welcome to Rathod Creation Wholesale! 🧵\nHow can we help you today? Please select an option from the menu below:\n\n(Type 'stop' anytime to end conversation)",
+      "buttonText": "Select Option",
+      "sections": [
+        {
+          "title": "Select Option",
+          "rows": [
+            { "id": "btn_catalog", "title": "🛍️ View Catalog", "description": "Browse our products and designs", "nextNode": "node_catalog_en" },
+            { "id": "btn_enquiry", "title": "📦 Product Enquiry", "description": "Enquire about wholesale orders", "nextNode": "node_enquiry_start_en" },
+            { "id": "btn_owner", "title": "💬 Talk to Our Team", "description": "Chat with our customer support team", "nextNode": "node_talk_owner_en" },
+            { "id": "btn_previous", "title": "🔙 Previous Step", "description": "Go back to language choice", "nextNode": "node_language" }
+          ]
+        }
+      ]
+    },
+    "node_catalog_en": {
+      "type": "interactive_list",
+      "text": "How would you like to view our catalog?",
+      "buttonText": "Explore Catalog",
+      "sections": [
+        {
+          "title": "Options",
+          "rows": [
+            { "id": "btn_full_catalog", "title": "📖 Full Catalog", "description": "View all collections at once", "nextNode": "node_cat_full_en" },
+            { "id": "btn_by_category", "title": "🗂️ Browse Category", "description": "Filter collections by item type", "nextNode": "node_catalog_categories_en" },
+            { "id": "btn_previous", "title": "🔙 Previous Step", "description": "Return to main welcome menu", "nextNode": "node_welcome_en" },
+            { "id": "btn_main_menu", "title": "🏠 Main Menu", "description": "Go to home screen", "nextNode": "node_welcome_en" }
+          ]
+        }
+      ]
+    },
+    "node_catalog_categories_en": {
+      "type": "interactive_list",
+      "text": "Please choose a category from the selection below:",
+      "buttonText": "Select Category",
+      "sections": [
+        {
+          "title": "Main Categories",
+          "rows": [
+            { "id": "btn_sarees", "title": "🥻 Sarees", "description": "Browse our sarees collection", "nextNode": "node_cat_sarees_en" },
+            { "id": "btn_kurtis", "title": "👚 Kurtis", "description": "Browse our kurtis collection", "nextNode": "node_cat_kurtis_en" },
+            { "id": "btn_lehengas", "title": "✨ Lehengas", "description": "Browse our lehengas collection", "nextNode": "node_cat_lehengas_en" },
+            { "id": "btn_new_arrivals", "title": "🆕 New Arrivals", "description": "Browse our latest new arrivals", "nextNode": "node_cat_newarrivals_en" },
+            { "id": "btn_full_catalog", "title": "📖 Full Catalog", "description": "Complete collection directory", "nextNode": "node_cat_full_en" },
+            { "id": "btn_previous", "title": "🔙 Previous Step", "description": "Go back to catalog menu", "nextNode": "node_catalog_en" },
+            { "id": "btn_main_menu", "title": "🏠 Main Menu", "description": "Go to home screen", "nextNode": "node_welcome_en" }
+          ]
+        }
+      ]
+    },
+    "node_cat_full_en": {
+      "type": "interactive_button",
+      "text": "Here is our complete product catalog: 📖\n👉 https://rathodwholesale.example.com/catalog/full",
+      "buttons": [
+        { "id": "btn_previous", "title": "🔙 Previous Step", "nextNode": "node_catalog_en" },
+        { "id": "btn_main_menu", "title": "🏠 Main Menu", "nextNode": "node_welcome_en" }
+      ]
+    },
+    "node_cat_sarees_en": {
+      "type": "interactive_button",
+      "text": "Here is our sarees collection: 🥻\n👉 https://rathodwholesale.example.com/catalog/sarees",
+      "buttons": [
+        { "id": "btn_previous", "title": "🔙 Previous Step", "nextNode": "node_catalog_categories_en" },
+        { "id": "btn_main_menu", "title": "🏠 Main Menu", "nextNode": "node_welcome_en" }
+      ]
+    },
+    "node_cat_kurtis_en": {
+      "type": "interactive_button",
+      "text": "Here is our kurtis collection: 👚\n👉 https://rathodwholesale.example.com/catalog/kurtis",
+      "buttons": [
+        { "id": "btn_previous", "title": "🔙 Previous Step", "nextNode": "node_catalog_categories_en" },
+        { "id": "btn_main_menu", "title": "🏠 Main Menu", "nextNode": "node_welcome_en" }
+      ]
+    },
+    "node_cat_lehengas_en": {
+      "type": "interactive_button",
+      "text": "Here is our lehengas collection: ✨\n👉 https://rathodwholesale.example.com/catalog/lehengas",
+      "buttons": [
+        { "id": "btn_previous", "title": "🔙 Previous Step", "nextNode": "node_catalog_categories_en" },
+        { "id": "btn_main_menu", "title": "🏠 Main Menu", "nextNode": "node_welcome_en" }
+      ]
+    },
+    "node_cat_newarrivals_en": {
+      "type": "interactive_button",
+      "text": "Check out our latest new arrivals: 🆕\n👉 https://rathodwholesale.example.com/catalog/new-arrivals",
+      "buttons": [
+        { "id": "btn_previous", "title": "🔙 Previous Step", "nextNode": "node_catalog_categories_en" },
+        { "id": "btn_main_menu", "title": "🏠 Main Menu", "nextNode": "node_welcome_en" }
+      ]
+    },
+    "node_enquiry_start_en": {
+      "type": "collect_input",
+      "text": "Please share the product name or style code of the item you want to enquire about: 📝\n\n(Type MENU anytime to go back to the main menu)",
+      "saveContextKey": "product_query",
+      "validation": {
+        "type": "text",
+        "errorMessage": "❌ Please share a product name or style code so we can help you."
+      },
+      "nextNode": "node_enquiry_qty_en"
+    },
+    "node_enquiry_qty_en": {
+      "type": "interactive_list",
+      "text": "Thank you. Please select the quantity range you want to order:",
+      "buttonText": "Select Quantity",
+      "sections": [
+        {
+          "title": "Quantity Ranges",
+          "rows": [
+            { "id": "qty_5_10", "title": "5-10 pieces", "nextNode": "node_enquiry_confirm_en" },
+            { "id": "qty_10_20", "title": "10-20 pieces", "nextNode": "node_enquiry_confirm_en" },
+            { "id": "qty_20_plus", "title": "20+ pieces", "nextNode": "node_enquiry_confirm_en" },
+            { "id": "btn_previous", "title": "🔙 Previous Step", "nextNode": "node_enquiry_start_en" },
+            { "id": "btn_main_menu", "title": "🏠 Main Menu", "nextNode": "node_welcome_en" }
+          ]
+        }
+      ]
+    },
+    "node_enquiry_confirm_en": {
+      "type": "interactive_button",
+      "text": "Thank you. We have received your enquiry for *{product_query}*. Our team will contact you shortly on this number with pricing details! 📞",
+      "buttons": [
+        { "id": "btn_another_product", "title": "📦 Enquire Product", "nextNode": "node_enquiry_start_en" },
+        { "id": "btn_previous", "title": "🔙 Previous Step", "nextNode": "node_enquiry_start_en" },
+        { "id": "btn_main_menu", "title": "🏠 Main Menu", "nextNode": "node_welcome_en" }
+      ]
+    },
+    "node_talk_owner_en": {
+      "type": "interactive_button",
+      "text": "Connecting you to our customer support team now. Someone will respond to you here shortly! 📞",
+      "buttons": [
+        { "id": "btn_browse_meanwhile", "title": "🛍️ Browse Catalog", "nextNode": "node_catalog_en" },
+        { "id": "btn_previous", "title": "🔙 Previous Step", "nextNode": "node_welcome_en" },
+        { "id": "btn_main_menu", "title": "🏠 Main Menu", "nextNode": "node_welcome_en" }
+      ]
+    },
+
+    "node_welcome_hi": {
+      "type": "interactive_list",
+      "text": "राठौड़ क्रिएशन होलसेल में आपका स्वागत है! 🧵\nहम आपकी किस प्रकार सहायता कर सकते हैं? कृपया नीचे दिए गए मेनू से एक विकल्प चुनें:\n\n(बातचीत समाप्त करने के लिए किसी भी समय 'stop' टाइप करें)",
+      "buttonText": "विकल्प चुनें",
+      "sections": [
+        {
+          "title": "विकल्प",
+          "rows": [
+            { "id": "btn_catalog", "title": "🛍️ कैटलॉग देखें", "description": "हमारे संग्रहों को ब्राउज़ करें", "nextNode": "node_catalog_hi" },
+            { "id": "btn_enquiry", "title": "📦 प्रोडक्ट पूछताछ", "description": "थोक ऑर्डर के बारे में पूछें", "nextNode": "node_enquiry_start_hi" },
+            { "id": "btn_owner", "title": "💬 टीम से बात करें", "description": "हमारे ग्राहक सहायता से चैट करें", "nextNode": "node_talk_owner_hi" },
+            { "id": "btn_previous", "title": "🔙 पिछला कदम", "description": "भाषा चयन पर वापस जाएं", "nextNode": "node_language" }
+          ]
+        }
+      ]
+    },
+    "node_catalog_hi": {
+      "type": "interactive_list",
+      "text": "आप हमारे कैटलॉग को कैसे देखना पसंद करेंगे?",
+      "buttonText": "कैटलॉग देखें",
+      "sections": [
+        {
+          "title": "विकल्प",
+          "rows": [
+            { "id": "btn_full_catalog", "title": "📖 पूरा कैटलॉग", "description": "हमारा संपूर्ण लुकबुक देखें", "nextNode": "node_cat_full_hi" },
+            { "id": "btn_by_category", "title": "🗂️ श्रेणी अनुसार", "description": "आइटम प्रकार द्वारा फ़िल्टर करें", "nextNode": "node_catalog_categories_hi" },
+            { "id": "btn_previous", "title": "🔙 पिछला कदम", "description": "मुख्य मेनू पर वापस जाएं", "nextNode": "node_welcome_hi" },
+            { "id": "btn_main_menu", "title": "🏠 मुख्य मेनू", "description": "होम स्क्रीन पर जाएं", "nextNode": "node_welcome_hi" }
+          ]
+        }
+      ]
+    },
+    "node_catalog_categories_hi": {
+      "type": "interactive_list",
+      "text": "कृपया नीचे दिए गए विकल्पों में से एक श्रेणी चुनें:",
+      "buttonText": "श्रेणी चुनें",
+      "sections": [
+        {
+          "title": "श्रेणियां",
+          "rows": [
+            { "id": "btn_sarees", "title": "🥻 साड़ियां", "description": "हमारा साड़ियों का संग्रह देखें", "nextNode": "node_cat_sarees_hi" },
+            { "id": "btn_kurtis", "title": "👚 कुर्तियां", "description": "हमारा कुर्तियों का संग्रह देखें", "nextNode": "node_cat_kurtis_hi" },
+            { "id": "btn_lehengas", "title": "✨ लहंगे", "description": "हमारा लहंगों का संग्रह देखें", "nextNode": "node_cat_lehengas_hi" },
+            { "id": "btn_new_arrivals", "title": "🆕 नई वस्तुएं", "description": "हमारी नवीनतम नई वस्तुएं देखें", "nextNode": "node_cat_newarrivals_hi" },
+            { "id": "btn_full_catalog", "title": "📖 पूरा कैटलॉग", "description": "संपूर्ण लुकबुक निर्देशिका", "nextNode": "node_cat_full_hi" },
+            { "id": "btn_previous", "title": "🔙 पिछला कदम", "description": "कैटलॉग मेनू पर वापस जाएं", "nextNode": "node_catalog_hi" },
+            { "id": "btn_main_menu", "title": "🏠 मुख्य मेनू", "description": "होम स्क्रीन पर जाएं", "nextNode": "node_welcome_hi" }
+          ]
+        }
+      ]
+    },
+    "node_cat_full_hi": {
+      "type": "interactive_button",
+      "text": "हमारा संपूर्ण उत्पाद संग्रह यहाँ देखें: 📖\n👉 https://rathodwholesale.example.com/catalog/full",
+      "buttons": [
+        { "id": "btn_previous", "title": "🔙 पिछला कदम", "nextNode": "node_catalog_hi" },
+        { "id": "btn_main_menu", "title": "🏠 मुख्य मेनू", "nextNode": "node_welcome_hi" }
+      ]
+    },
+    "node_cat_sarees_hi": {
+      "type": "interactive_button",
+      "text": "यहाँ हमारा साड़ियों का संग्रह देखें: 🥻\n👉 https://rathodwholesale.example.com/catalog/sarees",
+      "buttons": [
+        { "id": "btn_previous", "title": "🔙 पिछला कदम", "nextNode": "node_catalog_categories_hi" },
+        { "id": "btn_main_menu", "title": "🏠 मुख्य मेनू", "nextNode": "node_welcome_hi" }
+      ]
+    },
+    "node_cat_kurtis_hi": {
+      "type": "interactive_button",
+      "text": "यहाँ हमारा कुर्तियों का संग्रह देखें: 👚\n👉 https://rathodwholesale.example.com/catalog/kurtis",
+      "buttons": [
+        { "id": "btn_previous", "title": "🔙 पिछला कदम", "nextNode": "node_catalog_categories_hi" },
+        { "id": "btn_main_menu", "title": "🏠 मुख्य मेनू", "nextNode": "node_welcome_hi" }
+      ]
+    },
+    "node_cat_lehengas_hi": {
+      "type": "interactive_button",
+      "text": "यहाँ हमारा लहंगों का संग्रह देखें: ✨\n👉 https://rathodwholesale.example.com/catalog/lehengas",
+      "buttons": [
+        { "id": "btn_previous", "title": "🔙 पिछला कदम", "nextNode": "node_catalog_categories_hi" },
+        { "id": "btn_main_menu", "title": "🏠 मुख्य मेनू", "nextNode": "node_welcome_hi" }
+      ]
+    },
+    "node_cat_newarrivals_hi": {
+      "type": "interactive_button",
+      "text": "हमारी नवीनतम नई वस्तुएं देखें: 🆕\n👉 https://rathodwholesale.example.com/catalog/new-arrivals",
+      "buttons": [
+        { "id": "btn_previous", "title": "🔙 पिछला कदम", "nextNode": "node_catalog_categories_hi" },
+        { "id": "btn_main_menu", "title": "🏠 मुख्य मेनू", "nextNode": "node_welcome_hi" }
+      ]
+    },
+    "node_enquiry_start_hi": {
+      "type": "collect_input",
+      "text": "कृपया उस उत्पाद का नाम या स्टाइल कोड साझा करें जिसके बारे में आप पूछताछ करना चाहते हैं: 📝\n\n(मुख्य मेनू पर वापस जाने के लिए कभी भी MENU टाइप करें)",
+      "saveContextKey": "product_query",
+      "validation": {
+        "type": "text",
+        "errorMessage": "❌ कृपया उत्पाद का नाम या स्टाइल कोड भेजें।"
+      },
+      "nextNode": "node_enquiry_qty_hi"
+    },
+    "node_enquiry_qty_hi": {
+      "type": "interactive_list",
+      "text": "धन्यवाद। कृपया वह थोक मात्रा सीमा चुनें जिसे आप ऑर्डर करना चाहते हैं:",
+      "buttonText": "मात्रा चुनें",
+      "sections": [
+        {
+          "title": "मात्रा सीमा",
+          "rows": [
+            { "id": "qty_5_10", "title": "5-10 पीस", "nextNode": "node_enquiry_confirm_hi" },
+            { "id": "qty_10_20", "title": "10-20 पीस", "nextNode": "node_enquiry_confirm_hi" },
+            { "id": "qty_20_plus", "title": "20+ पीस", "nextNode": "node_enquiry_confirm_hi" },
+            { "id": "btn_previous", "title": "🔙 पिछला कदम", "nextNode": "node_enquiry_start_hi" },
+            { "id": "btn_main_menu", "title": "🏠 मुख्य मेनू", "nextNode": "node_welcome_hi" }
+          ]
+        }
+      ]
+    },
+    "node_enquiry_confirm_hi": {
+      "type": "interactive_button",
+      "text": "धन्यवाद। हमें *{product_query}* के लिए आपकी पूछताछ मिल गई है। हमारी टीम जल्द ही आपसे इस नंबर पर कीमतों के साथ संपर्क करेगी! 📞",
+      "buttons": [
+        { "id": "btn_another_product", "title": "📦 और पूछताछ", "nextNode": "node_enquiry_start_hi" },
+        { "id": "btn_previous", "title": "🔙 पिछला कदम", "nextNode": "node_enquiry_start_hi" },
+        { "id": "btn_main_menu", "title": "🏠 मुख्य मेनू", "nextNode": "node_welcome_hi" }
+      ]
+    },
+    "node_talk_owner_hi": {
+      "type": "interactive_button",
+      "text": "आपको हमारे ग्राहक सहायता विभाग से जोड़ा जा रहा है। कोई प्रतिनिधि जल्द ही आपसे यहाँ संपर्क करेगा! 📞",
+      "buttons": [
+        { "id": "btn_browse_meanwhile", "title": "🛍️ कैटलॉग देखें", "nextNode": "node_catalog_hi" },
+        { "id": "btn_previous", "title": "🔙 पिछला कदम", "nextNode": "node_welcome_hi" },
+        { "id": "btn_main_menu", "title": "🏠 मुख्य मेनू", "nextNode": "node_welcome_hi" }
+      ]
+    },
+
+    "node_welcome_mr": {
+      "type": "interactive_list",
+      "text": "राठोड क्रिएशन होलसेलमध्ये आपले स्वागत आहे! 🧵\nआम्ही तुम्हाला कशी मदत करू शकतो? कृपया खालील मेनूमधून एक पर्याय निवडा:\n\n(संभाषण समाप्त करण्यासाठी कोणत्याही वेळी 'stop' टाईप करा)",
+      "buttonText": "पर्याय निवडा",
+      "sections": [
+        {
+          "title": "पर्याय",
+          "rows": [
+            { "id": "btn_catalog", "title": "🛍️ कॅटलॉग पहा", "description": "आमचे कलेक्शन ब्राउझ करा", "nextNode": "node_catalog_mr" },
+            { "id": "btn_enquiry", "title": "📦 प्रॉडक्ट चौकशी", "description": "घाऊक ऑर्डरबद्दल चौकशी करा", "nextNode": "node_enquiry_start_mr" },
+            { "id": "btn_owner", "title": "💬 टीमशी बोला", "description": "आमच्या ग्राहक प्रतिनिधीशी बोला", "nextNode": "node_talk_owner_mr" },
+            { "id": "btn_previous", "title": "🔙 मागील पाऊल", "description": "भाषा निवडीवर परत जा", "nextNode": "node_language" }
+          ]
+        }
+      ]
+    },
+    "node_catalog_mr": {
+      "type": "interactive_list",
+      "text": "तुम्ही आमचे कॅटलॉग कशा प्रकारे पाहू इच्छिता?",
+      "buttonText": "कॅटलॉग पहा",
+      "sections": [
+        {
+          "title": "पर्याय",
+          "rows": [
+            { "id": "btn_full_catalog", "title": "📖 संपूर्ण कॅटलॉग", "description": "संपूर्ण लुकबुक पहा", "nextNode": "node_cat_full_mr" },
+            { "id": "btn_by_category", "title": "🗂️ श्रेणीनुसार", "description": "प्रकारानुसार फिल्टर करा", "nextNode": "node_catalog_categories_mr" },
+            { "id": "btn_previous", "title": "🔙 मागील पाऊल", "description": "मुख्य मेनूवर परत जा", "nextNode": "node_welcome_mr" },
+            { "id": "btn_main_menu", "title": "🏠 मुख्य मेनू", "description": "होम स्क्रीनवर जा", "nextNode": "node_welcome_mr" }
+          ]
+        }
+      ]
+    },
+    "node_catalog_categories_mr": {
+      "type": "interactive_list",
+      "text": "कृपया खालील पर्यायांमधून एक श्रेणी निवडा:",
+      "buttonText": "श्रेणी निवडा",
+      "sections": [
+        {
+          "title": "श्रेणी",
+          "rows": [
+            { "id": "btn_sarees", "title": "🥻 साड्या", "description": "आमचे साड्यांचे कलेक्शन पहा", "nextNode": "node_cat_sarees_mr" },
+            { "id": "btn_kurtis", "title": "👚 कुर्त्या", "description": "आमचे कुर्त्यांचे कलेक्शन पहा", "nextNode": "node_cat_kurtis_mr" },
+            { "id": "btn_lehengas", "title": "✨ लेहेंगा", "description": "आमचे लेहेंग्यांचे कलेक्शन पहा", "nextNode": "node_cat_lehengas_mr" },
+            { "id": "btn_new_arrivals", "title": "🆕 नवीन आगमन", "description": "आमचे नवीन कलेक्शन पहा", "nextNode": "node_cat_newarrivals_mr" },
+            { "id": "btn_full_catalog", "title": "📖 संपूर्ण कॅटलॉग", "description": "संपूर्ण लुकबुक निर्देशिका", "nextNode": "node_cat_full_mr" },
+            { "id": "btn_previous", "title": "🔙 मागील पाऊल", "description": "कॅटलॉग मेनूवर परत जा", "nextNode": "node_catalog_mr" },
+            { "id": "btn_main_menu", "title": "🏠 मुख्य मेनू", "description": "होम स्क्रीनवर जा", "nextNode": "node_welcome_mr" }
+          ]
+        }
+      ]
+    },
+    "node_cat_full_mr": {
+      "type": "interactive_button",
+      "text": "आमचे संपूर्ण उत्पादन संग्रह येथे पहा: 📖\n👉 https://rathodwholesale.example.com/catalog/full",
+      "buttons": [
+        { "id": "btn_previous", "title": "🔙 मागील पाऊल", "nextNode": "node_catalog_mr" },
+        { "id": "btn_main_menu", "title": "🏠 मुख्य मेनू", "nextNode": "node_welcome_mr" }
+      ]
+    },
+    "node_cat_sarees_mr": {
+      "type": "interactive_button",
+      "text": "येथे आमचे साडी कलेक्शन पहा: 🥻\n👉 https://rathodwholesale.example.com/catalog/sarees",
+      "buttons": [
+        { "id": "btn_previous", "title": "🔙 मागील पाऊल", "nextNode": "node_catalog_categories_mr" },
+        { "id": "btn_main_menu", "title": "🏠 मुख्य मेनू", "nextNode": "node_welcome_mr" }
+      ]
+    },
+    "node_cat_kurtis_mr": {
+      "type": "interactive_button",
+      "text": "येथे आमचे कुर्त्यांचे कलेक्शन पहा: 👚\n👉 https://rathodwholesale.example.com/catalog/kurtis",
+      "buttons": [
+        { "id": "btn_previous", "title": "🔙 मागील पाऊल", "nextNode": "node_catalog_categories_mr" },
+        { "id": "btn_main_menu", "title": "🏠 मुख्य मेनू", "nextNode": "node_welcome_mr" }
+      ]
+    },
+    "node_cat_lehengas_mr": {
+      "type": "interactive_button",
+      "text": "येथे आमचे लेहेंगा कलेक्शन पहा: ✨\n👉 https://rathodwholesale.example.com/catalog/lehengas",
+      "buttons": [
+        { "id": "btn_previous", "title": "🔙 मागील पाऊल", "nextNode": "node_catalog_categories_mr" },
+        { "id": "btn_main_menu", "title": "🏠 मुख्य मेनू", "nextNode": "node_welcome_mr" }
+      ]
+    },
+    "node_cat_newarrivals_mr": {
+      "type": "interactive_button",
+      "text": "आमचे नवीन आगमन पहा: 🆕\n👉 https://rathodwholesale.example.com/catalog/new-arrivals",
+      "buttons": [
+        { "id": "btn_previous", "title": "🔙 मागील पाऊल", "nextNode": "node_catalog_categories_mr" },
+        { "id": "btn_main_menu", "title": "🏠 मुख्य मेनू", "nextNode": "node_welcome_mr" }
+      ]
+    },
+    "node_enquiry_start_mr": {
+      "type": "collect_input",
+      "text": "कृपया आपण चौकशी करू इच्छित असलेल्या उत्पादनाचे नाव किंवा स्टाईल कोड सामायिक करा: 📝\n\n(मुख्य मेनूवर परत जाण्यासाठी कधीही MENU टाईप करा)",
+      "saveContextKey": "product_query",
+      "validation": {
+        "type": "text",
+        "errorMessage": "❌ कृपया उत्पादनाचे नाव किंवा स्टाईल कोड पाठवा."
+      },
+      "nextNode": "node_enquiry_qty_mr"
+    },
+    "node_enquiry_qty_mr": {
+      "type": "interactive_list",
+      "text": "धन्यवाद. कृपया घाऊक प्रमाण श्रेणी निवडा जे आपण ऑर्डर करू इच्छिता:",
+      "buttonText": "प्रमाण निवडा",
+      "sections": [
+        {
+          "title": "प्रमाण श्रेणी",
+          "rows": [
+            { "id": "qty_5_10", "title": "5-10 नग", "nextNode": "node_enquiry_confirm_mr" },
+            { "id": "qty_10_20", "title": "10-20 नग", "nextNode": "node_enquiry_confirm_mr" },
+            { "id": "qty_20_plus", "title": "20+ नग", "nextNode": "node_enquiry_confirm_mr" },
+            { "id": "btn_previous", "title": "🔙 मागील पाऊल", "nextNode": "node_enquiry_start_mr" },
+            { "id": "btn_main_menu", "title": "🏠 मुख्य मेनू", "nextNode": "node_welcome_mr" }
+          ]
+        }
+      ]
+    },
+    "node_enquiry_confirm_mr": {
+      "type": "interactive_button",
+      "text": "धन्यवाद. आम्हाला तुमची *{product_query}* साठी चौकशी मिळाली आहे. आमची टीम लवकरच आपल्याशी या नंबरवर किंमतीसह संपर्क साधेल! 📞",
+      "buttons": [
+        { "id": "btn_another_product", "title": "📦 आणखी चौकशी", "nextNode": "node_enquiry_start_mr" },
+        { "id": "btn_previous", "title": "🔙 मागील पाऊल", "nextNode": "node_enquiry_start_mr" },
+        { "id": "btn_main_menu", "title": "🏠 मुख्य मेनू", "nextNode": "node_welcome_mr" }
+      ]
+    },
+    "node_talk_owner_mr": {
+      "type": "interactive_button",
+      "text": "तुम्हाला आमच्या ग्राहक प्रतिनिधीशी जोडले जात आहे. आमचे प्रतिनिधी लवकरच आपल्याशी येथे संपर्क साधतील! 📞",
+      "buttons": [
+        { "id": "btn_browse_meanwhile", "title": "🛍️ कॅटलॉग पहा", "nextNode": "node_catalog_mr" },
+        { "id": "btn_previous", "title": "🔙 मागील पाऊल", "nextNode": "node_welcome_mr" },
+        { "id": "btn_main_menu", "title": "🏠 मुख्य मेनू", "nextNode": "node_welcome_mr" }
+      ]
+    },
+
+    "node_enquiry_qty_menu": {
+      "type": "interactive_list",
+      "text": "Thank you for enquiring about *{product_name}* (Code: {product_code} | Cat: {product_cat}).\n\nHow many pieces are you looking to order? 📦\n\n(Type 'stop' anytime to end conversation)",
+      "buttonText": "Select Quantity",
+      "sections": [
+        {
+          "title": "Options",
+          "rows": [
+            { "id": "qty_range", "title": "10 to 30 pcs", "description": "Order between 10 and 30 pieces", "nextNode": "node_enquiry_qty_range_menu" },
+            { "id": "qty_30_plus", "title": "30+ pcs", "description": "Order more than 30 pieces", "nextNode": "node_enquiry_qty_save_30_plus" },
+            { "id": "qty_custom", "title": "Custom Qty", "description": "Type a custom quantity number", "nextNode": "node_enquiry_qty_custom_prompt" },
+            { "id": "btn_previous", "title": "🔙 Previous Step", "description": "Return to category list", "nextNode": "node_catalog_categories_en" },
+            { "id": "btn_main_menu", "title": "🏠 Main Menu", "description": "Return to main home menu", "nextNode": "node_welcome_en" }
+          ]
+        }
+      ]
+    },
+    "node_enquiry_qty_range_menu": {
+      "type": "interactive_list",
+      "text": "Please select your quantity range: 📦",
+      "buttonText": "Select Range",
+      "sections": [
+        {
+          "title": "Select Range",
+          "rows": [
+            { "id": "qty_10_15", "title": "10-15 pcs", "description": "10 to 15 pieces", "nextNode": "node_enquiry_qty_save_10_15" },
+            { "id": "qty_15_20", "title": "15-20 pcs", "description": "15 to 20 pieces", "nextNode": "node_enquiry_qty_save_15_20" },
+            { "id": "qty_21_30", "title": "21-30 pcs", "description": "21 to 30 pieces", "nextNode": "node_enquiry_qty_save_21_30" },
+            { "id": "btn_previous", "title": "🔙 Previous Step", "description": "Return to quantity options", "nextNode": "node_enquiry_qty_menu" },
+            { "id": "btn_main_menu", "title": "🏠 Main Menu", "description": "Return to main home menu", "nextNode": "node_welcome_en" }
+          ]
+        }
+      ]
+    },
+    "node_enquiry_qty_save_10_15": {
+      "type": "action_node",
+      "action": "save_context",
+      "payload": {
+        "quantity": "10-15"
+      },
+      "nextNode": "node_enquiry_comments_prompt"
+    },
+    "node_enquiry_qty_save_15_20": {
+      "type": "action_node",
+      "action": "save_context",
+      "payload": {
+        "quantity": "15-20"
+      },
+      "nextNode": "node_enquiry_comments_prompt"
+    },
+    "node_enquiry_qty_save_21_30": {
+      "type": "action_node",
+      "action": "save_context",
+      "payload": {
+        "quantity": "21-30"
+      },
+      "nextNode": "node_enquiry_comments_prompt"
+    },
+    "node_enquiry_qty_save_30_plus": {
+      "type": "action_node",
+      "action": "save_context",
+      "payload": {
+        "quantity": "30+"
+      },
+      "nextNode": "node_enquiry_comments_prompt"
+    },
+    "node_enquiry_qty_custom_prompt": {
+      "type": "collect_input",
+      "text": "Please type your custom quantity number below: 🔢",
+      "saveContextKey": "quantity",
+      "validation": {
+        "type": "number",
+        "errorMessage": "❌ Invalid quantity. Please enter a valid number (e.g. 25)."
+      },
+      "nextNode": "node_enquiry_comments_prompt"
+    },
+    "node_enquiry_comments_prompt": {
+      "type": "collect_input",
+      "text": "Do you have any comments or specific requirements? If not, please type NA. ✉️",
+      "saveContextKey": "comments",
+      "nextNode": "node_enquiry_finalize"
+    },
+    "node_enquiry_finalize": {
+      "type": "action_node",
+      "action": "create_lead_or_booking",
+      "payload": {
+        "fullName": "Wholesale Inquiry: {product_name}",
+        "guests": "{quantity}",
+        "date": "Code: {product_code}",
+        "time": "Comments: {comments}"
+      },
+      "nextNode": "node_enquiry_thankyou"
+    },
+    "node_enquiry_thankyou": {
+      "type": "text",
+      "text": "✅ Thank you! Your wholesale enquiry has been successfully registered.\n\n*Product*: {product_name} ({product_code})\n*Category*: {product_cat} / {product_subcat}\n*Quantity*: {quantity}\n*Requirements*: {comments}\n\nOur team will contact you shortly on this number with pricing details. 💬"
+    }
+  }
+}

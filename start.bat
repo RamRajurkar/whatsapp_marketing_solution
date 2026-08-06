@@ -30,12 +30,23 @@ goto wait_docker
 
 :docker_ready
 echo Docker is ready. Starting Containers...
-cd /d "C:\RestoChat"
+cd /d "%~dp0"
 docker-compose up -d
+
+echo.
+echo Waiting for services to be ready before database sync...
+timeout /t 8 /nobreak >nul
+
+echo.
+echo [Sync] Syncing chatbot flow configuration to MongoDB...
+docker exec python_backend python /app/uploads/configs/sync_flow_docker.py
+
+echo.
+echo [Cleanup] Clearing active customer sessions...
+docker exec wa_mongodb mongosh whatsapp_saas --eval "db.customer_sessions.deleteMany({})"
 
 echo.
 echo RestoChat is running at http://localhost:3000
 echo.
-echo Waiting for services to be ready...
-timeout /t 8 /nobreak >nul
 start http://localhost:3000
+

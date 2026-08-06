@@ -1,27 +1,39 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import api from '@/lib/api';
 import toast from 'react-hot-toast';
 import { Play, Loader2, Smartphone, Send, MessageSquare } from 'lucide-react';
 
-export function SimulatorPanel() {
+export function SimulatorPanel({ flowData }: { flowData?: any }) {
   const [senderPhone, setSenderPhone] = useState('919876543210');
   const [senderName, setSenderName] = useState('Test User');
   const [messageText, setMessageText] = useState('hi');
   const [messageType, setMessageType] = useState<'text' | 'interactive'>('text');
-  const [buttonId, setButtonId] = useState('btn_address');
   
+  const startNode = flowData?.nodes?.[flowData?.startNode || 'node_welcome'];
+  const buttons = startNode?.type === 'interactive_button' ? (startNode.buttons || []) : [];
+  
+  const [buttonId, setButtonId] = useState('');
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<any>(null);
+
+  // Synchronize initial buttonId when flowData loads
+  useEffect(() => {
+    if (buttons.length > 0) {
+      setButtonId(buttons[0].id);
+    } else {
+      setButtonId('btn_address');
+    }
+  }, [flowData]);
 
   const isDevMode = process.env.NODE_ENV === 'development';
 
   if (!isDevMode) return null;
 
   const handleSimulate = async () => {
-    if (!senderPhone || !messageText) {
-      toast.error('Please enter phone number and message');
+    if (!senderPhone || (messageType === 'text' && !messageText)) {
+      toast.error('Please enter phone number and message details');
       return;
     }
 
@@ -39,7 +51,9 @@ export function SimulatorPanel() {
         payload.messageText = messageText;
       } else {
         payload.buttonId = buttonId;
-        payload.buttonTitle = buttonId === 'btn_address' ? '📍 Address' 
+        const matchedBtn = buttons.find((btn: any) => btn.id === buttonId);
+        payload.buttonTitle = matchedBtn ? (matchedBtn.title || matchedBtn.id)
+                            : buttonId === 'btn_address' ? '📍 Address' 
                             : buttonId === 'btn_menu' ? '📜 Menu' 
                             : '🕒 Timings';
       }
@@ -146,9 +160,16 @@ export function SimulatorPanel() {
               value={buttonId}
               onChange={(e) => setButtonId(e.target.value)}
             >
-              <option value="btn_address">📍 Address</option>
-              <option value="btn_menu">📜 Menu</option>
-              <option value="btn_timings">🕒 Timings</option>
+              {buttons.map((btn: any) => (
+                <option key={btn.id} value={btn.id}>{btn.title || btn.id}</option>
+              ))}
+              {buttons.length === 0 && (
+                <>
+                  <option value="btn_address">📍 Address</option>
+                  <option value="btn_menu">📜 Menu</option>
+                  <option value="btn_timings">🕒 Timings</option>
+                </>
+              )}
            </select>
         </div>
       )}
@@ -171,7 +192,7 @@ export function SimulatorPanel() {
             <div>• Bot Replies Triggered: {result.results.bot_replies.length}</div>
             {result.results.bot_replies.map((reply: any, idx: number) => (
                <div key={idx} style={{ marginLeft: '12px', color: '#059669' }}>
-                 ↳ Sent: "{reply.text}"
+                 ↳ Sent: "{reply.text || reply.error || 'interactive message'}"
                </div>
             ))}
           </div>

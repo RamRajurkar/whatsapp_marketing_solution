@@ -11,9 +11,17 @@ to produce the correct `components` list for the Messages API.
 """
 
 import re
+import os
+import mimetypes
+import logging
 from typing import Optional, List, Dict, Any
+from fastapi import HTTPException
 import httpx
 from app.http_client import get_http_client
+from app.config import settings
+from app.utils.image_utils import compress_image_bytes
+
+logger = logging.getLogger(__name__)
 
 
 def build_template_components(
@@ -22,6 +30,7 @@ def build_template_components(
     header_media_id: Optional[str] = None,
     body_params: Optional[List[str]] = None,
     carousel_cards: Optional[List[Dict[str, Any]]] = None,
+    button_params: Optional[List[str]] = None,
 ) -> List[Dict[str, Any]]:
     """
     Build the `components` array for a WhatsApp template send request.
@@ -44,7 +53,6 @@ def build_template_components(
     for comp in template_components:
         comp_type = comp.get("type", "").upper()
 
-        # ── HEADER with media ────────────────────────────────────────────
         if comp_type == "HEADER":
             fmt = comp.get("format", "").upper()
             if fmt in ("IMAGE", "VIDEO", "DOCUMENT") and (header_media_url or header_media_id):
@@ -64,17 +72,40 @@ def build_template_components(
                         }
                     ],
                 })
+            elif fmt == "TEXT":
+                header_text = comp.get("text", "")
+                if "{{1}}" in header_text and body_params:
+                    header_val = body_params[0]
+                    components.append({
+                        "type": "header",
+                        "parameters": [{"type": "text", "text": header_val}]
+                    })
 
         # ── BODY with variables ──────────────────────────────────────────
         elif comp_type == "BODY":
             body_text = comp.get("text", "")
-            var_slots = re.findall(r"\{\{(\d+)\}\}", body_text)
-            if var_slots and body_params:
+            raw_slots = re.findall(r"\{\{([^}]+)\}\}", body_text)
+            if raw_slots and body_params:
+                # Deduplicate while preserving order
+                var_slots = []
+                for v in raw_slots:
+                    if v not in var_slots:
+                        var_slots.append(v)
+
+                is_positional = all(v.isdigit() for v in var_slots)
                 parameters = []
-                for idx in sorted(int(v) for v in var_slots):
-                    # body_params is 0-indexed; template vars are 1-indexed
-                    value = body_params[idx - 1] if idx - 1 < len(body_params) else ""
-                    parameters.append({"type": "text", "text": value})
+                if is_positional:
+                    for idx in sorted(int(v) for v in var_slots):
+                        value = body_params[idx - 1] if idx - 1 < len(body_params) else ""
+                        parameters.append({"type": "text", "text": value})
+                else:
+                    for idx, var_name in enumerate(var_slots):
+                        value = body_params[idx] if idx < len(body_params) else ""
+                        parameters.append({
+                            "type": "text",
+                            "parameter_name": var_name,
+                            "text": value
+                        })
                 components.append({
                     "type": "body",
                     "parameters": parameters,
@@ -110,13 +141,28 @@ def build_template_components(
 
                     elif card_comp_type == "BODY":
                         card_body_text = card_comp.get("text", "")
-                        card_var_slots = re.findall(r"\{\{(\d+)\}\}", card_body_text)
+                        raw_card_vars = re.findall(r"\{\{([^}]+)\}\}", card_body_text)
                         card_body_params = card_params.get("bodyParams", [])
-                        if card_var_slots and card_body_params:
+                        if raw_card_vars and card_body_params:
+                            card_var_slots = []
+                            for v in raw_card_vars:
+                                if v not in card_var_slots:
+                                    card_var_slots.append(v)
+
+                            is_positional = all(v.isdigit() for v in card_var_slots)
                             parameters = []
-                            for idx in sorted(int(v) for v in card_var_slots):
-                                value = card_body_params[idx - 1] if idx - 1 < len(card_body_params) else ""
-                                parameters.append({"type": "text", "text": value})
+                            if is_positional:
+                                for idx in sorted(int(v) for v in card_var_slots):
+                                    value = card_body_params[idx - 1] if idx - 1 < len(card_body_params) else ""
+                                    parameters.append({"type": "text", "text": value})
+                            else:
+                                for idx, var_name in enumerate(card_var_slots):
+                                    value = card_body_params[idx] if idx < len(card_body_params) else ""
+                                    parameters.append({
+                                        "type": "text",
+                                        "parameter_name": var_name,
+                                        "text": value
+                                    })
                             card_components.append({
                                 "type": "body",
                                 "parameters": parameters,
@@ -152,10 +198,37 @@ def build_template_components(
         elif comp_type == "BUTTONS":
             buttons = comp.get("buttons", [])
             for btn_idx, btn in enumerate(buttons):
-                if btn.get("type") == "URL" and "{{1}}" in btn.get("url", ""):
-                    # Dynamic URL button — would need a parameter
-                    # For now we skip unless we get button params in the future
-                    pass
+                btn_type = btn.get("type", "").upper()
+
+                if btn_type == "URL" and "{{1}}" in btn.get("url", ""):
+                    # Dynamic URL button — needs URL suffix parameter
+                    given_val = button_params[btn_idx] if button_params and btn_idx < len(button_params) else ""
+                    example_val = (btn.get("example", ["offer"])[0] if isinstance(btn.get("example"), list) and btn.get("example") else "offer")
+                    btn_value = given_val.strip() if given_val and given_val.strip() else example_val
+
+                    components.append({
+                        "type": "button",
+                        "sub_type": "url",
+                        "index": str(btn_idx),
+                        "parameters": [
+                            {"type": "text", "text": btn_value}
+                        ],
+                    })
+
+                elif btn_type == "COPY_CODE":
+                    # Copy-code button — needs the coupon code as a parameter
+                    given_val = button_params[btn_idx] if button_params and btn_idx < len(button_params) else ""
+                    example_val = (btn.get("example", ["SAVE10"])[0] if isinstance(btn.get("example"), list) and btn.get("example") else "SAVE10")
+                    btn_value = given_val.strip() if given_val and given_val.strip() else example_val
+
+                    components.append({
+                        "type": "button",
+                        "sub_type": "COPY_CODE",
+                        "index": str(btn_idx),
+                        "parameters": [
+                            {"type": "coupon_code", "coupon_code": btn_value}
+                        ],
+                    })
 
     return components
 
@@ -186,3 +259,101 @@ async def fetch_template_components(
             return t.get("components", [])
 
     return []
+
+
+async def upload_media_to_meta(file_bytes: bytes, filename: str, file_type: str, wa_phone_id: str, wa_token: str) -> str:
+    """Helper to upload media bytes to Meta's WhatsApp Graph API media endpoint."""
+    upload_url = f"https://graph.facebook.com/{settings.WA_API_VERSION}/{wa_phone_id}/media"
+    upload_files = {"file": (filename, file_bytes, file_type)}
+    upload_data = {"messaging_product": "whatsapp"}
+    upload_headers = {"Authorization": f"Bearer {wa_token}"}
+
+    client = get_http_client()
+    resp = await client.post(upload_url, headers=upload_headers, data=upload_data, files=upload_files)
+    if resp.status_code in (200, 201):
+        return resp.json().get("id")
+    else:
+        err_msg = resp.json().get("error", {}).get("message", resp.text)
+        raise HTTPException(status_code=400, detail=f"WhatsApp Media Upload Error: {err_msg}")
+
+
+async def process_header_media(
+    header_media_url: Optional[str],
+    header_media_id: Optional[str],
+    wa_phone_id: str,
+    wa_token: str,
+) -> tuple[Optional[str], Optional[str]]:
+    """
+    Validates and prepares header media for WhatsApp template send.
+    - Returns (final_header_url, final_header_id)
+    - If media_id is provided, uses it directly.
+    - If media_url is a local file or external HTTP(S) link, fetches and validates content type.
+    - If content-type is text/html or unsupported, raises a friendly HTTPException.
+    - Auto-uploads valid media bytes to WhatsApp API as a Media ID to guarantee Meta never fails with #131053.
+    """
+    if header_media_id:
+        return None, header_media_id
+
+    if not header_media_url:
+        return None, None
+
+    url = header_media_url.strip()
+    if not url:
+        return None, None
+
+    # Case 1: Local file URL
+    if "localhost" in url or "/uploads/" in url:
+        filename = url.split("/")[-1].split("?")[0]
+        local_path = os.path.join("uploads", "media", filename)
+        if not os.path.exists(local_path):
+            raise HTTPException(status_code=400, detail=f"Local media file not found: {local_path}")
+        
+        file_type, _ = mimetypes.guess_type(local_path)
+        file_type = file_type or "image/jpeg"
+        with open(local_path, "rb") as f:
+            file_bytes = f.read()
+        file_bytes, filename, file_type = compress_image_bytes(file_bytes, filename, file_type)
+        media_id = await upload_media_to_meta(file_bytes, filename, file_type, wa_phone_id, wa_token)
+        return None, media_id
+
+    # Case 2: External HTTP / HTTPS link
+    if url.startswith("http://") or url.startswith("https://"):
+        try:
+            client = get_http_client()
+            resp = await client.get(url, follow_redirects=True, timeout=12.0)
+            if resp.status_code != 200:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Could not download image from link (HTTP {resp.status_code}). Please provide a direct public image URL."
+                )
+
+            content_type = resp.headers.get("content-type", "").lower()
+            if "text/html" in content_type or resp.content.startswith(b"<!DOCTYPE") or resp.content.startswith(b"<html"):
+                raise HTTPException(
+                    status_code=400,
+                    detail="The provided URL points to an HTML webpage (text/html) rather than a direct image file. Please use a direct image link (ending in .jpg, .png, .webp) or upload the image file directly."
+                )
+
+            mime = content_type.split(";")[0].strip()
+            if mime and not any(mime.startswith(prefix) for prefix in ["image/", "video/", "application/pdf"]):
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Unsupported media type '{mime}'. Please use a valid image (JPEG, PNG, WEBP), video, or PDF document."
+                )
+
+            # Auto-upload downloaded media bytes to WhatsApp API as a Media ID
+            ext = mimetypes.guess_extension(mime) or ".jpg"
+            filename = f"header_media{ext}"
+            file_bytes, filename, mime = compress_image_bytes(resp.content, filename, mime or "image/jpeg")
+            media_id = await upload_media_to_meta(file_bytes, filename, mime, wa_phone_id, wa_token)
+            return None, media_id
+
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.warning(f"Failed to pre-download external media URL {url}: {e}")
+            # Fall back to passing raw link if fetch failed due to temporary network error
+            return url, None
+
+    return url, None
+

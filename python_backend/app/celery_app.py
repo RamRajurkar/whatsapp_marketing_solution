@@ -38,7 +38,16 @@ celery_app.conf.update(
 
     # Result settings
     result_expires=3600,                     # Results expire after 1 hour
+
+    # Celery Beat schedule for automated 24h frequency cap retries
+    beat_schedule={
+        "auto-retry-frequency-capped-every-30m": {
+            "task": "app.tasks.broadcast_task.auto_retry_frequency_capped_recipients",
+            "schedule": 1800.0,  # Run every 30 minutes
+        },
+    },
 )
 
 # Explicitly import tasks so they are registered with Celery
 import app.tasks.broadcast_task  # noqa: F401
+

@@ -102,6 +102,7 @@ function SendMessageModal({ customer, onClose }: { customer: any; onClose: () =>
   // Component parameter state
   const [headerMediaUrl, setHeaderMediaUrl] = useState('');
   const [bodyParams, setBodyParams] = useState<string[]>([]);
+  const [buttonParams, setButtonParams] = useState<string[]>([]);
   const [carouselCards, setCarouselCards] = useState<{ mediaUrl: string; bodyParams: string[] }[]>([]);
 
   const { data: templatesData } = useQuery({
@@ -112,7 +113,7 @@ function SendMessageModal({ customer, onClose }: { customer: any; onClose: () =>
   const templates = templatesData?.templates || [];
 
   // Get the currently selected template object
-  const selectedTemplate = templates.find((t: any) => t.name === templateName);
+  const selectedTemplate = templates.find((t: any) => t.name === templateName && t.language === templateLang);
   const selectedComponents: any[] = selectedTemplate?.components || [];
 
   // Derived info about what the template needs
@@ -121,26 +122,62 @@ function SendMessageModal({ customer, onClose }: { customer: any; onClose: () =>
   const carouselComp = selectedComponents.find((c: any) => c.type === 'CAROUSEL');
 
   const needsHeaderMedia = headerComp && ['IMAGE', 'VIDEO', 'DOCUMENT'].includes(headerComp.format);
-  const bodyVarSlots = bodyComp?.text?.match(/\{\{\d+\}\}/g) || [];
+  const bodyVarSlots = Array.from(new Set(bodyComp?.text?.match(/\{\{([^}]+)\}\}/g) || []));
   const needsBodyParams = bodyVarSlots.length > 0;
 
+  // Buttons that require parameters: COPY_CODE or URL with {{1}}
+  const buttonsComp = selectedComponents.find((c: any) => c.type === 'BUTTONS');
+  const dynamicButtons: { idx: number; type: string; label: string }[] = [];
+  if (buttonsComp?.buttons) {
+    buttonsComp.buttons.forEach((btn: any, idx: number) => {
+      if (btn.type === 'COPY_CODE') {
+        dynamicButtons.push({ idx, type: 'COPY_CODE', label: `Button "${btn.text}" — Copy Code` });
+      } else if (btn.type === 'URL' && btn.url?.includes('{{1}}')) {
+        dynamicButtons.push({ idx, type: 'URL', label: `Button "${btn.text}" — URL Suffix` });
+      }
+    });
+  }
+
   // Handle template selection change
-  const handleTemplateSelect = (name: string) => {
-    const selected = templates.find((t: any) => t.name === name);
+  const handleTemplateSelect = (val: string) => {
+    if (!val) {
+      setTemplateName('');
+      setHeaderMediaUrl('');
+      setBodyParams([]);
+      setCarouselCards([]);
+      return;
+    }
+    const [name, lang] = val.split(':');
+    const selected = templates.find((t: any) => t.name === name && t.language === lang);
     setTemplateName(name);
+    setTemplateLang(lang);
     setHeaderMediaUrl('');
     setBodyParams([]);
+    setButtonParams([]);
     setCarouselCards([]);
 
-    if (selected?.language) setTemplateLang(selected.language);
     if (selected?.components) {
-      // Initialize body params array — auto-fill {{1}} with customer name
+      // Initialize body params array — auto-fill with customer name
       const body = selected.components.find((c: any) => c.type === 'BODY');
-      const vars = body?.text?.match(/\{\{\d+\}\}/g) || [];
+      const rawVars = body?.text?.match(/\{\{([^}]+)\}\}/g) || [];
+      const vars = Array.from(new Set(rawVars));
       if (vars.length > 0) {
         const params = new Array(vars.length).fill('');
-        if (customer?.name && customer.name !== 'Unknown') params[0] = customer.name;
+        if (customer?.name && customer.name !== 'Unknown') {
+          const custNameIdx = vars.findIndex(v => v.includes('customer_name') || v === '{{1}}');
+          if (custNameIdx !== -1) {
+            params[custNameIdx] = customer.name;
+          } else {
+            params[0] = customer.name;
+          }
+        }
         setBodyParams(params);
+      }
+
+      // Initialize button params — index-aligned to the buttons array
+      const btnsComp = selected.components.find((c: any) => c.type === 'BUTTONS');
+      if (btnsComp?.buttons?.length) {
+        setButtonParams(new Array(btnsComp.buttons.length).fill(''));
       }
 
       // Initialize carousel cards
@@ -149,7 +186,7 @@ function SendMessageModal({ customer, onClose }: { customer: any; onClose: () =>
         setCarouselCards(
           carousel.cards.map((card: any) => {
             const cardBody = card.components?.find((c: any) => c.type === 'BODY');
-            const cardVars = cardBody?.text?.match(/\{\{\d+\}\}/g) || [];
+            const cardVars = Array.from(new Set(cardBody?.text?.match(/\{\{([^}]+)\}\}/g) || []));
             return { mediaUrl: '', bodyParams: new Array(cardVars.length).fill('') };
           })
         );
@@ -180,6 +217,7 @@ function SendMessageModal({ customer, onClose }: { customer: any; onClose: () =>
           templateComponents: selectedComponents.length > 0 ? selectedComponents : undefined,
           headerMediaUrl: headerMediaUrl.trim() || undefined,
           bodyParams: bodyParams.length > 0 ? bodyParams : undefined,
+          buttonParams: buttonParams.some(v => v.trim()) ? buttonParams : undefined,
           carouselCards: carouselCards.length > 0 ? carouselCards : undefined,
         });
         toast.success(`Template sent to ${customer.name}`);
@@ -261,13 +299,13 @@ function SendMessageModal({ customer, onClose }: { customer: any; onClose: () =>
               {templates.length > 0 ? (
                 <select
                   className="input-field"
-                  value={templateName}
+                  value={templateName ? `${templateName}:${templateLang}` : ""}
                   onChange={e => handleTemplateSelect(e.target.value)}
                 >
                   <option value="">Select a template...</option>
                   {templates.map((t: any) => (
-                    <option key={t.name + t.language} value={t.name}>
-                      {t.name} ({t.status})
+                    <option key={t.name + t.language} value={`${t.name}:${t.language}`}>
+                      {t.name} ({t.language}) ({t.status})
                     </option>
                   ))}
                 </select>
@@ -309,10 +347,10 @@ function SendMessageModal({ customer, onClose }: { customer: any; onClose: () =>
                 <label style={{ fontSize: '13px', fontWeight: '500', color: '#374151', display: 'block', marginBottom: '6px' }}>
                   📝 Body Variables
                 </label>
-                {bodyVarSlots.map((_: any, idx: number) => (
+                {bodyVarSlots.map((slot: string, idx: number) => (
                   <div key={idx} style={{ marginBottom: '6px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <span style={{ fontSize: '12px', color: '#6b7280', fontWeight: '600', minWidth: '36px' }}>{`{{${idx + 1}}}`}</span>
+                      <span style={{ fontSize: '12px', color: '#6b7280', fontWeight: '600', minWidth: '36px' }}>{slot}</span>
                       <input
                         className="input-field"
                         value={bodyParams[idx] || ''}
@@ -321,7 +359,7 @@ function SendMessageModal({ customer, onClose }: { customer: any; onClose: () =>
                           updated[idx] = e.target.value;
                           setBodyParams(updated);
                         }}
-                        placeholder={`Value for {{${idx + 1}}}`}
+                        placeholder={`Value for ${slot}`}
                         style={{ flex: 1 }}
                       />
                     </div>
@@ -340,7 +378,7 @@ function SendMessageModal({ customer, onClose }: { customer: any; onClose: () =>
                   const cardDef = carouselComp.cards?.[cardIdx];
                   const cardHeaderDef = cardDef?.components?.find((c: any) => c.type === 'HEADER');
                   const cardBodyDef = cardDef?.components?.find((c: any) => c.type === 'BODY');
-                  const cardBodyVars = cardBodyDef?.text?.match(/\{\{\d+\}\}/g) || [];
+                  const cardBodyVars = Array.from(new Set(cardBodyDef?.text?.match(/\{\{([^}]+)\}\}/g) || []));
                   return (
                     <div key={cardIdx} style={{ background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '8px', padding: '10px', marginBottom: '8px' }}>
                       <p style={{ margin: '0 0 8px', fontSize: '12px', fontWeight: '600', color: '#374151' }}>Card {cardIdx + 1}</p>
@@ -357,9 +395,9 @@ function SendMessageModal({ customer, onClose }: { customer: any; onClose: () =>
                           style={{ marginBottom: '6px' }}
                         />
                       )}
-                      {cardBodyVars.map((_: any, varIdx: number) => (
+                      {cardBodyVars.map((slot: string, varIdx: number) => (
                         <div key={varIdx} style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-                          <span style={{ fontSize: '11px', color: '#6b7280', minWidth: '30px' }}>{`{{${varIdx + 1}}}`}</span>
+                          <span style={{ fontSize: '11px', color: '#6b7280', minWidth: '30px' }}>{slot}</span>
                           <input
                             className="input-field"
                             value={card.bodyParams[varIdx] || ''}
@@ -370,7 +408,7 @@ function SendMessageModal({ customer, onClose }: { customer: any; onClose: () =>
                               updated[cardIdx] = { ...updated[cardIdx], bodyParams: updatedParams };
                               setCarouselCards(updated);
                             }}
-                            placeholder={`Value for {{${varIdx + 1}}}`}
+                            placeholder={`Value for ${slot}`}
                             style={{ flex: 1 }}
                           />
                         </div>
@@ -378,6 +416,33 @@ function SendMessageModal({ customer, onClose }: { customer: any; onClose: () =>
                     </div>
                   );
                 })}
+              </div>
+            )}
+
+            {/* Button Parameters — shown when template has COPY_CODE or dynamic URL buttons */}
+            {dynamicButtons.length > 0 && (
+              <div>
+                <label style={{ fontSize: '13px', fontWeight: '500', color: '#374151', display: 'block', marginBottom: '6px' }}>
+                  🔘 Button Parameters
+                </label>
+                {dynamicButtons.map(({ idx, type, label }) => (
+                  <div key={idx} style={{ marginBottom: '6px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span style={{ fontSize: '12px', color: '#6b7280', fontWeight: '600', minWidth: '120px' }}>{label}</span>
+                      <input
+                        className="input-field"
+                        value={buttonParams[idx] || ''}
+                        onChange={e => {
+                          const updated = [...buttonParams];
+                          updated[idx] = e.target.value;
+                          setButtonParams(updated);
+                        }}
+                        placeholder={type === 'COPY_CODE' ? 'Enter coupon code' : 'Enter URL suffix or full URL'}
+                        style={{ flex: 1 }}
+                      />
+                    </div>
+                  </div>
+                ))}
               </div>
             )}
 

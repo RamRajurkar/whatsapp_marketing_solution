@@ -36,6 +36,28 @@ def _now():
     return datetime.now(timezone.utc)
 
 
+def _serialize_mongo_doc(doc: dict) -> dict:
+    clean = {}
+    for k, v in doc.items():
+        if isinstance(v, ObjectId):
+            clean[k] = str(v)
+        elif isinstance(v, datetime):
+            clean[k] = v.isoformat()
+        elif isinstance(v, dict):
+            clean[k] = _serialize_mongo_doc(v)
+        elif isinstance(v, list):
+            clean[k] = [
+                str(x) if isinstance(x, ObjectId)
+                else x.isoformat() if isinstance(x, datetime)
+                else _serialize_mongo_doc(x) if isinstance(x, dict)
+                else x
+                for x in v
+            ]
+        else:
+            clean[k] = v
+    return clean
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 #  Webhook Verification (GET)
 # ─────────────────────────────────────────────────────────────────────────────
@@ -115,13 +137,20 @@ async def _process_webhook_body(body: dict) -> dict:
                     else:
                         text_content = f"[{msg_type} message]"
 
+                    # Resolve tenant_id for SaaS
+                    from app.utils.tenant import resolve_webhook_tenant
+                    metadata_wa_id = value.get("metadata", {}).get("phone_number_id")
+                    tenant_id = await resolve_webhook_tenant(metadata_wa_id)
+
                     # Find or create conversation
-                    conversation = await db.db.conversations.find_one(
-                        {"customerPhone": phone_number}
-                    )
+                    conv_query = {"customerPhone": phone_number}
+                    if tenant_id:
+                        conv_query["tenantId"] = tenant_id
+
+                    conversation = await db.db.conversations.find_one(conv_query)
 
                     if not conversation:
-                        result = await db.db.conversations.insert_one({
+                        conv_doc = {
                             "customerPhone":   phone_number,
                             "customerName":    customer_name,
                             "lastMessage":     text_content,
@@ -130,7 +159,10 @@ async def _process_webhook_body(body: dict) -> dict:
                             "status":          "active",
                             "createdAt":       _now(),
                             "updatedAt":       timestamp,
-                        })
+                        }
+                        if tenant_id:
+                            conv_doc["tenantId"] = tenant_id
+                        result = await db.db.conversations.insert_one(conv_doc)
                         conv_id = str(result.inserted_id)
                     else:
                         conv_id = str(conversation["_id"])
@@ -147,6 +179,17 @@ async def _process_webhook_body(body: dict) -> dict:
                             },
                         )
 
+                    # Always sync profile name to customers and broadcast_recipients if name is provided
+                    if customer_name and customer_name != "Unknown" and customer_name != phone_number:
+                        await db.db.customers.update_one(
+                            {"phone": phone_number},
+                            {"$set": {"name": customer_name, "updatedAt": _now()}}
+                        )
+                        await db.db.broadcast_recipients.update_many(
+                            {"customerPhone": phone_number},
+                            {"$set": {"customerName": customer_name, "updatedAt": _now()}}
+                        )
+
                     # Save inbound message
                     message_doc = {
                         "conversationId":    conv_id,
@@ -158,6 +201,8 @@ async def _process_webhook_body(body: dict) -> dict:
                         "timestamp":         timestamp,
                         "createdAt":         _now(),
                     }
+                    if tenant_id:
+                        message_doc["tenantId"] = tenant_id
                     await db.db.messages.insert_one(message_doc)
                     message_doc["_id"] = str(message_doc.pop("_id"))
 
@@ -173,7 +218,7 @@ async def _process_webhook_body(body: dict) -> dict:
 
                     # ── Bot Logic ─────────────────────────────────────────
                     try:
-                        bot_reply = await _run_bot_logic(msg, msg_type, text_content, phone_number, conv_id)
+                        bot_reply = await _run_bot_logic(msg, msg_type, text_content, phone_number, conv_id, tenant_id)
                         if bot_reply:
                             results["bot_replies"].append(bot_reply)
                     except Exception as bot_err:
@@ -186,350 +231,99 @@ async def _process_webhook_body(body: dict) -> dict:
                 for status in value["statuses"]:
                     status_msg_id = status.get("id")
                     status_type   = status.get("status")
-                    await db.db.messages.update_one(
+
+                    update_fields: dict = {"status": status_type, "updatedAt": _now()}
+
+                    # Persist failure reason when the status is "failed"
+                    if status_type == "failed":
+                        errors = status.get("errors", [])
+                        if errors:
+                            err = errors[0]
+                            code    = err.get("code", "")
+                            message = err.get("message", "") or err.get("title", "")
+                            details = err.get("error_data", {})
+                            if isinstance(details, dict):
+                                details = details.get("details", "")
+                            reason = message
+                            if details:
+                                reason = f"{message}: {details}"
+                            if code:
+                                reason = f"[#{code}] {reason}"
+                            update_fields["errorReason"] = reason
+                        else:
+                            update_fields["errorReason"] = "Message delivery failed"
+
+                    msg_update = await db.db.messages.find_one_and_update(
                         {"whatsappMessageId": status_msg_id},
-                        {"$set": {"status": status_type, "updatedAt": _now()}},
+                        {"$set": update_fields},
+                        return_document=True,
                     )
-                    msg_record = await db.db.messages.find_one(
-                        {"whatsappMessageId": status_msg_id}
+                    if msg_update:
+                        conv_id = str(msg_update.get("conversationId", ""))
+                        if conv_id:
+                            emit_doc = _serialize_mongo_doc(msg_update)
+                            await sio.emit("message:status", emit_doc, room=conv_id)
+
+                    # Update broadcast_recipients collection if this message belongs to a broadcast
+                    rec_update = {"status": status_type, "updatedAt": _now()}
+                    if status_type == "delivered":
+                        rec_update["deliveredAt"] = _now()
+                    elif status_type == "read":
+                        rec_update["readAt"] = _now()
+                    elif status_type == "failed":
+                        errors = status.get("errors", [])
+                        if errors:
+                            err = errors[0]
+                            code = err.get("code", 0)
+                            msg_text = err.get("message", "")
+                            rec_update["errorCode"] = code
+                            rec_update["errorReason"] = msg_text
+                            rec_update["isRetryable"] = (code in (131049, 130429, 131056, 131057))
+
+                    recipient_phone = status.get("recipient_id")
+                    rec_doc = await db.db.broadcast_recipients.find_one_and_update(
+                        {"whatsappMessageId": status_msg_id},
+                        {"$set": rec_update},
+                        return_document=True,
                     )
-                    if msg_record:
-                        conv_id = msg_record.get("conversationId")
-                        msg_record["_id"] = str(msg_record["_id"])
-                        emit_doc = {**msg_record}
-                        for key in ("timestamp", "createdAt", "updatedAt"):
-                            if key in emit_doc and hasattr(emit_doc[key], "isoformat"):
-                                emit_doc[key] = emit_doc[key].isoformat()
-                        await sio.emit("message:status", emit_doc, room=conv_id)
-                        await sio.emit("conversation:updated", {"conversationId": conv_id})
-                    results["statuses_processed"] += 1
+                    if not rec_doc and recipient_phone:
+                        rec_doc = await db.db.broadcast_recipients.find_one_and_update(
+                            {"customerPhone": recipient_phone, "status": {"$in": ["sent", "delivered"]}},
+                            {"$set": {**rec_update, "whatsappMessageId": status_msg_id}},
+                            return_document=True,
+                        )
 
-    return results
+                    if rec_doc and rec_doc.get("broadcastId"):
+                        try:
+                            inc_field = f"stats.{status_type}"
+                            await db.db.broadcasts.update_one(
+                                {"_id": ObjectId(rec_doc["broadcastId"])},
+                                {"$inc": {inc_field: 1}, "$set": {"updatedAt": _now()}}
+                            )
+                        except Exception:
+                            pass
 
-
-async def _run_bot_logic(msg: dict, msg_type: str, text_content: str, phone_number: str, conv_id: str) -> Optional[dict]:
+async def _run_bot_logic(
+    msg: dict, 
+    msg_type: str, 
+    text_content: str, 
+    phone_number: str, 
+    conv_id: str,
+    tenant_id: Optional[str] = None
+) -> Optional[dict]:
     """
     Execute chatbot auto-reply logic for an incoming message.
-    Returns a result dict if a reply was sent, or None if no reply was triggered.
+    Delegates parsing to the unified state-machine executor.
     """
-    import asyncio
-    bot_settings, user, fb_state, state_doc = await asyncio.gather(
-        get_bot_settings(db.db),
-        db.db.users.find_one({}),
-        db.db.feedback_states.find_one({"phone": phone_number}),
-        db.db.reservation_states.find_one({"phone": phone_number})
+    from app.services.bot_executor import execute_chatbot_flow
+    return await execute_chatbot_flow(
+        phone_number=phone_number,
+        incoming_msg=msg,
+        text_content=text_content,
+        tenant_id=tenant_id,
+        conv_id=conv_id
     )
 
-    if not bot_settings or not bot_settings.get("isActive"):
-        return None
-    wa_token    = (user.get("waAccessToken") if user else None) or settings.WA_ACCESS_TOKEN
-    wa_phone_id = (user.get("waPhoneNumberId") if user else None) or settings.WA_PHONE_NUMBER_ID
-    api_version = settings.WA_API_VERSION
-
-    if not wa_token or not wa_phone_id:
-        return None
-
-    url     = f"https://graph.facebook.com/{api_version}/{wa_phone_id}/messages"
-    headers = {"Authorization": f"Bearer {wa_token}", "Content-Type": "application/json"}
-
-    bot_reply_text = None
-    payload = None
-
-    INTENT_GROUPS = {
-        "greeting": ["hi", "hello", "hey", "start", "help", "hii", "helo",
-                     "namaste", "namaskar", "kem cho", "kya hal", "good morning",
-                     "good evening", "good afternoon", "sup", "yo"],
-        "menu":     ["menu", "food", "kya hai", "what do you have", "show menu",
-                     "items", "dishes", "khana", "what's available", "card"],
-        "timings":  ["timing", "timings", "open", "close", "hours", "time",
-                     "kab", "kitne baje", "when", "schedule"],
-        "address":  ["address", "location", "where", "kahan", "directions",
-                     "map", "place", "how to reach", "locate"],
-        "booking":  ["book", "reservation", "table", "reserve", "seat",
-                     "booking", "jagah", "place a booking"]
-    }
-
-    # Check for active feedback state
-    if fb_state and msg_type == "text":
-        text_val = text_content.strip()
-        rating = None
-        if text_val in ["1", "2", "3"]:
-            rating = int(text_val)
-        
-        if rating:
-            res_id = fb_state.get("reservationId")
-            await db.db.feedback.insert_one({
-                "reservationId": res_id,
-                "phone": phone_number,
-                "rating": rating,
-                "createdAt": _now()
-            })
-            await db.db.feedback_states.delete_one({"_id": fb_state["_id"]})
-            
-            bot_reply_text = "Thank you for your valuable feedback! 🙏 Hope to see you again soon."
-            payload = {
-                "messaging_product": "whatsapp",
-                "recipient_type": "individual",
-                "to": phone_number,
-                "type": "text",
-                "text": {"preview_url": False, "body": bot_reply_text}
-            }
-            # We skip normal logic by returning here since we handled it
-            # But we must send the message first
-            client = get_http_client()
-            resp = await client.post(url, json=payload, headers=headers)
-            if resp.status_code in (200, 201):
-                wa_msg_id = resp.json().get("messages", [{}])[0].get("id", "unknown")
-                outbound_doc = {
-                    "conversationId": conv_id,
-                    "whatsappMessageId": wa_msg_id,
-                    "direction": "outbound",
-                    "type": "text",
-                    "content": {"text": bot_reply_text},
-                    "status": "sent",
-                    "timestamp": _now(),
-                    "createdAt": _now(),
-                }
-                await db.db.messages.insert_one(outbound_doc)
-                outbound_doc["_id"] = str(outbound_doc["_id"])
-                outbound_doc["timestamp"] = outbound_doc["timestamp"].isoformat()
-                outbound_doc["createdAt"] = outbound_doc["createdAt"].isoformat()
-                await sio.emit("message:new", outbound_doc, room=conv_id)
-            return {"to": phone_number, "text": bot_reply_text, "type": "feedback"}
-            
-    # Check for active reservation state
-    if state_doc and msg_type == "text":
-        step = state_doc.get("step")
-        text_val = text_content.strip()
-        
-        if step == "ask_guests":
-            await db.db.reservation_states.update_one(
-                {"_id": state_doc["_id"]},
-                {"$set": {"step": "ask_date", "guests": text_val, "updatedAt": _now()}}
-            )
-            bot_reply_text = "What date would you like? 📅 (e.g. 25 June)"
-            payload = {
-                "messaging_product": "whatsapp",
-                "recipient_type": "individual",
-                "to": phone_number,
-                "type": "text",
-                "text": {"preview_url": False, "body": bot_reply_text}
-            }
-        elif step == "ask_date":
-            await db.db.reservation_states.update_one(
-                {"_id": state_doc["_id"]},
-                {"$set": {"step": "ask_time", "date": text_val, "updatedAt": _now()}}
-            )
-            bot_reply_text = "What time would you prefer? 🕒 (e.g. 7:30 PM)"
-            payload = {
-                "messaging_product": "whatsapp",
-                "recipient_type": "individual",
-                "to": phone_number,
-                "type": "text",
-                "text": {"preview_url": False, "body": bot_reply_text}
-            }
-        elif step == "ask_time":
-            guests = state_doc.get("guests", "Unknown")
-            date_val = state_doc.get("date", "Unknown")
-            time_val = text_val
-            
-            conv = await db.db.conversations.find_one({"customerPhone": phone_number})
-            cust_name = conv.get("customerName", phone_number) if conv else phone_number
-            
-            reservation = {
-                "guestName": cust_name,
-                "phone": phone_number,
-                "guests": guests,
-                "date": date_val,
-                "time": time_val,
-                "status": "Pending",
-                "createdAt": _now(),
-                "updatedAt": _now()
-            }
-            res_result = await db.db.reservations.insert_one(reservation)
-            
-            await db.db.reservation_states.delete_one({"_id": state_doc["_id"]})
-            
-            bot_reply_text = f"✅ Reservation request received!\n👥 {guests} people | 📅 {date_val} | 🕒 {time_val}\nWe'll confirm within 15 minutes."
-            payload = {
-                "messaging_product": "whatsapp",
-                "recipient_type": "individual",
-                "to": phone_number,
-                "type": "text",
-                "text": {"preview_url": False, "body": bot_reply_text}
-            }
-            
-            res_emit = {**reservation, "_id": str(res_result.inserted_id), "createdAt": reservation["createdAt"].isoformat(), "updatedAt": reservation["updatedAt"].isoformat()}
-            await sio.emit("reservation:new", res_emit)
-
-    # If not in reservation state, do standard intent matching
-    elif msg_type == "text":
-        lower_text = text_content.lower().strip()
-        
-        # 1. First check FAQ items
-        faq_cursor = db.db.faq_items.find({"isActive": True})
-        matched_faq = None
-        async for faq in faq_cursor:
-            if any(keyword in lower_text for keyword in faq.get("keywords", [])):
-                matched_faq = faq
-                break
-                
-        if matched_faq:
-            bot_reply_text = matched_faq.get("answer", "")
-            payload = {
-                "messaging_product": "whatsapp",
-                "recipient_type": "individual",
-                "to": phone_number,
-                "type": "text",
-                "text": {"preview_url": False, "body": bot_reply_text}
-            }
-        else:
-            # 2. If no FAQ match, check standard intents
-            intent = None
-            for key, keywords in INTENT_GROUPS.items():
-                if any(keyword in lower_text for keyword in keywords):
-                    intent = key
-                    break
-                    
-            if intent == "greeting":
-                IST = pytz.timezone("Asia/Kolkata")
-                current_hour = datetime.now(IST).hour
-                open_hour = bot_settings.get("openHour", 11)
-                close_hour = bot_settings.get("closeHour", 23)
-                
-                if current_hour >= close_hour or current_hour < open_hour:
-                    closed_msg = f"😴 We're currently closed. We open at {open_hour}:00. Leave your message and we'll get back to you!"
-                    payload = {
-                        "messaging_product": "whatsapp",
-                        "recipient_type": "individual",
-                        "to": phone_number,
-                        "type": "text",
-                        "text": {"preview_url": False, "body": closed_msg}
-                    }
-                    bot_reply_text = closed_msg
-                else:
-                    if 11 <= current_hour < 15:
-                        time_prefix = "🍽️ We're open for lunch! "
-                    elif 19 <= current_hour < 23:
-                        time_prefix = "🌙 We're open for dinner! "
-                    else:
-                        time_prefix = "👋 Hello! "
-                        
-                    base_welcome = bot_settings.get("welcomeMessage", "Welcome!")
-                    bot_reply_text = f"{time_prefix}\n{base_welcome}"
-                    
-                    buttons = [
-                        {"id": "btn_address", "title": "📍 Address"},
-                        {"id": "btn_menu", "title": "📜 Menu"},
-                        {"id": "btn_timings", "title": "🕒 Timings"}
-                    ]
-                    payload = get_greeting_payload(phone_number, bot_reply_text, buttons)
-            elif intent == "menu":
-                menu_url = bot_settings.get("menuUrl", "")
-                bot_reply_text = f"Here is our menu:\n{menu_url}" if menu_url else "Menu not available right now."
-                payload = {
-                    "messaging_product": "whatsapp",
-                    "recipient_type": "individual",
-                    "to": phone_number,
-                    "type": "text",
-                    "text": {"preview_url": True, "body": bot_reply_text}
-                }
-            elif intent == "timings":
-                bot_reply_text = bot_settings.get("timingsText", "Timings not set.")
-                payload = {
-                    "messaging_product": "whatsapp",
-                    "recipient_type": "individual",
-                    "to": phone_number,
-                    "type": "text",
-                    "text": {"preview_url": True, "body": bot_reply_text}
-                }
-            elif intent == "address":
-                bot_reply_text = bot_settings.get("addressText", "Address not set.")
-                payload = {
-                    "messaging_product": "whatsapp",
-                    "recipient_type": "individual",
-                    "to": phone_number,
-                    "type": "text",
-                    "text": {"preview_url": True, "body": bot_reply_text}
-                }
-            elif intent == "booking":
-                await db.db.reservation_states.update_one(
-                    {"phone": phone_number},
-                    {"$set": {"step": "ask_guests", "updatedAt": _now()}},
-                    upsert=True
-                )
-                bot_reply_text = "Let's get your table booked! How many people will be dining? 👥 (Reply with a number)"
-                payload = {
-                    "messaging_product": "whatsapp",
-                    "recipient_type": "individual",
-                    "to": phone_number,
-                    "type": "text",
-                    "text": {"preview_url": False, "body": bot_reply_text}
-                }
-
-    # 2. Button click handler
-    elif msg_type == "interactive":
-        interactive_data = msg.get("interactive", {})
-        if interactive_data.get("type") == "button_reply":
-            btn_id = interactive_data.get("button_reply", {}).get("id")
-
-            if btn_id == "btn_address":
-                bot_reply_text = bot_settings.get("addressText", "Address not set.")
-            elif btn_id == "btn_menu":
-                menu_url = bot_settings.get("menuUrl", "")
-                bot_reply_text = f"Here is our menu:\n{menu_url}" if menu_url else "Menu not available right now."
-            elif btn_id == "btn_timings":
-                bot_reply_text = bot_settings.get("timingsText", "Timings not set.")
-
-            if bot_reply_text:
-                payload = {
-                    "messaging_product": "whatsapp",
-                    "recipient_type": "individual",
-                    "to": phone_number,
-                    "type": "text",
-                    "text": {"preview_url": True, "body": bot_reply_text}
-                }
-
-    # Send the bot response
-    if not payload:
-        return None
-
-    print(f"[BOT] Sending auto-reply to {phone_number}: {bot_reply_text[:50]}...")
-    client = get_http_client()
-    resp = await client.post(url, json=payload, headers=headers)
-    if resp.status_code in (200, 201):
-        wa_msg_id = resp.json().get("messages", [{}])[0].get("id", "unknown")
-        outbound_doc = {
-            "conversationId": conv_id,
-            "whatsappMessageId": wa_msg_id,
-            "direction": "outbound",
-            "type": payload["type"],
-            "content": {"text": bot_reply_text},
-            "status": "sent",
-            "timestamp": _now(),
-            "createdAt": _now(),
-        }
-        await db.db.messages.insert_one(outbound_doc)
-
-        outbound_doc["_id"] = str(outbound_doc["_id"])
-        outbound_doc["timestamp"] = outbound_doc["timestamp"].isoformat()
-        outbound_doc["createdAt"] = outbound_doc["createdAt"].isoformat()
-
-        # Emit to frontend
-        await sio.emit("message:new", outbound_doc, room=conv_id)
-
-        # Update conversation last message
-        conv_oid = ObjectId(conv_id)
-        await db.db.conversations.update_one(
-            {"_id": conv_oid},
-            {"$set": {"lastMessage": bot_reply_text, "lastMessageTime": _now()}}
-        )
-        await sio.emit("conversation:updated", {"conversationId": conv_id})
-        print(f"[BOT] Auto-reply sent successfully: {wa_msg_id}")
-        return {"to": phone_number, "text": bot_reply_text, "wa_msg_id": wa_msg_id}
-    else:
-        print(f"[BOT] Auto-reply FAILED: {resp.status_code} {resp.text}")
-        return {"to": phone_number, "text": bot_reply_text, "error": resp.text}
 
 
 # ─────────────────────────────────────────────────────────────────────────────

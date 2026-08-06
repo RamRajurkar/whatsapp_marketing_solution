@@ -4,9 +4,10 @@ from typing import Optional, List
 from app.routes.auth import get_current_user
 from app.database import db
 from bson import ObjectId
-from datetime import datetime
+from datetime import datetime, timezone
 from app.config import settings
 from app.http_client import get_http_client
+from app.utils.tenant import get_tenant_filter, inject_tenant_id
 import httpx
 
 router = APIRouter()
@@ -19,11 +20,18 @@ async def get_reservations(
     status: Optional[str] = None,
     current_user: dict = Depends(get_current_user)
 ):
-    """Get all reservations, optionally filtered by status."""
+    """Get all bookings, optionally filtered by status."""
+    tenant_filter = get_tenant_filter(current_user)
     query = {}
     if status and status != "All":
         query["status"] = status
         
+    if tenant_filter:
+        if query:
+            query = {"$and": [query, tenant_filter]}
+        else:
+            query = tenant_filter
+            
     reservations = []
     cursor = db.db.reservations.find(query).sort("createdAt", -1)
     async for res in cursor:
@@ -41,21 +49,25 @@ async def update_reservation_status(
     if data.status not in ["Pending", "Confirmed", "Cancelled", "Completed"]:
         raise HTTPException(status_code=400, detail="Invalid status")
         
+    tenant_filter = get_tenant_filter(current_user)
+    query = {"_id": ObjectId(res_id)}
+    if tenant_filter:
+        query = {"$and": [query, tenant_filter]}
+
     result = await db.db.reservations.update_one(
-        {"_id": ObjectId(res_id)},
-        {"$set": {"status": data.status, "updatedAt": datetime.utcnow()}}
+        query,
+        {"$set": {"status": data.status, "updatedAt": datetime.now(timezone.utc)}}
     )
     
-    if result.modified_count == 0:
+    if result.matched_count == 0:
         raise HTTPException(status_code=404, detail="Reservation not found")
         
-    updated_res = await db.db.reservations.find_one({"_id": ObjectId(res_id)})
+    updated_res = await db.db.reservations.find_one(query)
     if updated_res:
         updated_res["_id"] = str(updated_res["_id"])
         
         # Trigger feedback message if completed
         if data.status == "Completed":
-            
             wa_token = current_user.get("waAccessToken") or settings.WA_ACCESS_TOKEN
             wa_phone_id = current_user.get("waPhoneNumberId") or settings.WA_PHONE_NUMBER_ID
             api_version = settings.WA_API_VERSION
@@ -65,7 +77,7 @@ async def update_reservation_status(
                 headers = {"Authorization": f"Bearer {wa_token}", "Content-Type": "application/json"}
                 
                 name = updated_res.get("guestName", "Guest").split(" ")[0]
-                feedback_msg = f"Hi {name}! 😊 Thank you for dining with us!\nHow was your experience? Reply with:\n1 ⭐ - Poor\n2 ⭐⭐⭐ - Good\n3 ⭐⭐⭐⭐⭐ - Excellent"
+                feedback_msg = f"Hi {name}! 😊 Thank you for your visit!\nHow was your experience? Reply with:\n1 ⭐ - Poor\n2 ⭐⭐⭐ - Good\n3 ⭐⭐⭐⭐⭐ - Excellent"
                 
                 payload = {
                     "messaging_product": "whatsapp",
@@ -78,10 +90,13 @@ async def update_reservation_status(
                 client = get_http_client()
                 resp = await client.post(url, json=payload, headers=headers)
                 if resp.status_code in (200, 201):
-                    # Save feedback state
+                    # Save feedback state with tenant isolation
+                    fb_doc = {"reservationId": res_id, "updatedAt": datetime.now(timezone.utc)}
+                    inject_tenant_id(fb_doc, current_user)
+                    
                     await db.db.feedback_states.update_one(
                         {"phone": updated_res["phone"]},
-                        {"$set": {"reservationId": res_id, "updatedAt": datetime.utcnow()}},
+                        {"$set": fb_doc},
                         upsert=True
                     )
 
@@ -93,7 +108,12 @@ async def delete_reservation(
     current_user: dict = Depends(get_current_user)
 ):
     """Delete a reservation."""
-    result = await db.db.reservations.delete_one({"_id": ObjectId(res_id)})
+    tenant_filter = get_tenant_filter(current_user)
+    query = {"_id": ObjectId(res_id)}
+    if tenant_filter:
+        query = {"$and": [query, tenant_filter]}
+
+    result = await db.db.reservations.delete_one(query)
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Reservation not found")
     return {"message": "Reservation deleted"}

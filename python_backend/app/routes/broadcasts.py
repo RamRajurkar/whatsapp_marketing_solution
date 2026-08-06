@@ -1,5 +1,5 @@
-from fastapi import APIRouter, Depends, HTTPException
-from typing import Optional, List
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
+from typing import Optional, List, Dict, Any
 from pydantic import BaseModel
 from app.routes.auth import get_current_user
 from app.database import db
@@ -7,11 +7,18 @@ from app.config import settings
 from bson import ObjectId
 from datetime import datetime, timezone
 import os
+import io
+import csv
+import re
 import httpx
 import mimetypes
+import pytz
+from app.celery_app import celery_app
+from app.utils.phone import normalize_indian_phone
 from app.utils.image_utils import compress_image_bytes
 from app.tasks.broadcast_task import send_broadcast as send_broadcast_task
 from app.http_client import get_http_client
+from app.utils.tenant import get_tenant_filter, inject_tenant_id
 
 router = APIRouter()
 
@@ -20,40 +27,187 @@ def _now():
     return datetime.now(timezone.utc)
 
 
+def _get_scheduled_eta(scheduled_at_str: Optional[str]) -> Optional[datetime]:
+    if not scheduled_at_str:
+        return None
+    try:
+        dt = datetime.fromisoformat(scheduled_at_str)
+        if dt.tzinfo is None:
+            ist = pytz.timezone("Asia/Kolkata")
+            dt = ist.localize(dt)
+        return dt.astimezone(timezone.utc)
+    except Exception as e:
+        print(f"[Broadcast Schedule] Failed to parse scheduledAt '{scheduled_at_str}': {e}")
+        return None
+
+
 class BroadcastCreate(BaseModel):
     name: str
     templateName: str
     templateLanguage: str = "en"
     audienceTags: Optional[List[str]] = []
+    audienceType: Optional[str] = "tags"  # "tags" | "csv"
+    csvAudience: Optional[List[Dict[str, Any]]] = None
     scheduledAt: Optional[str] = None
+    recurringSchedule: Optional[str] = "none"  # "none" | "daily" | "weekly" | "monthly"
+    category: Optional[str] = "MARKETING"
+    estimatedCost: Optional[float] = 0.0
     status: str = "draft"
-    templateComponents: Optional[List[dict]] = None  # Template component definitions
+    templateComponents: Optional[List[dict]] = None
     headerMediaUrl: Optional[str] = None
     headerMediaId: Optional[str] = None
     bodyParams: Optional[List[str]] = None
+    buttonParams: Optional[List[str]] = None
     carouselCards: Optional[List[dict]] = None
 
 
+@router.post("/parse-csv")
+async def parse_broadcast_csv(file: UploadFile = File(...), current_user: dict = Depends(get_current_user)):
+    """
+    Parse uploaded CSV file for broadcast campaign audience and dynamic variables.
+    Detects phone, name, and parameter columns.
+    """
+    if not file.filename.endswith(".csv"):
+        raise HTTPException(status_code=400, detail="Only .csv files are supported")
+
+    content = await file.read()
+    text = content.decode("utf-8-sig", errors="ignore")
+    stream = io.StringIO(text)
+    reader = csv.reader(stream)
+
+    rows = list(reader)
+    if not rows or len(rows) < 2:
+        raise HTTPException(status_code=400, detail="CSV file is empty or missing headers")
+
+    raw_headers = [h.strip() for h in rows[0]]
+    lower_headers = [h.lower() for h in raw_headers]
+
+    phone_idx = -1
+    name_idx = -1
+
+    phone_keywords = ["phone", "mobile", "number", "whatsapp", "phone_number", "contact", "to", "recipient"]
+    name_keywords = ["name", "customer_name", "full_name", "contact_name", "customer"]
+
+    for i, h in enumerate(lower_headers):
+        if phone_idx == -1 and any(k in h for k in phone_keywords):
+            phone_idx = i
+        if name_idx == -1 and any(k in h for k in name_keywords):
+            name_idx = i
+
+    if phone_idx == -1:
+        phone_idx = 0
+
+    if name_idx == -1:
+        name_idx = 1 if len(raw_headers) > 1 else 0
+
+    parsed_recipients = []
+    preview_rows = []
+
+    for row_idx, row in enumerate(rows[1:], start=1):
+        if not row or not any(cell.strip() for cell in row):
+            continue
+
+        raw_phone = row[phone_idx].strip() if phone_idx < len(row) else ""
+        if not raw_phone:
+            continue
+
+        try:
+            phone = normalize_indian_phone(raw_phone)
+        except Exception:
+            phone = re.sub(r"\D", "", raw_phone)
+
+        name = row[name_idx].strip() if (name_idx < len(row) and name_idx != phone_idx) else phone
+        if not name:
+            name = phone
+
+        params = []
+        for i, val in enumerate(row):
+            if i != phone_idx:
+                params.append(val.strip())
+
+        rec_item = {
+            "phone": phone,
+            "name": name,
+            "params": params,
+            "raw_row": {raw_headers[i]: row[i].strip() for i in range(min(len(raw_headers), len(row)))}
+        }
+
+        parsed_recipients.append(rec_item)
+        if len(preview_rows) < 5:
+            preview_rows.append(rec_item)
+
+    return {
+        "filename": file.filename,
+        "total_rows": len(parsed_recipients),
+        "headers": raw_headers,
+        "phone_header": raw_headers[phone_idx] if phone_idx < len(raw_headers) else "",
+        "name_header": raw_headers[name_idx] if name_idx < len(raw_headers) else "",
+        "preview_rows": preview_rows,
+        "parsed_recipients": parsed_recipients,
+    }
+
+
+@router.get("")
 @router.get("/")
 async def get_broadcasts(current_user: dict = Depends(get_current_user)):
     """Get all broadcast campaigns."""
-    cursor = db.db.broadcasts.find().sort("createdAt", -1)
+    tenant_filter = get_tenant_filter(current_user)
+    
+    cursor = db.db.broadcasts.find(tenant_filter).sort("createdAt", -1)
     broadcasts = await cursor.to_list(length=100)
     for b in broadcasts:
         b["_id"] = str(b["_id"])
     return broadcasts
 
 
+@router.post("")
 @router.post("/")
 async def create_broadcast(data: BroadcastCreate, current_user: dict = Depends(get_current_user)):
     """Create a new broadcast campaign."""
     doc = data.model_dump()
-    doc["createdAt"] = _now()
-    doc["updatedAt"] = _now()
+    now = _now()
+    doc["createdAt"] = now
+    doc["updatedAt"] = now
     doc["stats"] = {"total": 0, "sent": 0, "failed": 0}
+    inject_tenant_id(doc, current_user)
+
+    scheduled_at = doc.get("scheduledAt")
+    eta_utc = _get_scheduled_eta(scheduled_at)
+
+    if eta_utc and eta_utc > now:
+        doc["status"] = "scheduled"
 
     result = await db.db.broadcasts.insert_one(doc)
-    doc["_id"] = str(result.inserted_id)
+    broadcast_id = str(result.inserted_id)
+    doc["_id"] = broadcast_id
+
+    if eta_utc and eta_utc > now:
+        wa_phone_id = current_user.get("waPhoneNumberId") or settings.WA_PHONE_NUMBER_ID
+        wa_token    = current_user.get("waAccessToken")    or settings.WA_ACCESS_TOKEN
+        tenant_id   = str(current_user["_id"]) if settings.APP_MODE == "saas" else None
+
+        if wa_phone_id and wa_token:
+            task = send_broadcast_task.apply_async(
+                kwargs={
+                    "broadcast_id": broadcast_id,
+                    "wa_phone_id": wa_phone_id,
+                    "wa_token": wa_token,
+                    "template_name": doc["templateName"],
+                    "template_lang": doc.get("templateLanguage", "en"),
+                    "template_components": doc.get("templateComponents"),
+                    "header_media_url": doc.get("headerMediaUrl"),
+                    "header_media_id": doc.get("headerMediaId"),
+                    "body_params": doc.get("bodyParams"),
+                    "carousel_cards": doc.get("carouselCards"),
+                    "audience_tags": doc.get("audienceTags"),
+                    "tenant_id": tenant_id,
+                    "csv_audience": doc.get("csvAudience"),
+                },
+                eta=eta_utc
+            )
+            await db.db.broadcasts.update_one({"_id": ObjectId(broadcast_id)}, {"$set": {"celeryTaskId": task.id}})
+            doc["celeryTaskId"] = task.id
+
     return doc
 
 
@@ -65,7 +219,19 @@ async def delete_broadcast(broadcast_id: str, current_user: dict = Depends(get_c
     except Exception:
         raise HTTPException(status_code=400, detail="Invalid broadcast ID")
 
-    result = await db.db.broadcasts.delete_one({"_id": obj_id})
+    tenant_filter = get_tenant_filter(current_user)
+    delete_query = {"_id": obj_id}
+    if tenant_filter:
+        delete_query = {"$and": [delete_query, tenant_filter]}
+
+    broadcast = await db.db.broadcasts.find_one(delete_query)
+    if broadcast and broadcast.get("celeryTaskId"):
+        try:
+            celery_app.control.revoke(broadcast["celeryTaskId"], terminate=True)
+        except Exception:
+            pass
+
+    result = await db.db.broadcasts.delete_one(delete_query)
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Broadcast not found")
     return {"message": "Broadcast deleted"}
@@ -79,7 +245,12 @@ async def update_broadcast(broadcast_id: str, data: BroadcastCreate, current_use
     except Exception:
         raise HTTPException(status_code=400, detail="Invalid broadcast ID")
 
-    broadcast = await db.db.broadcasts.find_one({"_id": obj_id})
+    tenant_filter = get_tenant_filter(current_user)
+    broadcast_query = {"_id": obj_id}
+    if tenant_filter:
+        broadcast_query = {"$and": [broadcast_query, tenant_filter]}
+
+    broadcast = await db.db.broadcasts.find_one(broadcast_query)
     if not broadcast:
         raise HTTPException(status_code=404, detail="Broadcast not found")
         
@@ -87,11 +258,47 @@ async def update_broadcast(broadcast_id: str, data: BroadcastCreate, current_use
         raise HTTPException(status_code=400, detail="Only draft or scheduled broadcasts can be edited")
 
     update_data = data.model_dump(exclude_unset=True)
-    update_data["updatedAt"] = _now()
+    now = _now()
+    update_data["updatedAt"] = now
     
-    await db.db.broadcasts.update_one({"_id": obj_id}, {"$set": update_data})
+    scheduled_at = update_data.get("scheduledAt")
+    eta_utc = _get_scheduled_eta(scheduled_at)
+    if eta_utc and eta_utc > now:
+        update_data["status"] = "scheduled"
+        if broadcast.get("celeryTaskId"):
+            try:
+                celery_app.control.revoke(broadcast["celeryTaskId"], terminate=True)
+            except Exception:
+                pass
+
+        wa_phone_id = current_user.get("waPhoneNumberId") or settings.WA_PHONE_NUMBER_ID
+        wa_token    = current_user.get("waAccessToken")    or settings.WA_ACCESS_TOKEN
+        tenant_id   = str(current_user["_id"]) if settings.APP_MODE == "saas" else None
+
+        if wa_phone_id and wa_token:
+            task = send_broadcast_task.apply_async(
+                kwargs={
+                    "broadcast_id": broadcast_id,
+                    "wa_phone_id": wa_phone_id,
+                    "wa_token": wa_token,
+                    "template_name": update_data.get("templateName", broadcast.get("templateName")),
+                    "template_lang": update_data.get("templateLanguage", broadcast.get("templateLanguage", "en")),
+                    "template_components": update_data.get("templateComponents", broadcast.get("templateComponents")),
+                    "header_media_url": update_data.get("headerMediaUrl", broadcast.get("headerMediaUrl")),
+                    "header_media_id": update_data.get("headerMediaId", broadcast.get("headerMediaId")),
+                    "body_params": update_data.get("bodyParams", broadcast.get("bodyParams")),
+                    "carousel_cards": update_data.get("carouselCards", broadcast.get("carouselCards")),
+                    "audience_tags": update_data.get("audienceTags", broadcast.get("audienceTags")),
+                    "tenant_id": tenant_id,
+                    "csv_audience": update_data.get("csvAudience", broadcast.get("csvAudience")),
+                },
+                eta=eta_utc
+            )
+            update_data["celeryTaskId"] = task.id
+
+    await db.db.broadcasts.update_one(broadcast_query, {"$set": update_data})
     
-    updated = await db.db.broadcasts.find_one({"_id": obj_id})
+    updated = await db.db.broadcasts.find_one(broadcast_query)
     updated["_id"] = str(updated["_id"])
     return updated
 
@@ -103,19 +310,22 @@ async def send_broadcast(
 ):
     """
     Queue a broadcast campaign to Celery for background processing.
-    Returns immediately — the actual sending runs in a Celery worker
-    so the HTTP request doesn't block and survives server restarts.
     """
     try:
         obj_id = ObjectId(broadcast_id)
     except Exception:
         raise HTTPException(status_code=400, detail="Invalid broadcast ID")
 
-    broadcast = await db.db.broadcasts.find_one({"_id": obj_id})
+    tenant_filter = get_tenant_filter(current_user)
+    broadcast_query = {"_id": obj_id}
+    if tenant_filter:
+        broadcast_query = {"$and": [broadcast_query, tenant_filter]}
+
+    broadcast = await db.db.broadcasts.find_one(broadcast_query)
     if not broadcast:
         raise HTTPException(status_code=404, detail="Broadcast not found")
 
-    if broadcast.get("status") not in ("draft", "failed", "partial"):
+    if broadcast.get("status") not in ("draft", "scheduled", "failed", "partial"):
         raise HTTPException(
             status_code=400,
             detail="Broadcast has already been sent or is currently sending",
@@ -130,10 +340,16 @@ async def send_broadcast(
             detail="WhatsApp credentials not configured. Go to Settings.",
         )
 
-    # Count target customers for immediate UI feedback
+    # Count target customers
     audience_tags  = broadcast.get("audienceTags", [])
-    customer_query = {"tags": {"$in": audience_tags}} if audience_tags else {}
-    total_count    = await db.db.customers.count_documents(customer_query)
+    csv_audience = broadcast.get("csvAudience")
+    if csv_audience:
+        total_count = len(csv_audience)
+    else:
+        customer_query = {"tags": {"$in": audience_tags}} if audience_tags else {}
+        if tenant_filter:
+            customer_query = {"$and": [customer_query, tenant_filter]}
+        total_count = await db.db.customers.count_documents(customer_query)
 
     if total_count == 0:
         raise HTTPException(
@@ -141,7 +357,6 @@ async def send_broadcast(
             detail="No customers found for the selected audience",
         )
 
-    # Handle local media URLs that Meta cannot download
     header_media_url = broadcast.get("headerMediaUrl")
     header_media_id = broadcast.get("headerMediaId")
 
@@ -157,7 +372,6 @@ async def send_broadcast(
                 with open(local_path, "rb") as f:
                     file_bytes = f.read()
                 
-                # Compress image if too large for WhatsApp (5 MB limit)
                 file_bytes, filename, file_type = compress_image_bytes(file_bytes, filename, file_type)
                 
                 upload_url = f"https://graph.facebook.com/{settings.WA_API_VERSION}/{wa_phone_id}/media"
@@ -174,10 +388,9 @@ async def send_broadcast(
                 u_resp = await u_client.post(upload_url, headers=upload_headers, data=upload_data, files=upload_files)
                 if u_resp.status_code in (200, 201):
                     header_media_id = u_resp.json().get("id")
-                    header_media_url = None # Unset URL since we have ID
-                    # Persist to MongoDB
+                    header_media_url = None
                     await db.db.broadcasts.update_one(
-                        {"_id": obj_id},
+                        broadcast_query,
                         {"$set": {
                             "headerMediaId": header_media_id,
                             "headerMediaUrl": None
@@ -196,40 +409,89 @@ async def send_broadcast(
                     detail=f"Error uploading media file: {str(e)}"
                 )
 
-    # Mark as "sending" immediately for UI
-    await db.db.broadcasts.update_one(
-        {"_id": obj_id},
-        {"$set": {
-            "status":      "sending",
-            "stats.total": total_count,
-            "stats.sent":  0,
-            "stats.failed": 0,
-            "updatedAt":   _now(),
-        }},
-    )
+    scheduled_at = broadcast.get("scheduledAt")
+    eta_utc = _get_scheduled_eta(scheduled_at)
+    now = _now()
+    tenant_id = str(current_user["_id"]) if settings.APP_MODE == "saas" else None
 
-    # Dispatch to Celery worker
-    
-    task = send_broadcast_task.delay(
-        broadcast_id=broadcast_id,
-        wa_phone_id=wa_phone_id,
-        wa_token=wa_token,
-        template_name=broadcast["templateName"],
-        template_lang=broadcast.get("templateLanguage", "en"),
-        template_components=broadcast.get("templateComponents"),
-        header_media_url=header_media_url,
-        header_media_id=header_media_id,
-        body_params=broadcast.get("bodyParams"),
-        carousel_cards=broadcast.get("carouselCards"),
-        audience_tags=audience_tags,
-    )
+    if eta_utc and eta_utc > now:
+        if broadcast.get("celeryTaskId"):
+            try:
+                celery_app.control.revoke(broadcast["celeryTaskId"], terminate=True)
+            except Exception:
+                pass
 
-    return {
-        "message": f"Broadcast queued. Sending to {total_count} customers via Celery worker.",
-        "total": total_count,
-        "status": "sending",
-        "taskId": task.id,
-    }
+        task = send_broadcast_task.apply_async(
+            kwargs={
+                "broadcast_id": broadcast_id,
+                "wa_phone_id": wa_phone_id,
+                "wa_token": wa_token,
+                "template_name": broadcast["templateName"],
+                "template_lang": broadcast.get("templateLanguage", "en"),
+                "template_components": broadcast.get("templateComponents"),
+                "header_media_url": header_media_url,
+                "header_media_id": header_media_id,
+                "body_params": broadcast.get("bodyParams"),
+                "carousel_cards": broadcast.get("carouselCards"),
+                "audience_tags": audience_tags,
+                "tenant_id": tenant_id,
+                "csv_audience": csv_audience,
+            },
+            eta=eta_utc
+        )
+
+        await db.db.broadcasts.update_one(
+            broadcast_query,
+            {"$set": {
+                "status": "scheduled",
+                "stats.total": total_count,
+                "celeryTaskId": task.id,
+                "updatedAt": now,
+            }},
+        )
+
+        return {
+            "message": f"Broadcast scheduled successfully for {scheduled_at}.",
+            "total": total_count,
+            "status": "scheduled",
+            "taskId": task.id,
+        }
+
+    else:
+        # Immediate send
+        await db.db.broadcasts.update_one(
+            broadcast_query,
+            {"$set": {
+                "status": "sending",
+                "stats.total": total_count,
+                "stats.sent": 0,
+                "stats.failed": 0,
+                "updatedAt": now,
+            }},
+        )
+
+        task = send_broadcast_task.delay(
+            broadcast_id=broadcast_id,
+            wa_phone_id=wa_phone_id,
+            wa_token=wa_token,
+            template_name=broadcast["templateName"],
+            template_lang=broadcast.get("templateLanguage", "en"),
+            template_components=broadcast.get("templateComponents"),
+            header_media_url=header_media_url,
+            header_media_id=header_media_id,
+            body_params=broadcast.get("bodyParams"),
+            carousel_cards=broadcast.get("carouselCards"),
+            audience_tags=audience_tags,
+            tenant_id=tenant_id,
+            csv_audience=csv_audience,
+        )
+
+        return {
+            "message": f"Broadcast queued. Sending to {total_count} customers.",
+            "total": total_count,
+            "status": "sending",
+            "taskId": task.id,
+        }
 
 
 @router.get("/{broadcast_id}/progress")
@@ -240,7 +502,12 @@ async def get_broadcast_progress(broadcast_id: str, current_user: dict = Depends
     except Exception:
         raise HTTPException(status_code=400, detail="Invalid broadcast ID")
 
-    broadcast = await db.db.broadcasts.find_one({"_id": obj_id})
+    tenant_filter = get_tenant_filter(current_user)
+    broadcast_query = {"_id": obj_id}
+    if tenant_filter:
+        broadcast_query = {"$and": [broadcast_query, tenant_filter]}
+
+    broadcast = await db.db.broadcasts.find_one(broadcast_query)
     if not broadcast:
         raise HTTPException(status_code=404, detail="Broadcast not found")
 
@@ -257,3 +524,297 @@ async def get_broadcast_progress(broadcast_id: str, current_user: dict = Depends
         "total": total,
         "percentage": round((sent + failed) / total * 100, 1) if total > 0 else 0,
     }
+
+
+class RetryRequest(BaseModel):
+    retry_mode: Optional[str] = "temporary_only"  # "temporary_only", "frequency_capped", "all_failed"
+
+
+@router.get("/{broadcast_id}/details")
+async def get_broadcast_details(broadcast_id: str, current_user: dict = Depends(get_current_user)):
+    """Get complete analytics summary for a broadcast campaign."""
+    try:
+        obj_id = ObjectId(broadcast_id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid broadcast ID")
+
+    tenant_filter = get_tenant_filter(current_user)
+    broadcast_query = {"_id": obj_id}
+    if tenant_filter:
+        broadcast_query = {"$and": [broadcast_query, tenant_filter]}
+
+    broadcast = await db.db.broadcasts.find_one(broadcast_query)
+    if not broadcast:
+        raise HTTPException(status_code=404, detail="Broadcast not found")
+
+    broadcast["_id"] = str(broadcast["_id"])
+
+    # Auto-sync any 'sent' recipients whose underlying message in messages collection has updated to 'delivered' or 'read'
+    sent_recs = await db.db.broadcast_recipients.find({"broadcastId": broadcast_id, "status": "sent"}).to_list(100)
+    for r in sent_recs:
+        wa_id = r.get("whatsappMessageId")
+        phone = r.get("customerPhone")
+        msg = None
+        if wa_id:
+            msg = await db.db.messages.find_one({"whatsappMessageId": wa_id})
+        if not msg and phone:
+            msg = await db.db.messages.find_one({"customerPhone": phone, "direction": "outbound", "status": {"$in": ["delivered", "read"]}})
+        if msg and msg.get("status") in ["delivered", "read"]:
+            await db.db.broadcast_recipients.update_one({"_id": r["_id"]}, {"$set": {"status": msg["status"], "updatedAt": _now()}})
+
+    # Aggregate recipient status counts
+    pipeline = [
+        {"$match": {"broadcastId": broadcast_id}},
+        {
+            "$group": {
+                "_id": "$status",
+                "count": {"$sum": 1},
+            }
+        }
+    ]
+    status_counts_cursor = db.db.broadcast_recipients.aggregate(pipeline)
+    counts = {doc["_id"]: doc["count"] async for doc in status_counts_cursor}
+
+    # Count failure breakdowns
+    failed_perm = await db.db.broadcast_recipients.count_documents({"broadcastId": broadcast_id, "status": "failed", "isRetryable": False})
+    failed_temp = await db.db.broadcast_recipients.count_documents({"broadcastId": broadcast_id, "status": "failed", "isRetryable": True})
+    freq_capped = await db.db.broadcast_recipients.count_documents({"broadcastId": broadcast_id, "status": "frequency_capped"})
+
+    # Exclusive status counts (exact current state of each recipient)
+    sent_pending = counts.get("sent", 0)
+    delivered_unread = counts.get("delivered", 0)
+    read = counts.get("read", 0)
+    total_dispatched = sent_pending + delivered_unread + read
+    total = sum(counts.values()) or broadcast.get("stats", {}).get("total", 0)
+
+    total_delivered = delivered_unread + read
+    delivery_rate = round((total_delivered / total_dispatched * 100), 1) if total_dispatched > 0 else 0
+    read_rate = round((read / total_delivered * 100), 1) if total_delivered > 0 else 0
+
+    return {
+        "broadcast": broadcast,
+        "analytics": {
+            "total": total,
+            "totalDispatched": total_dispatched,
+            "sent": sent_pending,
+            "delivered": delivered_unread,
+            "read": read,
+            "failedPermanent": failed_perm,
+            "failedTemporary": failed_temp,
+            "frequencyCapped": freq_capped,
+            "deliveryRate": delivery_rate,
+            "readRate": read_rate,
+            "counts": counts,
+        }
+    }
+
+
+@router.get("/{broadcast_id}/recipients")
+async def get_broadcast_recipients(
+    broadcast_id: str,
+    page: int = 1,
+    limit: int = 50,
+    status: Optional[str] = None,
+    search: Optional[str] = None,
+    current_user: dict = Depends(get_current_user)
+):
+    """Get paginated list of recipients for a specific broadcast."""
+    try:
+        obj_id = ObjectId(broadcast_id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid broadcast ID")
+
+    query: dict = {"broadcastId": broadcast_id}
+
+    if status and status != "all":
+        if status == "failed_permanent":
+            query["status"] = "failed"
+            query["isRetryable"] = False
+        elif status == "failed_temporary":
+            query["status"] = "failed"
+            query["isRetryable"] = True
+        elif status == "frequency_capped":
+            query["status"] = "frequency_capped"
+        else:
+            query["status"] = status
+
+    if search:
+        query["$or"] = [
+            {"customerName": {"$regex": search, "$options": "i"}},
+            {"customerPhone": {"$regex": search, "$options": "i"}},
+        ]
+
+    skip = (page - 1) * limit
+    total = await db.db.broadcast_recipients.count_documents(query)
+    cursor = db.db.broadcast_recipients.find(query).sort("updatedAt", -1).skip(skip).limit(limit)
+    recipients = await cursor.to_list(length=limit)
+
+    for r in recipients:
+        r["_id"] = str(r["_id"])
+        phone = r.get("customerPhone", "")
+        name = r.get("customerName", "")
+        if not name or name == phone:
+            resolved_name = None
+            conv = await db.db.conversations.find_one({"customerPhone": phone})
+            if conv and conv.get("customerName") and conv["customerName"] != phone:
+                resolved_name = conv["customerName"]
+            else:
+                cust = await db.db.customers.find_one({"phone": phone})
+                if cust and cust.get("name") and cust["name"] != phone:
+                    resolved_name = cust["name"]
+
+            if resolved_name:
+                r["customerName"] = resolved_name
+                await db.db.broadcast_recipients.update_one({"_id": ObjectId(r["_id"])}, {"$set": {"customerName": resolved_name}})
+
+    return {
+        "recipients": recipients,
+        "total": total,
+        "page": page,
+        "limit": limit,
+        "has_more": (skip + len(recipients)) < total,
+    }
+
+
+@router.post("/{broadcast_id}/retry")
+async def retry_broadcast_failed_recipients(
+    broadcast_id: str,
+    req: Optional[RetryRequest] = None,
+    current_user: dict = Depends(get_current_user)
+):
+    """Resend campaign messages to failed or frequency-capped recipients."""
+    try:
+        obj_id = ObjectId(broadcast_id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid broadcast ID")
+
+    tenant_filter = get_tenant_filter(current_user)
+    broadcast_query = {"_id": obj_id}
+    if tenant_filter:
+        broadcast_query = {"$and": [broadcast_query, tenant_filter]}
+
+    broadcast = await db.db.broadcasts.find_one(broadcast_query)
+    if not broadcast:
+        raise HTTPException(status_code=404, detail="Broadcast not found")
+
+    if broadcast.get("isPaused"):
+        raise HTTPException(status_code=400, detail="Campaign is paused. Resume campaign first to trigger retries.")
+
+    retry_mode = req.retry_mode if req else "temporary_only"
+
+    # Build recipient query for retry
+    rec_query: dict = {"broadcastId": broadcast_id, "isPaused": {"$ne": True}}
+    if retry_mode == "frequency_capped":
+        rec_query["status"] = "frequency_capped"
+    elif retry_mode == "temporary_only":
+        rec_query["$or"] = [
+            {"status": "frequency_capped"},
+            {"status": "failed", "isRetryable": True}
+        ]
+    elif retry_mode == "all_failed":
+        rec_query["status"] = {"$in": ["failed", "frequency_capped"]}
+
+    target_recipients = await db.db.broadcast_recipients.find(rec_query).to_list(length=5000)
+    if not target_recipients:
+        return {"message": "No eligible failed recipients found to retry.", "retryCount": 0}
+
+    target_phones = [r["customerPhone"] for r in target_recipients]
+
+    wa_phone_id = current_user.get("waPhoneNumberId") or settings.WA_PHONE_NUMBER_ID
+    wa_token = current_user.get("waAccessToken") or settings.WA_ACCESS_TOKEN
+    tenant_id = str(current_user["_id"]) if settings.APP_MODE == "saas" else None
+
+    # Trigger Celery retry task
+    task = send_broadcast_task.delay(
+        broadcast_id=broadcast_id,
+        wa_phone_id=wa_phone_id,
+        wa_token=wa_token,
+        template_name=broadcast["templateName"],
+        template_lang=broadcast.get("templateLanguage", "en"),
+        template_components=broadcast.get("templateComponents"),
+        header_media_url=broadcast.get("headerMediaUrl"),
+        header_media_id=broadcast.get("headerMediaId"),
+        body_params=broadcast.get("bodyParams"),
+        carousel_cards=broadcast.get("carouselCards"),
+        audience_tags=None,
+        tenant_id=tenant_id
+    )
+
+    return {
+        "message": f"Retry started for {len(target_phones)} recipients.",
+        "retryCount": len(target_phones),
+        "taskId": task.id,
+    }
+
+
+@router.post("/{broadcast_id}/pause")
+async def pause_broadcast(broadcast_id: str, current_user: dict = Depends(get_current_user)):
+    """Pause automatic retries and ongoing dispatches for a campaign."""
+    try:
+        obj_id = ObjectId(broadcast_id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid broadcast ID")
+
+    result = await db.db.broadcasts.update_one(
+        {"_id": obj_id},
+        {"$set": {"isPaused": True, "status": "paused", "updatedAt": _now()}}
+    )
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Broadcast not found")
+
+    return {"message": "Campaign paused successfully", "isPaused": True}
+
+
+@router.post("/{broadcast_id}/resume")
+async def resume_broadcast(broadcast_id: str, current_user: dict = Depends(get_current_user)):
+    """Resume automatic retries and dispatches for a paused campaign."""
+    try:
+        obj_id = ObjectId(broadcast_id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid broadcast ID")
+
+    result = await db.db.broadcasts.update_one(
+        {"_id": obj_id},
+        {"$set": {"isPaused": False, "status": "running", "updatedAt": _now()}}
+    )
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Broadcast not found")
+
+    return {"message": "Campaign resumed successfully", "isPaused": False}
+
+
+@router.post("/{broadcast_id}/recipients/{recipient_id}/pause")
+async def pause_recipient_retry(broadcast_id: str, recipient_id: str, current_user: dict = Depends(get_current_user)):
+    """Pause retries for a specific recipient."""
+    try:
+        obj_id = ObjectId(recipient_id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid recipient ID")
+
+    result = await db.db.broadcast_recipients.update_one(
+        {"_id": obj_id, "broadcastId": broadcast_id},
+        {"$set": {"isPaused": True, "updatedAt": _now()}}
+    )
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Recipient not found")
+
+    return {"message": "Recipient paused from retries", "isPaused": True}
+
+
+@router.post("/{broadcast_id}/recipients/{recipient_id}/resume")
+async def resume_recipient_retry(broadcast_id: str, recipient_id: str, current_user: dict = Depends(get_current_user)):
+    """Resume retries for a specific recipient."""
+    try:
+        obj_id = ObjectId(recipient_id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid recipient ID")
+
+    result = await db.db.broadcast_recipients.update_one(
+        {"_id": obj_id, "broadcastId": broadcast_id},
+        {"$set": {"isPaused": False, "updatedAt": _now()}}
+    )
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Recipient not found")
+
+    return {"message": "Recipient resumed for retries", "isPaused": False}
+

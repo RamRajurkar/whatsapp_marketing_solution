@@ -12,7 +12,7 @@ import {
   MessageSquare, Search, User, CalendarDays, Zap, Paperclip,
   Send, Loader2, Image, FileText, Check, CheckCheck,
   Inbox as InboxIcon, Hand, Plus, X, AlertCircle, Clock, Smile,
-  Trash2, Video, UserCircle,
+  Trash2, Video, UserCircle, RotateCw,
 } from 'lucide-react';
 import EmojiPicker from 'emoji-picker-react';
 
@@ -365,18 +365,30 @@ function NewConversationModal({ onClose, onCreated }: { onClose: () => void; onC
 }
 
 
-function SendTemplateModal({ conversationId, phone, customerName, onClose }: { conversationId: string; phone: string; customerName: string; onClose: () => void }) {
+function SendTemplateModal({ conversationId, phone, customerName, initialMsg, onClose }: { conversationId: string; phone: string; customerName: string; initialMsg?: any; onClose: () => void }) {
   const queryClient = useQueryClient();
-  const [templateName, setTemplateName] = useState('');
-  const [templateLang, setTemplateLang] = useState('en_US');
-  const [templateText, setTemplateText] = useState('');
+  const [templateName, setTemplateName] = useState(initialMsg?.content?.templateName || '');
+  const [templateLang, setTemplateLang] = useState(initialMsg?.content?.templateLanguage || 'en_US');
+  const [templateText, setTemplateText] = useState(initialMsg?.content?.text || '');
   const [sending, setSending] = useState(false);
 
   // Component parameter state
-  const [headerMediaUrl, setHeaderMediaUrl] = useState('');
+  const [headerMediaUrl, setHeaderMediaUrl] = useState(initialMsg?.content?.headerMediaUrl || '');
   const [headerMediaFile, setHeaderMediaFile] = useState<File | null>(null);
-  const [bodyParams, setBodyParams] = useState<string[]>([]);
-  const [carouselCards, setCarouselCards] = useState<{ mediaUrl: string; bodyParams: string[] }[]>([]);
+  const [bodyParams, setBodyParams] = useState<string[]>(initialMsg?.content?.bodyParams || []);
+  const [buttonParams, setButtonParams] = useState<string[]>(initialMsg?.content?.buttonParams || []);
+  const [carouselCards, setCarouselCards] = useState<{ mediaUrl: string; bodyParams: string[] }[]>(initialMsg?.content?.carouselCards || []);
+
+  useEffect(() => {
+    if (initialMsg?.content) {
+      if (initialMsg.content.templateName) setTemplateName(initialMsg.content.templateName);
+      if (initialMsg.content.templateLanguage) setTemplateLang(initialMsg.content.templateLanguage);
+      if (initialMsg.content.headerMediaUrl) setHeaderMediaUrl(initialMsg.content.headerMediaUrl);
+      if (initialMsg.content.bodyParams?.length) setBodyParams(initialMsg.content.bodyParams);
+      if (initialMsg.content.buttonParams?.length) setButtonParams(initialMsg.content.buttonParams);
+      if (initialMsg.content.carouselCards?.length) setCarouselCards(initialMsg.content.carouselCards);
+    }
+  }, [initialMsg]);
 
   const { data: templatesData } = useQuery({
     queryKey: ['templates'],
@@ -392,7 +404,7 @@ function SendTemplateModal({ conversationId, phone, customerName, onClose }: { c
   const mediaList = mediaData?.media || [];
 
   // Get the currently selected template object
-  const selectedTemplate = templates.find((t: any) => t.name === templateName);
+  const selectedTemplate = templates.find((t: any) => t.name === templateName && t.language === templateLang);
   const selectedComponents: any[] = selectedTemplate?.components || [];
 
   // Derived info about what the template needs
@@ -401,30 +413,68 @@ function SendTemplateModal({ conversationId, phone, customerName, onClose }: { c
   const carouselComp = selectedComponents.find((c: any) => c.type === 'CAROUSEL');
 
   const needsHeaderMedia = headerComp && ['IMAGE', 'VIDEO', 'DOCUMENT'].includes(headerComp.format);
-  const bodyVarSlots = bodyComp?.text?.match(/\{\{\d+\}\}/g) || [];
+  const bodyVarSlots = Array.from(new Set(bodyComp?.text?.match(/\{\{([^}]+)\}\}/g) || []));
   const needsBodyParams = bodyVarSlots.length > 0;
 
+  // Buttons that require parameters: COPY_CODE or URL with {{1}}
+  const buttonsComp = selectedComponents.find((c: any) => c.type === 'BUTTONS');
+  const dynamicButtons: { idx: number; type: string; label: string }[] = [];
+  if (buttonsComp?.buttons) {
+    buttonsComp.buttons.forEach((btn: any, idx: number) => {
+      if (btn.type === 'COPY_CODE') {
+        dynamicButtons.push({ idx, type: 'COPY_CODE', label: `Button "${btn.text}" — Copy Code` });
+      } else if (btn.type === 'URL' && btn.url?.includes('{{1}}')) {
+        dynamicButtons.push({ idx, type: 'URL', label: `Button "${btn.text}" — URL Suffix` });
+      }
+    });
+  }
+
   // Handle template selection change
-  const handleTemplateSelect = (name: string) => {
-    const selected = templates.find((t: any) => t.name === name);
+  const handleTemplateSelect = (val: string) => {
+    if (!val) {
+      setTemplateName('');
+      setTemplateText('');
+      setHeaderMediaUrl('');
+      setHeaderMediaFile(null);
+      setBodyParams([]);
+      setCarouselCards([]);
+      return;
+    }
+    const [name, lang] = val.split(':');
+    const selected = templates.find((t: any) => t.name === name && t.language === lang);
     setTemplateName(name);
+    setTemplateLang(lang);
     setTemplateText('');
     setHeaderMediaUrl('');
     setHeaderMediaFile(null);
     setBodyParams([]);
+    setButtonParams([]);
     setCarouselCards([]);
 
-    if (selected?.language) setTemplateLang(selected.language);
     if (selected?.components) {
       const body = selected.components.find((c: any) => c.type === 'BODY');
       if (body?.text) setTemplateText(body.text);
 
-      // Initialize body params array — auto-fill {{1}} with customer name
-      const vars = body?.text?.match(/\{\{\d+\}\}/g) || [];
+      // Initialize body params array — auto-fill with customer name
+      const rawVars = body?.text?.match(/\{\{([^}]+)\}\}/g) || [];
+      const vars = Array.from(new Set(rawVars));
       if (vars.length > 0) {
         const params = new Array(vars.length).fill('');
-        if (customerName && customerName !== 'Unknown') params[0] = customerName;
+        if (customerName && customerName !== 'Unknown') {
+          const custNameIdx = vars.findIndex(v => v.includes('customer_name') || v === '{{1}}');
+          if (custNameIdx !== -1) {
+            params[custNameIdx] = customerName;
+          } else {
+            params[0] = customerName;
+          }
+        }
         setBodyParams(params);
+      }
+
+      // Initialize button params — index-aligned to the buttons array
+      const btnsComp = selected.components.find((c: any) => c.type === 'BUTTONS');
+      if (btnsComp?.buttons?.length) {
+        setButtonParams(new Array(btnsComp.buttons.length).fill(''));
       }
 
       // Initialize carousel cards
@@ -433,7 +483,7 @@ function SendTemplateModal({ conversationId, phone, customerName, onClose }: { c
         setCarouselCards(
           carousel.cards.map((card: any) => {
             const cardBody = card.components?.find((c: any) => c.type === 'BODY');
-            const cardVars = cardBody?.text?.match(/\{\{\d+\}\}/g) || [];
+            const cardVars = Array.from(new Set(cardBody?.text?.match(/\{\{([^}]+)\}\}/g) || []));
             return { mediaUrl: '', bodyParams: new Array(cardVars.length).fill('') };
           })
         );
@@ -481,6 +531,7 @@ function SendTemplateModal({ conversationId, phone, customerName, onClose }: { c
         headerMediaUrl: headerMediaUrl.trim() || undefined,
         headerMediaId: headerMediaId,
         bodyParams: bodyParams.length > 0 ? bodyParams : undefined,
+        buttonParams: buttonParams.some(v => v.trim()) ? buttonParams : undefined,
         carouselCards: carouselCards.length > 0 ? carouselCards : undefined,
       });
       toast.success('Template sent!');
@@ -494,10 +545,37 @@ function SendTemplateModal({ conversationId, phone, customerName, onClose }: { c
     }
   };
 
+  // ── Build live preview text (substitute vars into body text) ────────────
+  const previewBodyText = (() => {
+    if (!bodyComp?.text) return '';
+    let t = bodyComp.text;
+    // Named params
+    const rawSlots = Array.from(new Set(t.match(/\{\{([^}]+)\}\}/g) || []));
+    rawSlots.forEach((slot: string, idx: number) => {
+      const val = bodyParams[idx];
+      t = t.replace(new RegExp(slot.replace(/[{}]/g, '\\$&'), 'g'), val || slot);
+    });
+    return t;
+  })();
+
+  const headerText = selectedComponents.find((c: any) => c.type === 'HEADER' && c.format === 'TEXT')?.text || '';
+  const footerText = selectedComponents.find((c: any) => c.type === 'FOOTER')?.text || '';
+  const allButtons: any[] = buttonsComp?.buttons || [];
+
+  // Preview header image: prefer the file object URL, then the URL string
+  const previewHeaderImg = headerMediaFile
+    ? URL.createObjectURL(headerMediaFile)
+    : headerMediaUrl.trim() || '';
+
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '580px', maxHeight: '85vh', overflowY: 'auto' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+      <div
+        className="modal-content"
+        onClick={e => e.stopPropagation()}
+        style={{ maxWidth: '980px', width: '95vw', maxHeight: '92vh', overflowY: 'auto', padding: '0' }}
+      >
+        {/* ── Header ── */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '20px 24px 16px', borderBottom: '1px solid #f1f5f9' }}>
           <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '10px' }}>
             <FileText size={18} style={{ color: '#1B5E37' }} />
             Send Template
@@ -506,182 +584,319 @@ function SendTemplateModal({ conversationId, phone, customerName, onClose }: { c
             <X size={20} />
           </button>
         </div>
-        <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '10px', padding: '10px 14px', marginBottom: '16px', fontSize: '13px', color: '#166534' }}>
-          <strong>To:</strong> {formatIndianPhone(phone)}
-        </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-          <div>
-            <label style={{ fontSize: '13px', fontWeight: '500', color: '#374151', display: 'block', marginBottom: '6px' }}>Template</label>
-            {templates.length > 0 ? (
-              <select className="input-field" style={{ padding: '10px 14px', fontSize: '14px', backgroundColor: '#f9fafb', cursor: 'pointer' }} value={templateName} onChange={e => handleTemplateSelect(e.target.value)}>
-                <option value="">✨ Select a template...</option>
-                {templates.map((t: any) => (
-                  <option key={t.name + t.language} value={t.name}>{t.name} — {t.category || 'MARKETING'} ({t.status})</option>
-                ))}
-              </select>
-            ) : (
-              <input className="input-field" value={templateName} onChange={e => setTemplateName(e.target.value)} placeholder="hello_world" />
-            )}
-          </div>
-          <div>
-            <label style={{ fontSize: '13px', fontWeight: '500', color: '#374151', display: 'block', marginBottom: '6px' }}>Language</label>
-            <select className="input-field" value={templateLang} onChange={e => setTemplateLang(e.target.value)}>
-              <option value="en_US">English (US)</option>
-              <option value="en">English</option>
-              <option value="en_GB">English (UK)</option>
-              <option value="hi">Hindi</option>
-              <option value="ar">Arabic</option>
-            </select>
-          </div>
 
-          {/* Header Media URL — shown when template has IMAGE/VIDEO/DOCUMENT header */}
-          {needsHeaderMedia && (
-            <div style={{ background: '#f8fafc', padding: '16px', borderRadius: '12px', border: '1px dashed #cbd5e1' }}>
-              <label style={{ fontSize: '14px', fontWeight: '600', color: '#1e293b', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '12px' }}>
-                {headerComp.format === 'IMAGE' ? '🖼️ Header Image' : headerComp.format === 'VIDEO' ? '🎬 Header Video' : '📄 Header Document'}
-              </label>
-              
-              {headerComp.format === 'IMAGE' && mediaList.length > 0 && (
-                <div style={{ marginBottom: '16px' }}>
-                  <label style={{ fontSize: '13px', color: '#475569', display: 'block', marginBottom: '8px', fontWeight: '500' }}>Select from Media Library</label>
-                  <div style={{ display: 'flex', gap: '10px', overflowX: 'auto', paddingBottom: '8px' }}>
-                    {mediaList.map((m: any) => {
-                      const fullUrl = m.url.startsWith('http') ? m.url : `${API_BASE}${m.url}`;
-                      const isSelected = headerMediaUrl === fullUrl;
-                      return (
-                        <div 
-                          key={m._id} 
-                          onClick={() => { setHeaderMediaUrl(fullUrl); setHeaderMediaFile(null); }}
-                          style={{ 
-                            width: '120px', height: '120px', flexShrink: 0, borderRadius: '8px', cursor: 'pointer',
-                            border: isSelected ? '3px solid #22c55e' : '1px solid #e2e8f0',
-                            backgroundImage: `url(${fullUrl})`,
-                            backgroundSize: 'cover', backgroundPosition: 'center',
-                            opacity: isSelected ? 1 : 0.8, transition: 'all 0.2s'
-                          }}
-                        />
-                      );
-                    })}
+        {/* ── Two-column body ── */}
+        <div style={{ display: 'flex', gap: '0', minHeight: '0' }}>
+
+          {/* ─── LEFT: Form ─── */}
+          <div style={{ flex: '1 1 0', minWidth: 0, padding: '20px 24px 20px', overflowY: 'auto', maxHeight: 'calc(92vh - 130px)', borderRight: '1px solid #f1f5f9' }}>
+            <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '10px', padding: '10px 14px', marginBottom: '16px', fontSize: '13px', color: '#166534' }}>
+              <strong>To:</strong> {formatIndianPhone(phone)}
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              <div>
+                <label style={{ fontSize: '13px', fontWeight: '500', color: '#374151', display: 'block', marginBottom: '6px' }}>Template</label>
+                {templates.length > 0 ? (
+                  <select
+                    className="input-field"
+                    style={{ padding: '10px 14px', fontSize: '14px', backgroundColor: '#f9fafb', cursor: 'pointer' }}
+                    value={templateName ? `${templateName}:${templateLang}` : ""}
+                    onChange={e => handleTemplateSelect(e.target.value)}
+                  >
+                    <option value="">✨ Select a template...</option>
+                    {templates.map((t: any) => (
+                      <option key={t.name + t.language} value={`${t.name}:${t.language}`}>{t.name} ({t.language}) — {t.category || 'MARKETING'} ({t.status})</option>
+                    ))}
+                  </select>
+                ) : (
+                  <input className="input-field" value={templateName} onChange={e => setTemplateName(e.target.value)} placeholder="hello_world" />
+                )}
+              </div>
+              <div>
+                <label style={{ fontSize: '13px', fontWeight: '500', color: '#374151', display: 'block', marginBottom: '6px' }}>Language</label>
+                <select className="input-field" value={templateLang} onChange={e => setTemplateLang(e.target.value)}>
+                  <option value="en_US">English (US)</option>
+                  <option value="en">English</option>
+                  <option value="en_GB">English (UK)</option>
+                  <option value="hi">Hindi</option>
+                  <option value="ar">Arabic</option>
+                </select>
+              </div>
+
+              {needsHeaderMedia && (
+                <div style={{ background: '#f8fafc', padding: '16px', borderRadius: '12px', border: '1px dashed #cbd5e1' }}>
+                  <label style={{ fontSize: '14px', fontWeight: '600', color: '#1e293b', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '12px' }}>
+                    {headerComp.format === 'IMAGE' ? '🖼️ Header Image' : headerComp.format === 'VIDEO' ? '🎬 Header Video' : '📄 Header Document'}
+                  </label>
+                  {headerComp.format === 'IMAGE' && mediaList.length > 0 && (
+                    <div style={{ marginBottom: '16px' }}>
+                      <label style={{ fontSize: '13px', color: '#475569', display: 'block', marginBottom: '8px', fontWeight: '500' }}>Select from Media Library</label>
+                      <div style={{ display: 'flex', gap: '10px', overflowX: 'auto', paddingBottom: '8px' }}>
+                        {mediaList.map((m: any) => {
+                          const fullUrl = m.url.startsWith('http') ? m.url : `${API_BASE}${m.url}`;
+                          const isSelected = headerMediaUrl === fullUrl;
+                          return (
+                            <div
+                              key={m._id}
+                              onClick={() => { setHeaderMediaUrl(fullUrl); setHeaderMediaFile(null); }}
+                              style={{
+                                width: '80px', height: '80px', flexShrink: 0, borderRadius: '8px', cursor: 'pointer',
+                                border: isSelected ? '3px solid #22c55e' : '1px solid #e2e8f0',
+                                backgroundImage: `url(${fullUrl})`, backgroundSize: 'cover', backgroundPosition: 'center',
+                                opacity: isSelected ? 1 : 0.8, transition: 'all 0.2s'
+                              }}
+                            />
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                  <div style={{ marginBottom: '12px' }}>
+                    <label style={{ fontSize: '12px', color: '#64748b', display: 'block', marginBottom: '4px' }}>Upload File directly to WhatsApp</label>
+                    <input
+                      type="file"
+                      className="input-field"
+                      style={{ padding: '8px' }}
+                      onChange={e => { if (e.target.files?.[0]) { setHeaderMediaFile(e.target.files[0]); setHeaderMediaUrl(''); } }}
+                      accept={headerComp.format === 'IMAGE' ? 'image/*' : headerComp.format === 'VIDEO' ? 'video/*' : '*/*'}
+                    />
+                  </div>
+                  <div style={{ textAlign: 'center', fontSize: '12px', color: '#94a3b8', margin: '8px 0' }}>— OR —</div>
+                  <div>
+                    <label style={{ fontSize: '12px', color: '#64748b', display: 'block', marginBottom: '4px' }}>Paste Public URL</label>
+                    <input
+                      className="input-field"
+                      value={headerMediaUrl}
+                      onChange={e => { setHeaderMediaUrl(e.target.value); if (e.target.value) setHeaderMediaFile(null); }}
+                      placeholder={`https://example.com/media.${headerComp.format === 'IMAGE' ? 'jpg' : headerComp.format === 'VIDEO' ? 'mp4' : 'pdf'}`}
+                    />
                   </div>
                 </div>
               )}
 
-              <div style={{ marginBottom: '12px' }}>
-                <label style={{ fontSize: '12px', color: '#64748b', display: 'block', marginBottom: '4px' }}>Upload File directly to WhatsApp</label>
-                <input 
-                  type="file" 
-                  className="input-field" 
-                  style={{ padding: '8px' }}
-                  onChange={e => {
-                    if (e.target.files?.[0]) {
-                      setHeaderMediaFile(e.target.files[0]);
-                      setHeaderMediaUrl(''); // Clear URL if file selected
-                    }
-                  }} 
-                  accept={headerComp.format === 'IMAGE' ? 'image/*' : headerComp.format === 'VIDEO' ? 'video/*' : '*/*'}
-                />
-              </div>
-              
-              <div style={{ textAlign: 'center', fontSize: '12px', color: '#94a3b8', margin: '8px 0' }}>— OR —</div>
-
-              <div>
-                <label style={{ fontSize: '12px', color: '#64748b', display: 'block', marginBottom: '4px' }}>Paste Public URL</label>
-                <input
-                  className="input-field"
-                  value={headerMediaUrl}
-                  onChange={e => {
-                    setHeaderMediaUrl(e.target.value);
-                    if (e.target.value) setHeaderMediaFile(null); // Clear file if URL entered
-                  }}
-                  placeholder={`https://example.com/media.${headerComp.format === 'IMAGE' ? 'jpg' : headerComp.format === 'VIDEO' ? 'mp4' : 'pdf'}`}
-                />
-              </div>
-            </div>
-          )}
-
-          {/* Body Variables — shown when template body has {{1}}, {{2}}, etc. */}
-          {needsBodyParams && (
-            <div>
-              <label style={{ fontSize: '13px', fontWeight: '500', color: '#374151', display: 'block', marginBottom: '6px' }}>
-                📝 Body Variables
-              </label>
-              {bodyVarSlots.map((_: any, idx: number) => (
-                <div key={idx} style={{ marginBottom: '6px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <span style={{ fontSize: '12px', color: '#6b7280', fontWeight: '600', minWidth: '36px' }}>{`{{${idx + 1}}}`}</span>
-                    <input
-                      className="input-field"
-                      value={bodyParams[idx] || ''}
-                      onChange={e => {
-                        const updated = [...bodyParams];
-                        updated[idx] = e.target.value;
-                        setBodyParams(updated);
-                      }}
-                      placeholder={`Value for {{${idx + 1}}}`}
-                      style={{ flex: 1 }}
-                    />
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* Carousel Cards — shown when template has CAROUSEL component */}
-          {carouselComp && carouselCards.length > 0 && (
-            <div>
-              <label style={{ fontSize: '13px', fontWeight: '500', color: '#374151', display: 'block', marginBottom: '6px' }}>
-                🎠 Carousel Cards
-              </label>
-              {carouselCards.map((card, cardIdx) => {
-                const cardDef = carouselComp.cards?.[cardIdx];
-                const cardHeaderDef = cardDef?.components?.find((c: any) => c.type === 'HEADER');
-                const cardBodyDef = cardDef?.components?.find((c: any) => c.type === 'BODY');
-                const cardBodyVars = cardBodyDef?.text?.match(/\{\{\d+\}\}/g) || [];
-                return (
-                  <div key={cardIdx} style={{ background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '8px', padding: '10px', marginBottom: '8px' }}>
-                    <p style={{ margin: '0 0 8px', fontSize: '12px', fontWeight: '600', color: '#374151' }}>Card {cardIdx + 1}</p>
-                    {cardHeaderDef && ['IMAGE', 'VIDEO'].includes(cardHeaderDef.format) && (
-                      <input
-                        className="input-field"
-                        value={card.mediaUrl}
-                        onChange={e => {
-                          const updated = [...carouselCards];
-                          updated[cardIdx] = { ...updated[cardIdx], mediaUrl: e.target.value };
-                          setCarouselCards(updated);
-                        }}
-                        placeholder={`Media URL for card ${cardIdx + 1}`}
-                        style={{ marginBottom: '6px' }}
-                      />
-                    )}
-                    {cardBodyVars.map((_: any, varIdx: number) => (
-                      <div key={varIdx} style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-                        <span style={{ fontSize: '11px', color: '#6b7280', minWidth: '30px' }}>{`{{${varIdx + 1}}}`}</span>
+              {needsBodyParams && (
+                <div>
+                  <label style={{ fontSize: '13px', fontWeight: '500', color: '#374151', display: 'block', marginBottom: '6px' }}>📝 Body Variables</label>
+                  {bodyVarSlots.map((slot: string, idx: number) => (
+                    <div key={idx} style={{ marginBottom: '6px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span style={{ fontSize: '12px', color: '#6b7280', fontWeight: '600', minWidth: '120px', flexShrink: 0 }}>{slot}</span>
                         <input
                           className="input-field"
-                          value={card.bodyParams[varIdx] || ''}
-                          onChange={e => {
-                            const updated = [...carouselCards];
-                            const updatedParams = [...updated[cardIdx].bodyParams];
-                            updatedParams[varIdx] = e.target.value;
-                            updated[cardIdx] = { ...updated[cardIdx], bodyParams: updatedParams };
-                            setCarouselCards(updated);
-                          }}
-                          placeholder={`Value for {{${varIdx + 1}}}`}
+                          value={bodyParams[idx] || ''}
+                          onChange={e => { const u = [...bodyParams]; u[idx] = e.target.value; setBodyParams(u); }}
+                          placeholder={`Value for ${slot}`}
                           style={{ flex: 1 }}
                         />
                       </div>
-                    ))}
-                  </div>
-                );
-              })}
-            </div>
-          )}
+                    </div>
+                  ))}
+                </div>
+              )}
 
-          <p style={{ margin: 0, fontSize: '11px', color: '#9ca3af' }}>
-            Templates can be sent anytime. Use them to re-open conversations outside the 24-hour window.
-          </p>
+              {carouselComp && carouselCards.length > 0 && (
+                <div>
+                  <label style={{ fontSize: '13px', fontWeight: '500', color: '#374151', display: 'block', marginBottom: '6px' }}>🎠 Carousel Cards</label>
+                  {carouselCards.map((card, cardIdx) => {
+                    const cardDef = carouselComp.cards?.[cardIdx];
+                    const cardHeaderDef = cardDef?.components?.find((c: any) => c.type === 'HEADER');
+                    const cardBodyDef = cardDef?.components?.find((c: any) => c.type === 'BODY');
+                    const cardBodyVars = Array.from(new Set(cardBodyDef?.text?.match(/\{\{([^}]+)\}\}/g) || []));
+                    return (
+                      <div key={cardIdx} style={{ background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '8px', padding: '10px', marginBottom: '8px' }}>
+                        <p style={{ margin: '0 0 8px', fontSize: '12px', fontWeight: '600', color: '#374151' }}>Card {cardIdx + 1}</p>
+                        {cardHeaderDef && ['IMAGE', 'VIDEO'].includes(cardHeaderDef.format) && (
+                          <input className="input-field" value={card.mediaUrl}
+                            onChange={e => { const u = [...carouselCards]; u[cardIdx] = { ...u[cardIdx], mediaUrl: e.target.value }; setCarouselCards(u); }}
+                            placeholder={`Media URL for card ${cardIdx + 1}`} style={{ marginBottom: '6px' }} />
+                        )}
+                        {cardBodyVars.map((slot: string, varIdx: number) => (
+                          <div key={varIdx} style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                            <span style={{ fontSize: '11px', color: '#6b7280', minWidth: '30px' }}>{slot}</span>
+                            <input className="input-field" value={card.bodyParams[varIdx] || ''}
+                              onChange={e => { const u = [...carouselCards]; const p = [...u[cardIdx].bodyParams]; p[varIdx] = e.target.value; u[cardIdx] = { ...u[cardIdx], bodyParams: p }; setCarouselCards(u); }}
+                              placeholder={`Value for ${slot}`} style={{ flex: 1 }} />
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              {dynamicButtons.length > 0 && (
+                <div>
+                  <label style={{ fontSize: '13px', fontWeight: '500', color: '#374151', display: 'block', marginBottom: '6px' }}>🔘 Button Parameters</label>
+                  {dynamicButtons.map(({ idx, type, label }) => (
+                    <div key={idx} style={{ marginBottom: '6px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span style={{ fontSize: '12px', color: '#6b7280', fontWeight: '600', minWidth: '120px', flexShrink: 0 }}>{label}</span>
+                        <input className="input-field" value={buttonParams[idx] || ''}
+                          onChange={e => { const u = [...buttonParams]; u[idx] = e.target.value; setButtonParams(u); }}
+                          placeholder={type === 'COPY_CODE' ? 'Enter coupon code' : 'Enter URL suffix or full URL'}
+                          style={{ flex: 1 }} />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <p style={{ margin: 0, fontSize: '11px', color: '#9ca3af' }}>
+                Templates can be sent anytime. Use them to re-open conversations outside the 24-hour window.
+              </p>
+            </div>
+          </div>
+
+          {/* ─── RIGHT: Live WhatsApp Preview ─── */}
+          <div style={{
+            width: '320px', flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'center',
+            padding: '20px 16px', background: 'linear-gradient(160deg, #e8f5e9 0%, #f0f4f8 100%)',
+            overflowY: 'auto', maxHeight: 'calc(92vh - 130px)'
+          }}>
+            <p style={{ fontSize: '11px', fontWeight: '700', color: '#6b7280', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: '12px' }}>Live Preview</p>
+
+            {/* Phone frame */}
+            <div style={{
+              width: '260px', borderRadius: '32px', background: '#111', padding: '10px',
+              boxShadow: '0 20px 60px rgba(0,0,0,0.3)', position: 'relative'
+            }}>
+              {/* Status bar */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '4px 12px 6px', color: 'white', fontSize: '10px' }}>
+                <span style={{ fontWeight: '700' }}>9:41</span>
+                <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+                  <div style={{ width: '12px', height: '6px', border: '1px solid white', borderRadius: '1px', position: 'relative' }}>
+                    <div style={{ position: 'absolute', left: '1px', top: '1px', bottom: '1px', right: '3px', background: 'white', borderRadius: '0.5px' }} />
+                    <div style={{ position: 'absolute', right: '-3px', top: '1.5px', width: '2px', height: '3px', background: 'white', borderRadius: '0 1px 1px 0' }} />
+                  </div>
+                </div>
+              </div>
+
+              {/* WA chat screen */}
+              <div style={{ borderRadius: '24px', overflow: 'hidden', background: '#e5ddd5', minHeight: '380px', display: 'flex', flexDirection: 'column' }}>
+                {/* WA header bar */}
+                <div style={{ background: '#1b5e37', padding: '10px 12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: '#4ade80', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '13px', fontWeight: '700', color: 'white', flexShrink: 0 }}>
+                    {phone?.charAt(phone.length - 1) || 'U'}
+                  </div>
+                  <div>
+                    <div style={{ color: 'white', fontSize: '13px', fontWeight: '600' }}>{formatIndianPhone(phone)}</div>
+                    <div style={{ color: '#a7f3d0', fontSize: '10px' }}>online</div>
+                  </div>
+                </div>
+
+                {/* Chat background with message bubble */}
+                <div style={{
+                  flex: 1, padding: '10px 8px',
+                  backgroundImage: 'url("data:image/svg+xml,%3Csvg width=\'60\' height=\'60\' viewBox=\'0 0 60 60\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cg fill=\'none\' fill-rule=\'evenodd\'%3E%3Cg fill=\'%23bbb\' fill-opacity=\'0.08\'%3E%3Ccircle cx=\'30\' cy=\'30\' r=\'2\'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")'
+                }}>
+                  {!templateName ? (
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '200px' }}>
+                      <p style={{ color: '#9ca3af', fontSize: '12px', textAlign: 'center', padding: '0 16px' }}>Select a template to see a live preview</p>
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                      {/* Message bubble */}
+                      <div style={{
+                        maxWidth: '88%', background: '#dcf8c6', borderRadius: '12px 0 12px 12px',
+                        boxShadow: '0 1px 2px rgba(0,0,0,0.15)', overflow: 'hidden', position: 'relative'
+                      }}>
+                        {/* Header — Image */}
+                        {needsHeaderMedia && headerComp.format === 'IMAGE' && (
+                          previewHeaderImg ? (
+                            <img src={previewHeaderImg} alt="header" style={{ width: '100%', height: '120px', objectFit: 'cover', display: 'block' }} />
+                          ) : (
+                            <div style={{ width: '100%', height: '100px', background: 'linear-gradient(135deg, #d1d5db, #9ca3af)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                              <span style={{ fontSize: '28px' }}>🖼️</span>
+                            </div>
+                          )
+                        )}
+                        {/* Header — Video */}
+                        {needsHeaderMedia && headerComp.format === 'VIDEO' && (
+                          <div style={{ width: '100%', height: '100px', background: 'linear-gradient(135deg, #1e3a5f, #3b82f6)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <span style={{ fontSize: '28px' }}>🎬</span>
+                          </div>
+                        )}
+                        {/* Header — Document */}
+                        {needsHeaderMedia && headerComp.format === 'DOCUMENT' && (
+                          <div style={{ padding: '8px 10px', display: 'flex', alignItems: 'center', gap: '6px', background: '#f0f0f0', borderBottom: '1px solid #e0e0e0' }}>
+                            <span style={{ fontSize: '20px' }}>📄</span>
+                            <span style={{ fontSize: '11px', color: '#374151', fontWeight: '500' }}>Document</span>
+                          </div>
+                        )}
+                        {/* Header — Text */}
+                        {headerText && (
+                          <div style={{ padding: '8px 10px 4px', fontWeight: '700', fontSize: '13px', color: '#111' }}>{headerText}</div>
+                        )}
+
+                        {/* Body */}
+                        <div style={{ padding: '8px 10px 4px' }}>
+                          {previewBodyText ? (
+                            <p style={{ margin: 0, fontSize: '12px', color: '#111', lineHeight: '1.5', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+                              {previewBodyText}
+                            </p>
+                          ) : (
+                            <p style={{ margin: 0, fontSize: '12px', color: '#9ca3af', fontStyle: 'italic' }}>No body text</p>
+                          )}
+                        </div>
+
+                        {/* Footer */}
+                        {footerText && (
+                          <div style={{ padding: '2px 10px 6px', fontSize: '11px', color: '#6b7280' }}>{footerText}</div>
+                        )}
+
+                        {/* Timestamp */}
+                        <div style={{ padding: '2px 8px 6px', display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '3px' }}>
+                          <span style={{ fontSize: '10px', color: '#6b7280' }}>
+                            {new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })}
+                          </span>
+                          <span style={{ color: '#34b7f1', fontSize: '11px' }}>✓✓</span>
+                        </div>
+
+                        {/* Buttons */}
+                        {allButtons.length > 0 && (
+                          <div style={{ borderTop: '1px solid rgba(0,0,0,0.08)' }}>
+                            {allButtons.map((btn: any, bIdx: number) => (
+                              <div key={bIdx} style={{
+                                padding: '8px 10px', textAlign: 'center', fontSize: '12px', fontWeight: '600',
+                                color: '#1b5e37', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px',
+                                borderBottom: bIdx < allButtons.length - 1 ? '1px solid rgba(0,0,0,0.06)' : 'none',
+                                cursor: 'default'
+                              }}>
+                                {btn.type === 'URL' && <span style={{ fontSize: '10px' }}>🔗</span>}
+                                {btn.type === 'PHONE_NUMBER' && <span style={{ fontSize: '10px' }}>📞</span>}
+                                {btn.type === 'COPY_CODE' && <span style={{ fontSize: '10px' }}>📋</span>}
+                                {btn.type === 'QUICK_REPLY' && <span style={{ fontSize: '10px' }}>↩️</span>}
+                                {btn.text}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Home indicator */}
+              <div style={{ display: 'flex', justifyContent: 'center', padding: '8px 0 4px' }}>
+                <div style={{ width: '80px', height: '4px', borderRadius: '2px', background: '#444' }} />
+              </div>
+            </div>
+
+            {/* Template name badge */}
+            {templateName && (
+              <div style={{ marginTop: '12px', background: 'white', borderRadius: '8px', padding: '8px 14px', fontSize: '11px', color: '#6b7280', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', textAlign: 'center' }}>
+                <span style={{ fontWeight: '600', color: '#374151' }}>{templateName}</span>
+                <span style={{ margin: '0 6px', color: '#d1d5db' }}>·</span>
+                <span style={{ textTransform: 'uppercase', letterSpacing: '0.05em' }}>{templateLang}</span>
+              </div>
+            )}
+          </div>
+
         </div>
-        <div style={{ display: 'flex', gap: '10px', marginTop: '24px', justifyContent: 'flex-end' }}>
+
+        {/* ── Footer actions ── */}
+        <div style={{ display: 'flex', gap: '10px', padding: '16px 24px', borderTop: '1px solid #f1f5f9', justifyContent: 'flex-end', background: 'white' }}>
           <button className="btn-secondary" onClick={onClose}>Cancel</button>
           <button className="btn-primary" onClick={handleSend} disabled={sending || !templateName.trim()} style={{ opacity: (sending || !templateName.trim()) ? 0.6 : 1 }}>
             {sending ? <><Loader2 size={14} /> Sending...</> : <><Send size={14} /> Send Template</>}
@@ -702,6 +917,7 @@ export default function InboxPage() {
   const [showQuickReplies, setShowQuickReplies] = useState(false);
   const [newConvModal, setNewConvModal] = useState(false);
   const [templateModal, setTemplateModal] = useState(false);
+  const [templateModalMsg, setTemplateModalMsg] = useState<any>(null);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [showProfilePanel, setShowProfilePanel] = useState(false);
   const [profileData, setProfileData] = useState<any>(null);
@@ -735,6 +951,15 @@ export default function InboxPage() {
       queryClient.invalidateQueries({ queryKey: ['conversations'] });
     },
     onError: (err: any) => toast.error(err.response?.data?.detail || 'Failed to send'),
+  });
+  const retryMsg = useMutation({
+    mutationFn: (msgId: string) => api.post(`/api/conversations/${selectedConvId}/messages/${msgId}/retry`),
+    onSuccess: (res) => {
+      toast.success('Retrying message...');
+      queryClient.invalidateQueries({ queryKey: ['messages', selectedConvId] });
+      queryClient.invalidateQueries({ queryKey: ['conversations'] });
+    },
+    onError: (err: any) => toast.error(err.response?.data?.detail || 'Failed to retry message'),
   });
   const deleteConv = useMutation({
     mutationFn: (id: string) => api.delete(`/api/conversations/${id}`),
@@ -945,7 +1170,7 @@ export default function InboxPage() {
                   <div style={{ fontSize: '12px', color: '#1B5E37', fontWeight: '500' }}>{formatIndianPhone(selectedConv.customerPhone)}</div>
                 </div>
                 <div style={{ marginLeft: 'auto', display: 'flex', gap: '8px' }}>
-                  <button className="btn-secondary" style={{ padding: '8px 14px', fontSize: '13px' }} onClick={() => setTemplateModal(true)}>
+                  <button className="btn-secondary" style={{ padding: '8px 14px', fontSize: '13px' }} onClick={() => { setTemplateModalMsg(null); setTemplateModal(true); }}>
                     <FileText size={14} /> Template
                   </button>
                   <button className="btn-secondary" style={{ padding: '8px 14px', fontSize: '13px' }} onClick={handleShowProfile}><User size={14} /> Profile</button>
@@ -987,20 +1212,62 @@ export default function InboxPage() {
                       {msg.type === 'document' && <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}><FileText size={24} /><div><div style={{ fontSize: '13px', fontWeight: '600' }}>{msg.content?.filename || 'Document'}</div></div></div>}
                       {!['text', 'image', 'video', 'document', 'template'].includes(msg.type) && <p style={{ margin: 0 }}>{msg.content?.text || `[${msg.type}]`}</p>}
                     </div>
-                    <div style={{ fontSize: '11px', color: '#9ca3af', marginTop: '3px', textAlign: msg.direction === 'outbound' ? 'right' : 'left', display: 'flex', gap: '4px', justifyContent: msg.direction === 'outbound' ? 'flex-end' : 'flex-start', alignItems: 'center' }}>
+                    <div style={{ fontSize: '11px', color: '#9ca3af', marginTop: '3px', textAlign: msg.direction === 'outbound' ? 'right' : 'left', display: 'flex', gap: '6px', justifyContent: msg.direction === 'outbound' ? 'flex-end' : 'flex-start', alignItems: 'center' }}>
                       {getMessageTime(msg.timestamp)}
                       {msg.direction === 'outbound' && (
-                        <span style={{ 
-                          color: msg.status === 'read' ? '#53bdeb' : 
-                                 msg.status === 'delivered' ? '#9ca3af' :
-                                 msg.status === 'failed' ? '#ef4444' : '#9ca3af' 
-                        }}>
-                          {msg.status === 'read' ? <CheckCheck size={14} /> : 
-                           msg.status === 'delivered' ? <CheckCheck size={14} /> :
-                           msg.status === 'sent' ? <Check size={14} /> : 
-                           msg.status === 'failed' ? <AlertCircle size={14} /> : 
-                           <Clock size={12} />}
-                        </span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          <span 
+                            title={msg.status === 'failed' ? (msg.errorReason || 'Message delivery failed. Click retry button or check settings.') : undefined}
+                            style={{ 
+                              color: msg.status === 'read' ? '#53bdeb' : 
+                                     msg.status === 'delivered' ? '#9ca3af' :
+                                     msg.status === 'failed' ? '#ef4444' : '#9ca3af',
+                              cursor: msg.status === 'failed' ? 'pointer' : 'default',
+                              display: 'inline-flex',
+                              alignItems: 'center'
+                            }}
+                            onClick={() => {
+                              if (msg.status === 'failed' && msg.errorReason) {
+                                toast.error(`Failed: ${msg.errorReason}`, { duration: 5000 });
+                              }
+                            }}
+                          >
+                            {msg.status === 'read' ? <CheckCheck size={14} /> : 
+                             msg.status === 'delivered' ? <CheckCheck size={14} /> :
+                             msg.status === 'sent' ? <Check size={14} /> : 
+                             msg.status === 'failed' ? <AlertCircle size={14} /> : 
+                             <Clock size={12} />}
+                          </span>
+                          {msg.status === 'failed' && (
+                            <button
+                              onClick={() => {
+                                if (msg.type === 'template') {
+                                  setTemplateModalMsg(msg);
+                                  setTemplateModal(true);
+                                } else {
+                                  retryMsg.mutate(msg._id);
+                                }
+                              }}
+                              disabled={retryMsg.isPending}
+                              title="Click to retry resending"
+                              style={{
+                                background: '#fee2e2',
+                                border: '1px solid #fca5a5',
+                                borderRadius: '4px',
+                                padding: '1px 6px',
+                                fontSize: '10px',
+                                color: '#991b1b',
+                                cursor: 'pointer',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '2px',
+                                fontWeight: '600'
+                              }}
+                            >
+                              <RotateCw size={10} className={retryMsg.isPending ? 'spin' : ''} /> Retry
+                            </button>
+                          )}
+                        </div>
                       )}
                     </div>
                   </div>
@@ -1062,7 +1329,8 @@ export default function InboxPage() {
           conversationId={selectedConvId}
           phone={selectedConv.customerPhone}
           customerName={selectedConv.customerName || ''}
-          onClose={() => setTemplateModal(false)}
+          initialMsg={templateModalMsg}
+          onClose={() => { setTemplateModal(false); setTemplateModalMsg(null); }}
         />
       )}
 

@@ -1,10 +1,3 @@
-"""
-Menu Management routes.
-
-Handles uploading, listing, and deleting menu files (PDFs and images)
-stored locally on the server.
-"""
-
 import os
 import uuid
 from datetime import datetime, timezone
@@ -12,6 +5,7 @@ from fastapi import APIRouter, Depends, File, UploadFile, HTTPException
 from app.routes.auth import get_current_user
 from app.database import db
 from bson import ObjectId
+from app.utils.tenant import get_tenant_filter, inject_tenant_id
 
 router = APIRouter()
 
@@ -38,7 +32,7 @@ async def upload_menu_file(
     file: UploadFile = File(...),
     current_user: dict = Depends(get_current_user),
 ):
-    """Upload a menu file (PDF or image) to local storage."""
+    """Upload a menu/catalog file (PDF or image) to local storage."""
     if not file:
         raise HTTPException(status_code=400, detail="No file provided")
 
@@ -55,10 +49,12 @@ async def upload_menu_file(
     if len(contents) > MAX_FILE_SIZE:
         raise HTTPException(status_code=400, detail="File size exceeds the 16MB limit")
 
-    # Check limit (max 20 menu files)
-    menu_count = await db.db.menu_assets.count_documents({})
+    tenant_filter = get_tenant_filter(current_user)
+
+    # Check limit (max 20 catalog files per tenant)
+    menu_count = await db.db.menu_assets.count_documents(tenant_filter)
     if menu_count >= 20:
-        raise HTTPException(status_code=400, detail="Menu library has reached the maximum limit of 20 files.")
+        raise HTTPException(status_code=400, detail="Catalog library has reached the maximum limit of 20 files.")
 
     # Save file locally
     file_extension = os.path.splitext(file.filename or "file")[1] or (
@@ -85,6 +81,7 @@ async def upload_menu_file(
         "size": len(contents),
         "createdAt": _now(),
     }
+    inject_tenant_id(doc, current_user)
 
     result = await db.db.menu_assets.insert_one(doc)
     doc["_id"] = str(result.inserted_id)
@@ -95,7 +92,8 @@ async def upload_menu_file(
 @router.get("/")
 async def list_menu_assets(current_user: dict = Depends(get_current_user)):
     """Retrieve all uploaded menu files."""
-    cursor = db.db.menu_assets.find({}).sort("createdAt", -1)
+    tenant_filter = get_tenant_filter(current_user)
+    cursor = db.db.menu_assets.find(tenant_filter).sort("createdAt", -1)
     assets = []
     async for m in cursor:
         m["_id"] = str(m["_id"])
@@ -106,12 +104,17 @@ async def list_menu_assets(current_user: dict = Depends(get_current_user)):
 @router.delete("/{asset_id}")
 async def delete_menu_asset(asset_id: str, current_user: dict = Depends(get_current_user)):
     """Delete a menu file from DB and disk."""
-    m = await db.db.menu_assets.find_one({"_id": ObjectId(asset_id)})
+    tenant_filter = get_tenant_filter(current_user)
+    query = {"_id": ObjectId(asset_id)}
+    if tenant_filter:
+        query = {"$and": [query, tenant_filter]}
+
+    m = await db.db.menu_assets.find_one(query)
     if not m:
-        raise HTTPException(status_code=404, detail="Menu asset not found")
+        raise HTTPException(status_code=404, detail="Catalog asset not found")
 
     # Delete from DB
-    await db.db.menu_assets.delete_one({"_id": ObjectId(asset_id)})
+    await db.db.menu_assets.delete_one(query)
 
     # Delete from disk
     file_path = os.path.join(UPLOAD_DIR, m.get("uniqueName", ""))
@@ -121,4 +124,4 @@ async def delete_menu_asset(asset_id: str, current_user: dict = Depends(get_curr
         except Exception as e:
             print(f"Error deleting file {file_path}: {e}")
 
-    return {"message": "Menu asset deleted successfully"}
+    return {"message": "Catalog asset deleted successfully"}

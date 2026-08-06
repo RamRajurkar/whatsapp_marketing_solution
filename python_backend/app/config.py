@@ -3,6 +3,7 @@ from typing import Optional
 import warnings
 
 class Settings(BaseSettings):
+    APP_MODE: str = "self_hosted"
     MONGODB_URI: str = "mongodb://localhost:27017"
     DB_NAME: str = "resto_chat"
     JWT_SECRET: str = "your-super-secret-jwt-key"

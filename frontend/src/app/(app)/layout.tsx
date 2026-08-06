@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/lib/store/authStore';
 import { Sidebar } from '@/components/Sidebar';
@@ -9,9 +9,18 @@ import { TopHeader } from '@/components/TopHeader';
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const { token } = useAuthStore();
+  const [isHydrated, setIsHydrated] = useState(false);
 
   useEffect(() => {
-    if (!token) {
+    setIsHydrated(true);
+  }, []);
+
+  useEffect(() => {
+    if (!isHydrated) return;
+
+    const storedToken = token || (typeof window !== 'undefined' ? localStorage.getItem('wa_token') : null);
+
+    if (!storedToken) {
       router.replace('/login');
     } else {
       document.body.style.overflow = 'hidden';
@@ -19,9 +28,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     return () => { 
       document.body.style.overflow = ''; 
     };
-  }, [token, router]);
+  }, [token, isHydrated, router]);
 
-  if (!token) return null;
+  const effectiveToken = token || (typeof window !== 'undefined' ? localStorage.getItem('wa_token') : null);
+
+  if (!isHydrated || !effectiveToken) return null;
 
   return (
     <div style={{ display: 'flex', height: '100vh', width: '100vw', overflow: 'hidden' }}>

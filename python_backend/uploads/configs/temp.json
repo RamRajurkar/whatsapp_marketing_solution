@@ -1,0 +1,77 @@
+{
+  "flowId": "fashion_store_flow",
+  "startNode": "node_welcome",
+  "nodes": {
+    "node_welcome": {
+      "type": "interactive_button",
+      "text": "Welcome to TrendVibe Fashion! 👗✨ How can we style you today?",
+      "buttons": [
+        {
+          "id": "btn_shop",
+          "title": "🛍️ View Catalog",
+          "nextNode": "node_catalog"
+        },
+        {
+          "id": "btn_size",
+          "title": "📏 Size Guide",
+          "nextNode": "node_size_info"
+        },
+        {
+          "id": "btn_support",
+          "title": "💬 Contact Stylist",
+          "nextNode": "node_support_start"
+        }
+      ]
+    },
+    "node_catalog": {
+      "type": "text",
+      "text": "Here is our latest collection! 👚👖\n👉 Visit: https://trendvibe-catalog.example.com\n\nUse code TREND10 to get 10% off your first purchase! 🎟️",
+      "nextNode": "node_welcome"
+    },
+    "node_size_info": {
+      "type": "interactive_button",
+      "text": "Choose a category to view the size chart:",
+      "buttons": [
+        {
+          "id": "btn_men",
+          "title": "👕 Men's Wear",
+          "nextNode": "node_size_men"
+        },
+        {
+          "id": "btn_women",
+          "title": "👗 Women's Wear",
+          "nextNode": "node_size_women"
+        },
+        {
+          "id": "btn_size_back",
+          "title": "🔙 Back to Menu",
+          "nextNode": "node_welcome"
+        }
+      ]
+    },
+    "node_size_men": {
+      "type": "text",
+      "text": "👕 Men's Size Guide (Chest size in inches):\n- Small (S): 38\"\n- Medium (M): 40\"\n- Large (L): 42\"\n- X-Large (XL): 44\"",
+      "nextNode": "node_size_info"
+    },
+    "node_size_women": {
+      "type": "text",
+      "text": "👗 Women's Size Guide (Bust size in inches):\n- X-Small (XS): 32\"\n- Small (S): 34\"\n- Medium (M): 36\"\n- Large (L): 38\"\n- X-Large (XL): 40\"",
+      "nextNode": "node_size_info"
+    },
+    "node_support_start": {
+      "type": "collect_input",
+      "text": "Sure! Please reply with your email address or question, and a stylist will get back to you shortly: ✉️",
+      "saveContextKey": "user_query",
+      "validation": {
+        "type": "text",
+        "errorMessage": "❌ Invalid response. Please reply with your question or email."
+      },
+      "nextNode": "node_support_done"
+    },
+    "node_support_done": {
+      "type": "text",
+      "text": "Thank you! We've received your query: \"{user_query}\". Our representative will contact you on this number soon! 💬"
+    }
+  }
+}

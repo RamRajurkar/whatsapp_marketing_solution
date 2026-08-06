@@ -1,0 +1,975 @@
+{
+  "flowId": "ecommerce_retail_flow",
+  "startNode": "node_language",
+  "nodes": {
+    "node_language": {
+      "type": "interactive_button",
+      "text": "Welcome! Please choose your language / अपनी भाषा चुनें / आपली भाषा निवडा:\n\n(Type 'stop' anytime to end conversation)",
+      "buttons": [
+        { "id": "lang_en", "title": "English", "nextNode": "node_main_menu_en" },
+        { "id": "lang_hi", "title": "हिंदी", "nextNode": "node_main_menu_hi" },
+        { "id": "lang_mr", "title": "मराठी", "nextNode": "node_main_menu_mr" }
+      ]
+    },
+
+    "node_main_menu_en": {
+      "type": "interactive_list",
+      "text": "Hi! How can we help you today? 👗",
+      "buttonText": "Explore Options",
+      "sections": [
+        {
+          "title": "Select Option",
+          "rows": [
+            { "id": "btn_track_order", "title": "📦 Track My Order", "description": "Check order status & tracking", "nextNode": "node_track_start_en" },
+            { "id": "btn_faqs", "title": "❓ FAQs", "description": "Read frequently asked questions", "nextNode": "node_faqs_categories_en" },
+            { "id": "btn_talk_support", "title": "👨 Talk to Support", "description": "Speak to our support team", "nextNode": "node_support_suggestion_en" },
+            { "id": "btn_language", "title": "🌐 Select Language", "description": "Change language settings", "nextNode": "node_language" }
+          ]
+        }
+      ]
+    },
+    "node_track_start_en": {
+      "type": "collect_input",
+      "text": "Please enter your Order ID or registered mobile number.\n\n(Type MENU to go back to the main menu)",
+      "saveContextKey": "order_lookup",
+      "validation": {
+        "type": "text",
+        "errorMessage": "❌ Please enter a valid Order ID or mobile number."
+      },
+      "nextNode": "node_track_action_en"
+    },
+    "node_track_action_en": {
+      "type": "action_node",
+      "action": "fetch_order_status",
+      "nextNode": "node_track_result_en"
+    },
+    "node_track_result_en": {
+      "type": "interactive_button",
+      "text": "📦 Order #{order_id}\n\nStatus: {order_status}\nEstimated Delivery: {delivery_date}\n\nTrack your shipment here:\n{tracking_link}",
+      "buttons": [
+        { "id": "btn_main_menu", "title": "🏠 Main Menu", "nextNode": "node_main_menu_en" },
+        { "id": "btn_support", "title": "👨 Contact Support", "nextNode": "node_support_suggestion_en" }
+      ]
+    },
+    "node_support_suggestion_en": {
+      "type": "collect_input",
+      "text": "Before we connect you with our support team:\n\n📦 For order updates, please use Track My Order.\n❓ For common questions, please check FAQs.\n\nIf you still need assistance, please type your message below.",
+      "saveContextKey": "support_issue",
+      "validation": {
+        "type": "text",
+        "errorMessage": "❌ Please type a brief description of your issue so we can help you."
+      },
+      "nextNode": "node_support_finalize_en"
+    },
+    "node_support_finalize_en": {
+      "type": "action_node",
+      "action": "create_support_ticket",
+      "nextNode": "node_support_confirm_en"
+    },
+    "node_support_confirm_en": {
+      "type": "interactive_button",
+      "text": "✅ Thank you! We've received your message and shared it with our support team.\n\nOne of our representatives will get back to you as soon as possible.",
+      "buttons": [
+        { "id": "btn_main_menu", "title": "🏠 Main Menu", "nextNode": "node_main_menu_en" }
+      ]
+    },
+
+    "node_faqs_categories_en": {
+      "type": "interactive_list",
+      "text": "We're here to help! 😊\n\nPlease choose a topic below:",
+      "buttonText": "Choose Topic",
+      "sections": [
+        {
+          "title": "FAQ Topics",
+          "rows": [
+            { "id": "faq_cat_shipping_en", "title": "🚚 Shipping & Delivery", "description": "Delivery time, charges, and locations", "nextNode": "node_faq_shipping_menu_en" },
+            { "id": "faq_cat_payments_en", "title": "💳 Payments", "description": "Payment methods, Cash on Delivery, failures", "nextNode": "node_faq_payments_menu_en" },
+            { "id": "faq_cat_returns_en", "title": "🔄 Returns & Refunds", "description": "Return rules, exchanges, and timelines", "nextNode": "node_faq_returns_menu_en" },
+            { "id": "faq_cat_orders_en", "title": "📦 Orders", "description": "Cancellations, address changes, modifications", "nextNode": "node_faq_orders_menu_en" },
+            { "id": "faq_cat_products_en", "title": "🛍 Products", "description": "Quality, care, and size guide link", "nextNode": "node_faq_products_menu_en" },
+            { "id": "faq_cat_support_en", "title": "📞 Contact Support", "description": "Connect directly with our support team", "nextNode": "node_support_suggestion_en" }
+          ]
+        }
+      ]
+    },
+    "node_faq_shipping_menu_en": {
+      "type": "interactive_button",
+      "text": "Please choose your question regarding Shipping & Delivery: 🚚",
+      "buttons": [
+        { "id": "btn_ship_time_en", "title": "Delivery Time", "nextNode": "node_faq_ship_time_en" },
+        { "id": "btn_ship_charges_en", "title": "Shipping Charges", "nextNode": "node_faq_ship_charges_en" },
+        { "id": "btn_ship_locations_en", "title": "Delivery Locations", "nextNode": "node_faq_ship_locations_en" }
+      ]
+    },
+    "node_faq_ship_time_en": {
+      "type": "interactive_button",
+      "text": "Standard delivery usually takes 3–7 business days depending on your location.",
+      "buttons": [
+        { "id": "btn_back_faq", "title": "⬅ Back to FAQs", "nextNode": "node_faqs_categories_en" },
+        { "id": "btn_main_menu", "title": "🏠 Main Menu", "nextNode": "node_main_menu_en" }
+      ]
+    },
+    "node_faq_ship_charges_en": {
+      "type": "interactive_button",
+      "text": "Shipping charges are calculated during checkout based on your delivery location. Free shipping may apply on eligible orders.",
+      "buttons": [
+        { "id": "btn_back_faq", "title": "⬅ Back to FAQs", "nextNode": "node_faqs_categories_en" },
+        { "id": "btn_main_menu", "title": "🏠 Main Menu", "nextNode": "node_main_menu_en" }
+      ]
+    },
+    "node_faq_ship_locations_en": {
+      "type": "interactive_button",
+      "text": "We deliver to most locations across India. Enter your PIN code on the product page or during checkout to check availability.",
+      "buttons": [
+        { "id": "btn_back_faq", "title": "⬅ Back to FAQs", "nextNode": "node_faqs_categories_en" },
+        { "id": "btn_main_menu", "title": "🏠 Main Menu", "nextNode": "node_main_menu_en" }
+      ]
+    },
+    "node_faq_payments_menu_en": {
+      "type": "interactive_button",
+      "text": "Please choose your question regarding Payments: 💳",
+      "buttons": [
+        { "id": "btn_pay_methods_en", "title": "Payment Methods", "nextNode": "node_faq_pay_methods_en" },
+        { "id": "btn_pay_cod_en", "title": "Cash on Delivery", "nextNode": "node_faq_pay_cod_en" },
+        { "id": "btn_pay_failed_en", "title": "Payment Failed", "nextNode": "node_faq_pay_failed_en" }
+      ]
+    },
+    "node_faq_pay_methods_en": {
+      "type": "interactive_button",
+      "text": "We accept UPI, Credit/Debit Cards, Net Banking, Wallets, and other secure payment options available during checkout.",
+      "buttons": [
+        { "id": "btn_back_faq", "title": "⬅ Back to FAQs", "nextNode": "node_faqs_categories_en" },
+        { "id": "btn_main_menu", "title": "🏠 Main Menu", "nextNode": "node_main_menu_en" }
+      ]
+    },
+    "node_faq_pay_cod_en": {
+      "type": "interactive_button",
+      "text": "Cash on Delivery is available for selected PIN codes.",
+      "buttons": [
+        { "id": "btn_back_faq", "title": "⬅ Back to FAQs", "nextNode": "node_faqs_categories_en" },
+        { "id": "btn_main_menu", "title": "🏠 Main Menu", "nextNode": "node_main_menu_en" }
+      ]
+    },
+    "node_faq_pay_failed_en": {
+      "type": "interactive_button",
+      "text": "If your payment failed but the amount was deducted, it is usually refunded automatically within 5–7 business days. If the issue continues, please contact our support team.",
+      "buttons": [
+        { "id": "btn_support", "title": "📞 Contact Support", "nextNode": "node_support_suggestion_en" },
+        { "id": "btn_main_menu", "title": "🏠 Main Menu", "nextNode": "node_main_menu_en" }
+      ]
+    },
+    "node_faq_returns_menu_en": {
+      "type": "interactive_button",
+      "text": "Please choose your question regarding Returns & Refunds: 🔄",
+      "buttons": [
+        { "id": "btn_ret_policy_en", "title": "Return Policy", "nextNode": "node_faq_ret_policy_en" },
+        { "id": "btn_ret_exchange_en", "title": "Exchange Policy", "nextNode": "node_faq_ret_exchange_en" },
+        { "id": "btn_ret_timeline_en", "title": "Refund Timeline", "nextNode": "node_faq_ret_timeline_en" }
+      ]
+    },
+    "node_faq_ret_policy_en": {
+      "type": "interactive_button",
+      "text": "Eligible products can be returned within the return window mentioned on the product page. Items must be unused and in their original packaging.",
+      "buttons": [
+        { "id": "btn_back_faq", "title": "⬅ Back to FAQs", "nextNode": "node_faqs_categories_en" },
+        { "id": "btn_main_menu", "title": "🏠 Main Menu", "nextNode": "node_main_menu_en" }
+      ]
+    },
+    "node_faq_ret_exchange_en": {
+      "type": "interactive_button",
+      "text": "Eligible products can be exchanged according to our exchange policy. Availability depends on stock.",
+      "buttons": [
+        { "id": "btn_back_faq", "title": "⬅ Back to FAQs", "nextNode": "node_faqs_categories_en" },
+        { "id": "btn_main_menu", "title": "🏠 Main Menu", "nextNode": "node_main_menu_en" }
+      ]
+    },
+    "node_faq_ret_timeline_en": {
+      "type": "interactive_button",
+      "text": "Refunds are processed after the returned product passes quality inspection. The amount is usually credited within 5–7 business days.",
+      "buttons": [
+        { "id": "btn_back_faq", "title": "⬅ Back to FAQs", "nextNode": "node_faqs_categories_en" },
+        { "id": "btn_main_menu", "title": "🏠 Main Menu", "nextNode": "node_main_menu_en" }
+      ]
+    },
+    "node_faq_orders_menu_en": {
+      "type": "interactive_button",
+      "text": "Please choose your question regarding Orders: 📦",
+      "buttons": [
+        { "id": "btn_ord_cancel_en", "title": "Cancel Order", "nextNode": "node_faq_ord_cancel_en" },
+        { "id": "btn_ord_address_en", "title": "Change Address", "nextNode": "node_faq_ord_address_en" },
+        { "id": "btn_ord_modify_en", "title": "Modify Order", "nextNode": "node_faq_ord_modify_en" }
+      ]
+    },
+    "node_faq_ord_cancel_en": {
+      "type": "interactive_button",
+      "text": "Orders can only be cancelled before they are shipped. If your order has already been dispatched, cancellation may not be possible.",
+      "buttons": [
+        { "id": "btn_support", "title": "📞 Contact Support", "nextNode": "node_support_suggestion_en" },
+        { "id": "btn_main_menu", "title": "🏠 Main Menu", "nextNode": "node_main_menu_en" }
+      ]
+    },
+    "node_faq_ord_address_en": {
+      "type": "interactive_button",
+      "text": "The delivery address can only be changed before your order is shipped.",
+      "buttons": [
+        { "id": "btn_support", "title": "📞 Contact Support", "nextNode": "node_support_suggestion_en" },
+        { "id": "btn_main_menu", "title": "🏠 Main Menu", "nextNode": "node_main_menu_en" }
+      ]
+    },
+    "node_faq_ord_modify_en": {
+      "type": "interactive_button",
+      "text": "Order modifications are possible only before order processing begins.",
+      "buttons": [
+        { "id": "btn_support", "title": "📞 Contact Support", "nextNode": "node_support_suggestion_en" },
+        { "id": "btn_main_menu", "title": "🏠 Main Menu", "nextNode": "node_main_menu_en" }
+      ]
+    },
+    "node_faq_products_menu_en": {
+      "type": "interactive_button",
+      "text": "Please choose your question regarding Products: 🛍",
+      "buttons": [
+        { "id": "btn_prod_quality_en", "title": "Product Quality", "nextNode": "node_faq_prod_quality_en" },
+        { "id": "btn_prod_care_en", "title": "Product Care", "nextNode": "node_faq_prod_care_en" },
+        { "id": "btn_prod_size_en", "title": "Size Guide", "nextNode": "node_faq_prod_size_en" }
+      ]
+    },
+    "node_faq_prod_quality_en": {
+      "type": "interactive_button",
+      "text": "All our products go through quality checks before dispatch to ensure you receive the best experience.",
+      "buttons": [
+        { "id": "btn_back_faq", "title": "⬅ Back to FAQs", "nextNode": "node_faqs_categories_en" },
+        { "id": "btn_main_menu", "title": "🏠 Main Menu", "nextNode": "node_main_menu_en" }
+      ]
+    },
+    "node_faq_prod_care_en": {
+      "type": "interactive_button",
+      "text": "Please follow the care instructions provided on the product label to maintain product quality.",
+      "buttons": [
+        { "id": "btn_back_faq", "title": "⬅ Back to FAQs", "nextNode": "node_faqs_categories_en" },
+        { "id": "btn_main_menu", "title": "🏠 Main Menu", "nextNode": "node_main_menu_en" }
+      ]
+    },
+    "node_faq_prod_size_en": {
+      "type": "interactive_button",
+      "text": "You can view our complete size guide here:\n\n🔗 https://yourwebsite.com/size-guide",
+      "buttons": [
+        { "id": "btn_main_menu", "title": "🏠 Main Menu", "nextNode": "node_main_menu_en" },
+        { "id": "btn_support", "title": "📞 Contact Support", "nextNode": "node_support_suggestion_en" }
+      ]
+    },
+
+    "node_main_menu_hi": {
+      "type": "interactive_list",
+      "text": "नमस्ते! आज हम आपकी कैसे मदद कर सकते हैं? 👑",
+      "buttonText": "विकल्प देखें",
+      "sections": [
+        {
+          "title": "विकल्प चुनें",
+          "rows": [
+            { "id": "btn_track_order", "title": "📦 ऑर्डर ट्रैक करें", "description": "ऑर्डर की स्थिति और ट्रैकिंग जांचें", "nextNode": "node_track_start_hi" },
+            { "id": "btn_faqs", "title": "❓ पूछे जाने वाले प्रश्न", "description": "अक्सर पूछे जाने वाले प्रश्न पढ़ें", "nextNode": "node_faqs_categories_hi" },
+            { "id": "btn_talk_support", "title": "👨 सहायता से बात करें", "description": "हमारी सहायता टीम से संपर्क करें", "nextNode": "node_support_suggestion_hi" },
+            { "id": "btn_language", "title": "🌐 भाषा बदलें", "description": "भाषा सेटिंग बदलें", "nextNode": "node_language" }
+          ]
+        }
+      ]
+    },
+    "node_track_start_hi": {
+      "type": "collect_input",
+      "text": "कृपया अपना ऑर्डर ID या पंजीकृत मोबाइल नंबर दर्ज करें।\n\n(मुख्य मेनू पर जाने के लिए MENU टाइप करें)",
+      "saveContextKey": "order_lookup",
+      "validation": {
+        "type": "text",
+        "errorMessage": "❌ कृपया एक मान्य ऑर्डर ID या मोबाइल नंबर दर्ज करें।"
+      },
+      "nextNode": "node_track_action_hi"
+    },
+    "node_track_action_hi": {
+      "type": "action_node",
+      "action": "fetch_order_status",
+      "nextNode": "node_track_result_hi"
+    },
+    "node_track_result_hi": {
+      "type": "interactive_button",
+      "text": "📦 ऑर्डर #{order_id}\n\nस्थिति: {order_status}\nअनुमानित डिलीवरी: {delivery_date}\n\nअपना शिपमेंट यहाँ ट्रैक करें:\n{tracking_link}",
+      "buttons": [
+        { "id": "btn_main_menu", "title": "🏠 मुख्य मेनू", "nextNode": "node_main_menu_hi" },
+        { "id": "btn_support", "title": "👨 सहायता से बात करें", "nextNode": "node_support_suggestion_hi" }
+      ]
+    },
+    "node_support_suggestion_hi": {
+      "type": "collect_input",
+      "text": "सहायता टीम से जोड़ने से पहले:\n\n📦 ऑर्डर अपडेट के लिए, कृपया 'ऑर्डर ट्रैक करें' का उपयोग करें।\n❓ सामान्य प्रश्नों के लिए, कृपया 'पूछे जाने वाले प्रश्न' देखें।\n\nयदि आपको अभी भी सहायता चाहिए, तो कृपया अपना संदेश नीचे टाइप करें।",
+      "saveContextKey": "support_issue",
+      "validation": {
+        "type": "text",
+        "errorMessage": "❌ कृपया अपनी समस्या का संक्षिप्त विवरण टाइप करें ताकि हम आपकी मदद कर सकें।"
+      },
+      "nextNode": "node_support_finalize_hi"
+    },
+    "node_support_finalize_hi": {
+      "type": "action_node",
+      "action": "create_support_ticket",
+      "nextNode": "node_support_confirm_hi"
+    },
+    "node_support_confirm_hi": {
+      "type": "interactive_button",
+      "text": "✅ धन्यवाद! हमें आपका संदेश मिल गया है और इसे हमारी सहायता टीम के साथ साझा कर दिया गया है।\n\nहमारे प्रतिनिधियों में से एक जल्द से जल्द आपसे संपर्क करेगा।",
+      "buttons": [
+        { "id": "btn_main_menu", "title": "🏠 मुख्य मेनू", "nextNode": "node_main_menu_hi" }
+      ]
+    },
+
+    "node_faqs_categories_hi": {
+      "type": "interactive_list",
+      "text": "हम आपकी मदद के लिए यहाँ हैं! 😊\n\nकृपया नीचे दिए गए विकल्पों में से एक विषय चुनें:",
+      "buttonText": "विषय चुनें",
+      "sections": [
+        {
+          "title": "पूछे जाने वाले प्रश्न",
+          "rows": [
+            { "id": "faq_cat_shipping_hi", "title": "🚚 शिपिंग और डिलीवरी", "description": "डिलीवरी का समय, शुल्क और स्थान", "nextNode": "node_faq_shipping_menu_hi" },
+            { "id": "faq_cat_payments_hi", "title": "💳 भुगतान", "description": "भुगतान के तरीके, कैश ऑन डिलीवरी, असफलताएं", "nextNode": "node_faq_payments_menu_hi" },
+            { "id": "faq_cat_returns_hi", "title": "🔄 रिटर्न और रिफंड", "description": "रिटर्न नियम, एक्सचेंज और रिफंड समयसीमा", "nextNode": "node_faq_returns_menu_hi" },
+            { "id": "faq_cat_orders_hi", "title": "📦 ऑर्डर", "description": "रद्दीकरण, पता परिवर्तन, ऑर्डर संशोधन", "nextNode": "node_faq_orders_menu_hi" },
+            { "id": "faq_cat_products_hi", "title": "🛍 उत्पाद", "description": "गुणवत्ता, देखभाल, साइज़ गाइड लिंक", "nextNode": "node_faq_products_menu_hi" },
+            { "id": "faq_cat_support_hi", "title": "📞 सहायता से संपर्क करें", "description": "सहायता टीम से सीधे जुड़ें", "nextNode": "node_support_suggestion_hi" }
+          ]
+        }
+      ]
+    },
+    "node_faq_shipping_menu_hi": {
+      "type": "interactive_button",
+      "text": "कृपया शिपिंग और डिलीवरी से संबंधित अपना प्रश्न चुनें: 🚚",
+      "buttons": [
+        { "id": "btn_ship_time_hi", "title": "डिलीवरी का समय", "nextNode": "node_faq_ship_time_hi" },
+        { "id": "btn_ship_charges_hi", "title": "शिपिंग शुल्क", "nextNode": "node_faq_ship_charges_hi" },
+        { "id": "btn_ship_locations_hi", "title": "डिलीवरी स्थान", "nextNode": "node_faq_ship_locations_hi" }
+      ]
+    },
+    "node_faq_ship_time_hi": {
+      "type": "interactive_button",
+      "text": "मानक डिलीवरी में आमतौर पर आपके स्थान के आधार पर 3-7 कार्य दिवस लगते हैं।",
+      "buttons": [
+        { "id": "btn_back_faq", "title": "⬅ वापस FAQs", "nextNode": "node_faqs_categories_hi" },
+        { "id": "btn_main_menu", "title": "🏠 मुख्य मेनू", "nextNode": "node_main_menu_hi" }
+      ]
+    },
+    "node_faq_ship_charges_hi": {
+      "type": "interactive_button",
+      "text": "शिपिंग शुल्क की गणना आपके डिलीवरी स्थान के आधार पर चेकआउट के दौरान की जाती है। पात्र ऑर्डरों पर मुफ्त शिपिंग लागू हो सकती है।",
+      "buttons": [
+        { "id": "btn_back_faq", "title": "⬅ वापस FAQs", "nextNode": "node_faqs_categories_hi" },
+        { "id": "btn_main_menu", "title": "🏠 मुख्य मेनू", "nextNode": "node_main_menu_hi" }
+      ]
+    },
+    "node_faq_ship_locations_hi": {
+      "type": "interactive_button",
+      "text": "हम भारत में अधिकांश स्थानों पर डिलीवरी करते हैं। उपलब्धता की जांच करने के लिए उत्पाद पृष्ठ पर या चेकआउट के दौरान अपना पिन कोड दर्ज करें।",
+      "buttons": [
+        { "id": "btn_back_faq", "title": "⬅ वापस FAQs", "nextNode": "node_faqs_categories_hi" },
+        { "id": "btn_main_menu", "title": "🏠 मुख्य मेनू", "nextNode": "node_main_menu_hi" }
+      ]
+    },
+    "node_faq_payments_menu_hi": {
+      "type": "interactive_button",
+      "text": "कृपया भुगतान से संबंधित अपना प्रश्न चुनें: 💳",
+      "buttons": [
+        { "id": "btn_pay_methods_hi", "title": "भुगतान के तरीके", "nextNode": "node_faq_pay_methods_hi" },
+        { "id": "btn_pay_cod_hi", "title": "कैश ऑन डिलीवरी", "nextNode": "node_faq_pay_cod_hi" },
+        { "id": "btn_pay_failed_hi", "title": "भुगतान विफल", "nextNode": "node_faq_pay_failed_hi" }
+      ]
+    },
+    "node_faq_pay_methods_hi": {
+      "type": "interactive_button",
+      "text": "हम UPI, क्रेडिट/डेबिट कार्ड, नेट बैंकिंग, वॉलेट और चेकआउट के दौरान उपलब्ध अन्य सुरक्षित भुगतान विकल्पों को स्वीकार करते हैं।",
+      "buttons": [
+        { "id": "btn_back_faq", "title": "⬅ वापस FAQs", "nextNode": "node_faqs_categories_hi" },
+        { "id": "btn_main_menu", "title": "🏠 मुख्य मेनू", "nextNode": "node_main_menu_hi" }
+      ]
+    },
+    "node_faq_pay_cod_hi": {
+      "type": "interactive_button",
+      "text": "कैश ऑन डिलीवरी चुनिंदा पिन कोड के लिए उपलब्ध है।",
+      "buttons": [
+        { "id": "btn_back_faq", "title": "⬅ वापस FAQs", "nextNode": "node_faqs_categories_hi" },
+        { "id": "btn_main_menu", "title": "🏠 मुख्य मेनू", "nextNode": "node_main_menu_hi" }
+      ]
+    },
+    "node_faq_pay_failed_hi": {
+      "type": "interactive_button",
+      "text": "यदि आपका भुगतान विफल हो गया है लेकिन राशि काट ली गई थी, तो यह आमतौर पर 5-7 कार्य दिवसों के भीतर स्वचालित रूप से वापस कर दी जाती है। यदि समस्या बनी रहती है, तो कृपया हमारी सहायता टीम से संपर्क करें।",
+      "buttons": [
+        { "id": "btn_support", "title": "📞 सहायता से बात करें", "nextNode": "node_support_suggestion_hi" },
+        { "id": "btn_main_menu", "title": "🏠 मुख्य मेनू", "nextNode": "node_main_menu_hi" }
+      ]
+    },
+    "node_faq_returns_menu_hi": {
+      "type": "interactive_button",
+      "text": "कृपया रिटर्न और रिफंड से संबंधित अपना प्रश्न चुनें: 🔄",
+      "buttons": [
+        { "id": "btn_ret_policy_hi", "title": "रिटर्न पॉलिसी", "nextNode": "node_faq_ret_policy_hi" },
+        { "id": "btn_ret_exchange_hi", "title": "एक्सचेंज पॉलिसी", "nextNode": "node_faq_ret_exchange_hi" },
+        { "id": "btn_ret_timeline_hi", "title": "रिफंड समयसीमा", "nextNode": "node_faq_ret_timeline_hi" }
+      ]
+    },
+    "node_faq_ret_policy_hi": {
+      "type": "interactive_button",
+      "text": "पात्र उत्पादों को उत्पाद पृष्ठ पर उल्लिखित रिटर्न विंडो के भीतर वापस किया जा सकता है। वस्तुएं अप्रयुक्त और अपनी मूल पैकेजिंग में होनी चाहिए।",
+      "buttons": [
+        { "id": "btn_back_faq", "title": "⬅ वापस FAQs", "nextNode": "node_faqs_categories_hi" },
+        { "id": "btn_main_menu", "title": "🏠 मुख्य मेनू", "nextNode": "node_main_menu_hi" }
+      ]
+    },
+    "node_faq_ret_exchange_hi": {
+      "type": "interactive_button",
+      "text": "हमारी एक्सचेंज पॉलिसी के अनुसार पात्र उत्पादों को बदला जा सकता है। उपलब्धता स्टॉक पर निर्भर करती है।",
+      "buttons": [
+        { "id": "btn_back_faq", "title": "⬅ वापस FAQs", "nextNode": "node_faqs_categories_hi" },
+        { "id": "btn_main_menu", "title": "🏠 मुख्य मेनू", "nextNode": "node_main_menu_hi" }
+      ]
+    },
+    "node_faq_ret_timeline_hi": {
+      "type": "interactive_button",
+      "text": "लौटाए गए उत्पाद के गुणवत्ता निरीक्षण में उत्तीर्ण होने के बाद रिफंड संसाधित किया जाता है। राशि आमतौर पर 5-7 कार्य दिवसों के भीतर क्रेडिट कर दी जाती है।",
+      "buttons": [
+        { "id": "btn_back_faq", "title": "⬅ वापस FAQs", "nextNode": "node_faqs_categories_hi" },
+        { "id": "btn_main_menu", "title": "🏠 मुख्य मेनू", "nextNode": "node_main_menu_hi" }
+      ]
+    },
+    "node_faq_orders_menu_hi": {
+      "type": "interactive_button",
+      "text": "कृपया ऑर्डर से संबंधित अपना प्रश्न चुनें: 📦",
+      "buttons": [
+        { "id": "btn_ord_cancel_hi", "title": "ऑर्डर रद्द करें", "nextNode": "node_faq_ord_cancel_hi" },
+        { "id": "btn_ord_address_hi", "title": "पता बदलें", "nextNode": "node_faq_ord_address_hi" },
+        { "id": "btn_ord_modify_hi", "title": "ऑर्डर बदलें", "nextNode": "node_faq_ord_modify_hi" }
+      ]
+    },
+    "node_faq_ord_cancel_hi": {
+      "type": "interactive_button",
+      "text": "ऑर्डर को केवल उनके शिप होने से पहले ही रद्द किया जा सकता है। यदि आपका ऑर्डर पहले ही डिस्पैच हो चुका है, तो रद्दीकरण संभव नहीं हो सकता है।",
+      "buttons": [
+        { "id": "btn_support", "title": "📞 सहायता से बात करें", "nextNode": "node_support_suggestion_hi" },
+        { "id": "btn_main_menu", "title": "🏠 मुख्य मेनू", "nextNode": "node_main_menu_hi" }
+      ]
+    },
+    "node_faq_ord_address_hi": {
+      "type": "interactive_button",
+      "text": "डिलिवरी पता केवल आपका ऑर्डर शिप होने से पहले ही बदला जा सकता है।",
+      "buttons": [
+        { "id": "btn_support", "title": "📞 सहायता से बात करें", "nextNode": "node_support_suggestion_hi" },
+        { "id": "btn_main_menu", "title": "🏠 मुख्य मेनू", "nextNode": "node_main_menu_hi" }
+      ]
+    },
+    "node_faq_ord_modify_hi": {
+      "type": "interactive_button",
+      "text": "ऑर्डर में संशोधन केवल ऑर्डर प्रोसेसिंग शुरू होने से पहले ही संभव है।",
+      "buttons": [
+        { "id": "btn_support", "title": "📞 सहायता से बात करें", "nextNode": "node_support_suggestion_hi" },
+        { "id": "btn_main_menu", "title": "🏠 मुख्य मेनू", "nextNode": "node_main_menu_hi" }
+      ]
+    },
+    "node_faq_products_menu_hi": {
+      "type": "interactive_button",
+      "text": "कृपया उत्पादों से संबंधित अपना प्रश्न चुनें: 🛍",
+      "buttons": [
+        { "id": "btn_prod_quality_hi", "title": "उत्पाद गुणवत्ता", "nextNode": "node_faq_prod_quality_hi" },
+        { "id": "btn_prod_care_hi", "title": "उत्पाद देखभाल", "nextNode": "node_faq_prod_care_hi" },
+        { "id": "btn_prod_size_hi", "title": "साइज़ गाइड", "nextNode": "node_faq_prod_size_hi" }
+      ]
+    },
+    "node_faq_prod_quality_hi": {
+      "type": "interactive_button",
+      "text": "यह सुनिश्चित करने के लिए कि आपको सबसे अच्छा अनुभव मिले, डिस्पैच से पहले हमारे सभी उत्पाद गुणवत्ता जांच से गुजरते हैं।",
+      "buttons": [
+        { "id": "btn_back_faq", "title": "⬅ वापस FAQs", "nextNode": "node_faqs_categories_hi" },
+        { "id": "btn_main_menu", "title": "🏠 मुख्य मेनू", "nextNode": "node_main_menu_hi" }
+      ]
+    },
+    "node_faq_prod_care_hi": {
+      "type": "interactive_button",
+      "text": "उत्पाद की गुणवत्ता बनाए रखने के लिए कृपया उत्पाद लेबल पर दिए गए देखभाल निर्देशों का पालन करें।",
+      "buttons": [
+        { "id": "btn_back_faq", "title": "⬅ वापस FAQs", "nextNode": "node_faqs_categories_hi" },
+        { "id": "btn_main_menu", "title": "🏠 मुख्य मेनू", "nextNode": "node_main_menu_hi" }
+      ]
+    },
+    "node_faq_prod_size_hi": {
+      "type": "interactive_button",
+      "text": "आप हमारी पूरी साइज़ गाइड यहाँ देख सकते हैं:\n\n🔗 https://yourwebsite.com/size-guide",
+      "buttons": [
+        { "id": "btn_main_menu", "title": "🏠 मुख्य मेनू", "nextNode": "node_main_menu_hi" },
+        { "id": "btn_support", "title": "💬 सहायता से बात करें", "nextNode": "node_support_suggestion_hi" }
+      ]
+    },
+
+    "node_main_menu_mr": {
+      "type": "interactive_list",
+      "text": "नमस्कार! आज आम्ही तुम्हाला कशी मदत करू शकतो? 👑",
+      "buttonText": "पर्याय पहा",
+      "sections": [
+        {
+          "title": "पर्याय निवडा",
+          "rows": [
+            { "id": "btn_track_order", "title": "📦 ऑर्डर ट्रॅक करा", "description": "ऑर्डरची स्थिती आणि ट्रॅकिंग तपासा", "nextNode": "node_track_start_mr" },
+            { "id": "btn_faqs", "title": "❓ प्रश्नोत्तरे", "description": "वारंवार विचारले जाणारे प्रश्न वाचा", "nextNode": "node_faqs_categories_mr" },
+            { "id": "btn_talk_support", "title": "👨 सपोर्टशी बोला", "description": "आमच्या सपोर्ट टीमशी बोला", "nextNode": "node_support_suggestion_mr" },
+            { "id": "btn_language", "title": "🌐 भाषा बदला", "description": "भाषा सेटिंग बदला", "nextNode": "node_language" }
+          ]
+        }
+      ]
+    },
+    "node_track_start_mr": {
+      "type": "collect_input",
+      "text": "कृपया तुमचा ऑर्डर ID किंवा नोंदणीकृत मोबाईल नंबर प्रविष्ट करा.\n\n(मुख्य मेनूवर जाण्यासाठी MENU टाईप करा)",
+      "saveContextKey": "order_lookup",
+      "validation": {
+        "type": "text",
+        "errorMessage": "❌ कृपया वैध ऑर्डर ID किंवा मोबाईल नंबर प्रविष्ट करा."
+      },
+      "nextNode": "node_track_action_mr"
+    },
+    "node_track_action_mr": {
+      "type": "action_node",
+      "action": "fetch_order_status",
+      "nextNode": "node_track_result_mr"
+    },
+    "node_track_result_mr": {
+      "type": "interactive_button",
+      "text": "📦 ऑर्डर #{order_id}\n\nस्थिती: {order_status}\nअपेक्षित डिलिव्हरी: {delivery_date}\n\nतुमची शिपमेंट येथे ट्रॅक करा:\n{tracking_link}",
+      "buttons": [
+        { "id": "btn_main_menu", "title": "🏠 मुख्य मेनू", "nextNode": "node_main_menu_mr" },
+        { "id": "btn_support", "title": "👨 सपोर्टशी बोला", "nextNode": "node_support_suggestion_mr" }
+      ]
+    },
+    "node_support_suggestion_mr": {
+      "type": "collect_input",
+      "text": "तुम्हाला सपोर्ट टीमशी जोडण्यापूर्वी:\n\n📦 ऑर्डर अपडेट्ससाठी, कृपया 'ऑर्डर ट्रॅक करा' चा वापर करा.\n❓ सामान्य प्रश्नांसाठी, कृपया 'प्रश्नोत्तरे' तपासा.\n\nतरीही तुम्हाला मदतीची आवश्यकता असल्यास, कृपया तुमचा संदेश खाली टाईप करा.",
+      "saveContextKey": "support_issue",
+      "validation": {
+        "type": "text",
+        "errorMessage": "❌ कृपया तुमच्या समस्येचे थोडक्यात वर्णन टाईप करा जेणेकरून आम्ही मदत करू शकू."
+      },
+      "nextNode": "node_support_finalize_mr"
+    },
+    "node_support_finalize_mr": {
+      "type": "action_node",
+      "action": "create_support_ticket",
+      "nextNode": "node_support_confirm_mr"
+    },
+    "node_support_confirm_mr": {
+      "type": "interactive_button",
+      "text": "✅ धन्यवाद! आम्हाला तुमचा संदेश मिळाला आहे आणि आम्ही तो आमच्या सपोर्ट टीमसोबत शेअर केला आहे.\n\nआमचे प्रतिनिधी लवकरात लवकर तुमच्याशी संपर्क साधतील.",
+      "buttons": [
+        { "id": "btn_main_menu", "title": "🏠 मुख्य मेनू", "nextNode": "node_main_menu_mr" }
+      ]
+    },
+
+    "node_faqs_categories_mr": {
+      "type": "interactive_list",
+      "text": "आम्ही तुमच्या मदतीसाठी येथे आहोत! 😊\n\nकृपया खालील पर्यायांमधून एक विषय निवडा:",
+      "buttonText": "विषय निवडा",
+      "sections": [
+        {
+          "title": "प्रश्नोत्तरे (FAQs)",
+          "rows": [
+            { "id": "faq_cat_shipping_mr", "title": "🚚 शिपिंग आणि डिलिव्हरी", "description": "डिलिव्हरीची वेळ, शुल्क आणि ठिकाणे", "nextNode": "node_faq_shipping_menu_mr" },
+            { "id": "faq_cat_payments_mr", "title": "💳 पेमेंट", "description": "पेमेंट पद्धती, कॅश ऑन डिलिव्हरी, अपयश", "nextNode": "node_faq_payments_menu_mr" },
+            { "id": "faq_cat_returns_mr", "title": "🔄 रिटर्न आणि रिफंड", "description": "रिटर्न नियम, एक्सचेंज आणि रिफंड मर्यादा", "nextNode": "node_faq_returns_menu_mr" },
+            { "id": "faq_cat_orders_mr", "title": "📦 ऑर्डर", "description": "ऑर्डर रद्द करणे, पत्ता बदलणे, ऑर्डमधील बदल", "nextNode": "node_faq_orders_menu_mr" },
+            { "id": "faq_cat_products_mr", "title": "🛍 उत्पादने", "description": "गुणवत्ता, काळजी, साईझ गाईड लिंक", "nextNode": "node_faq_products_menu_mr" },
+            { "id": "faq_cat_support_mr", "title": "📞 सपोर्टशी संपर्क करा", "description": "ग्राहक प्रतिनिधीशी थेट चॅट करा", "nextNode": "node_support_suggestion_mr" }
+          ]
+        }
+      ]
+    },
+    "node_faq_shipping_menu_mr": {
+      "type": "interactive_button",
+      "text": "कृपया शिपिंग आणि डिलिव्हरी संबंधित आपला प्रश्न निवडा: 🚚",
+      "buttons": [
+        { "id": "btn_ship_time_mr", "title": "डिलिव्हरीची वेळ", "nextNode": "node_faq_ship_time_mr" },
+        { "id": "btn_ship_charges_mr", "title": "शिपिंग चार्जेस", "nextNode": "node_faq_ship_charges_mr" },
+        { "id": "btn_ship_locations_mr", "title": "डिलिव्हरी ठिकाणे", "nextNode": "node_faq_ship_locations_mr" }
+      ]
+    },
+    "node_faq_ship_time_mr": {
+      "type": "interactive_button",
+      "text": "तुमच्या ठिकाणानुसार मानक डिलिव्हरीसाठी सहसा ३-७ व्यवसाय दिवस लागतात.",
+      "buttons": [
+        { "id": "btn_back_faq", "title": "⬅ परत FAQs", "nextNode": "node_faqs_categories_mr" },
+        { "id": "btn_main_menu", "title": "🏠 मुख्य मेनू", "nextNode": "node_main_menu_mr" }
+      ]
+    },
+    "node_faq_ship_charges_mr": {
+      "type": "interactive_button",
+      "text": "तुमच्या डिलिव्हरी ठिकाणाच्या आधारे चेकआउट दरम्यान शिपिंग चार्जेस मोजले जातात. पात्र ऑर्डर्सवर मोफत शिपिंग लागू होऊ शकते.",
+      "buttons": [
+        { "id": "btn_back_faq", "title": "⬅ परत FAQs", "nextNode": "node_faqs_categories_mr" },
+        { "id": "btn_main_menu", "title": "🏠 मुख्य मेनू", "nextNode": "node_main_menu_mr" }
+      ]
+    },
+    "node_faq_ship_locations_mr": {
+      "type": "interactive_button",
+      "text": "आम्ही भारतातील बहुतांश ठिकाणी डिलिव्हरी करतो. उपलब्धता तपासण्यासाठी उत्पादन पृष्ठावर किंवा चेकआउट दरम्यान तुमचा पिन कोड प्रविष्ट करा.",
+      "buttons": [
+        { "id": "btn_back_faq", "title": "⬅ परत FAQs", "nextNode": "node_faqs_categories_mr" },
+        { "id": "btn_main_menu", "title": "🏠 मुख्य मेनू", "nextNode": "node_main_menu_mr" }
+      ]
+    },
+    "node_faq_payments_menu_mr": {
+      "type": "interactive_button",
+      "text": "कृपया पेमेंट संबंधित आपला प्रश्न निवडा: 💳",
+      "buttons": [
+        { "id": "btn_pay_methods_mr", "title": "पेमेंट पद्धती", "nextNode": "node_faq_pay_methods_mr" },
+        { "id": "btn_pay_cod_mr", "title": "कॅश ऑन डिलिव्हरी", "nextNode": "node_faq_pay_cod_mr" },
+        { "id": "btn_pay_failed_mr", "title": "पेमेंट अयशस्वी", "nextNode": "node_faq_pay_failed_mr" }
+      ]
+    },
+    "node_faq_pay_methods_mr": {
+      "type": "interactive_button",
+      "text": "आम्ही Net Banking, UPI, क्रेडिट/डेबिट कार्ड, वॉलेट आणि चेकआउट दरम्यान उपलब्ध इतर सुरक्षित पेमेंट पर्याय स्वीकारतो.",
+      "buttons": [
+        { "id": "btn_back_faq", "title": "⬅ परत FAQs", "nextNode": "node_faqs_categories_mr" },
+        { "id": "btn_main_menu", "title": "🏠 मुख्य मेनू", "nextNode": "node_main_menu_mr" }
+      ]
+    },
+    "node_faq_pay_cod_mr": {
+      "type": "interactive_button",
+      "text": "निवडक पिन कोडसाठी कॅश ऑन डिलिव्हरी उपलब्ध आहे.",
+      "buttons": [
+        { "id": "btn_back_faq", "title": "⬅ परत FAQs", "nextNode": "node_faqs_categories_mr" },
+        { "id": "btn_main_menu", "title": "🏠 मुख्य मेनू", "nextNode": "node_main_menu_mr" }
+      ]
+    },
+    "node_faq_pay_failed_mr": {
+      "type": "interactive_button",
+      "text": "तुमचे पेमेंट अयशस्वी झाले असल्यास परंतु रक्कम वजा झाली असल्यास, ती सहसा ५-७ व्यवसाय दिवसांत आपोआप रिफंड केली जाते. समस्या कायम राहिल्यास, कृपया आमच्या सपोर्ट टीमशी संपर्क साधा.",
+      "buttons": [
+        { "id": "btn_support", "title": "💬 सपोर्टशी बोला", "nextNode": "node_support_suggestion_mr" },
+        { "id": "btn_main_menu", "title": "🏠 मुख्य मेनू", "nextNode": "node_main_menu_mr" }
+      ]
+    },
+    "node_faq_returns_menu_mr": {
+      "type": "interactive_button",
+      "text": "कृपया रिटर्न आणि रिफंड संबंधित आपला प्रश्न निवडा: 🔄",
+      "buttons": [
+        { "id": "btn_ret_policy_mr", "title": "रिटर्न पॉलिसी", "nextNode": "node_faq_ret_policy_mr" },
+        { "id": "btn_ret_exchange_mr", "title": "एक्सचेंज पॉलिसी", "nextNode": "node_faq_ret_exchange_mr" },
+        { "id": "btn_ret_timeline_mr", "title": "रिफंडची वेळ", "nextNode": "node_faq_ret_timeline_mr" }
+      ]
+    },
+    "node_faq_ret_policy_mr": {
+      "type": "interactive_button",
+      "text": "पात्र उत्पादने उत्पादन पृष्ठावर नमूद केलेल्या रिटर्न विंडोच्या आत परत केली जाऊ शकतात. वस्तू न वापरलेल्या आणि त्यांच्या मूळ पॅकेजिंगमध्ये असणे आवश्यक आहे.",
+      "buttons": [
+        { "id": "btn_back_faq", "title": "⬅ परत FAQs", "nextNode": "node_faqs_categories_mr" },
+        { "id": "btn_main_menu", "title": "🏠 मुख्य मेनू", "nextNode": "node_main_menu_mr" }
+      ]
+    },
+    "node_faq_ret_exchange_mr": {
+      "type": "interactive_button",
+      "text": "आमच्या एक्सचेंज पॉलिसीनुसार पात्र उत्पादने बदलून मिळू शकतात. उपलब्धता स्टॉकवर अवलंबून असते.",
+      "buttons": [
+        { "id": "btn_back_faq", "title": "⬅ परत FAQs", "nextNode": "node_faqs_categories_mr" },
+        { "id": "btn_main_menu", "title": "🏠 मुख्य मेनू", "nextNode": "node_main_menu_mr" }
+      ]
+    },
+    "node_faq_ret_timeline_mr": {
+      "type": "interactive_button",
+      "text": "परत केलेले उत्पादन गुणवत्ता तपासणीत उत्तीर्ण झाल्यानंतर रिफंडची प्रक्रिया केली जाते. रक्कम सहसा ५-७ व्यवसाय दिवसांत जमा केली जाते.",
+      "buttons": [
+        { "id": "btn_back_faq", "title": "⬅ परत FAQs", "nextNode": "node_faqs_categories_mr" },
+        { "id": "btn_main_menu", "title": "🏠 मुख्य मेनू", "nextNode": "node_main_menu_mr" }
+      ]
+    },
+    "node_faq_orders_menu_mr": {
+      "type": "interactive_button",
+      "text": "कृपया ऑर्डर संबंधित आपला प्रश्न निवडा: 📦",
+      "buttons": [
+        { "id": "btn_ord_cancel_mr", "title": "ऑर्डर रद्द करा", "nextNode": "node_faq_ord_cancel_mr" },
+        { "id": "btn_ord_address_mr", "title": "पत्ता बदला", "nextNode": "node_faq_ord_address_mr" },
+        { "id": "btn_ord_modify_mr", "title": "ऑर्डर बदला", "nextNode": "node_faq_ord_modify_mr" }
+      ]
+    },
+    "node_faq_ord_cancel_mr": {
+      "type": "interactive_button",
+      "text": "ऑर्डर केवळ शिप होण्यापूर्वीच रद्द केल्या जाऊ शकतात. तुमची ऑर्डर आधीच पाठवली गेली असल्यास, रद्दीकरण शक्य होणार नाही.",
+      "buttons": [
+        { "id": "btn_support", "title": "💬 सपोर्टशी बोला", "nextNode": "node_support_suggestion_mr" },
+        { "id": "btn_main_menu", "title": "🏠 मुख्य मेनू", "nextNode": "node_main_menu_mr" }
+      ]
+    },
+    "node_faq_ord_address_mr": {
+      "type": "interactive_button",
+      "text": "डिलिव्हरी पत्ता फक्त तुमची ऑर्डर शिप होण्यापूर्वीच बदलला जाऊ शकतो.",
+      "buttons": [
+        { "id": "btn_support", "title": "💬 सपोर्टशी बोला", "nextNode": "node_support_suggestion_mr" },
+        { "id": "btn_main_menu", "title": "🏠 मुख्य मेनू", "nextNode": "node_main_menu_mr" }
+      ]
+    },
+    "node_faq_ord_modify_mr": {
+      "type": "interactive_button",
+      "text": "ऑर्डरमध्ये बदल फक्त ऑर्डरची प्रक्रिया सुरू होण्यापूर्वीच शक्य आहे.",
+      "buttons": [
+        { "id": "btn_support", "title": "💬 सपोर्टशी बोला", "nextNode": "node_support_suggestion_mr" },
+        { "id": "btn_main_menu", "title": "🏠 मुख्य मेनू", "nextNode": "node_main_menu_mr" }
+      ]
+    },
+    "node_faq_products_menu_mr": {
+      "type": "interactive_button",
+      "text": "कृपया उत्पादनांशी संबंधित आपला प्रश्न निवडा: 🛍",
+      "buttons": [
+        { "id": "btn_prod_quality_mr", "title": "उत्पादन गुणवत्ता", "nextNode": "node_faq_prod_quality_mr" },
+        { "id": "btn_prod_care_mr", "title": "उत्पादनाची काळजी", "nextNode": "node_faq_prod_care_mr" },
+        { "id": "btn_prod_size_mr", "title": "Size Guide", "nextNode": "node_faq_prod_size_mr" }
+      ]
+    },
+    "node_faq_prod_quality_mr": {
+      "type": "interactive_button",
+      "text": "तुम्हाला सर्वोत्तम अनुभव मिळावा यासाठी आमची सर्व उत्पादने पाठवण्यापूर्वी गुणवत्ता तपासणीतून जातात.",
+      "buttons": [
+        { "id": "btn_back_faq", "title": "⬅ परत FAQs", "nextNode": "node_faqs_categories_mr" },
+        { "id": "btn_main_menu", "title": "🏠 मुख्य मेनू", "nextNode": "node_main_menu_mr" }
+      ]
+    },
+    "node_faq_prod_care_mr": {
+      "type": "interactive_button",
+      "text": "उत्पादनाची काळजी टिकवून ठेवण्यासाठी कृपया उत्पादन लेबलवर दिलेल्या काळजी सूचनांचे पालन करा.",
+      "buttons": [
+        { "id": "btn_back_faq", "title": "⬅ परत FAQs", "nextNode": "node_faqs_categories_mr" },
+        { "id": "btn_main_menu", "title": "🏠 मुख्य मेनू", "nextNode": "node_main_menu_mr" }
+      ]
+    },
+    "node_faq_prod_size_mr": {
+      "type": "interactive_button",
+      "text": "तुम्ही आमची संपूर्ण साईझ गाईड येथे पाहू शकता:\n\n🔗 https://yourwebsite.com/size-guide",
+      "buttons": [
+        { "id": "btn_main_menu", "title": "🏠 मुख्य मेनू", "nextNode": "node_main_menu_mr" },
+        { "id": "btn_support", "title": "💬 सपोर्टशी बोला", "nextNode": "node_support_suggestion_mr" }
+      ]
+    },
+
+    "node_order_confirmed_en": {
+      "type": "interactive_button",
+      "text": "Your order is confirmed! 🎉\nOrder #{order_id}\nItems: {items}\nExpected delivery: {delivery_date}",
+      "buttons": [
+        { "id": "btn_view_order", "title": "📦 View Order Details", "nextNode": "node_order_details_link_en" },
+        { "id": "btn_support", "title": "💬 Contact Support", "nextNode": "node_support_suggestion_en" },
+        { "id": "btn_shop_more", "title": "🛍️ Continue Shopping", "nextNode": "node_shop_more_link_en" }
+      ]
+    },
+    "node_order_details_link_en": {
+      "type": "interactive_button",
+      "text": "Here is your order link: 👉 https://newfashionbrand.example.com/orders/{order_id}",
+      "buttons": [
+        { "id": "btn_previous", "title": "🔙 Previous Step", "nextNode": "node_order_confirmed_en" },
+        { "id": "btn_main_menu", "title": "🏠 Main Menu", "nextNode": "node_main_menu_en" }
+      ]
+    },
+    "node_shop_more_link_en": {
+      "type": "interactive_button",
+      "text": "Here is our store link: 👉 https://newfashionbrand.example.com",
+      "buttons": [
+        { "id": "btn_previous", "title": "🔙 Previous Step", "nextNode": "node_order_confirmed_en" },
+        { "id": "btn_main_menu", "title": "🏠 Main Menu", "nextNode": "node_main_menu_en" }
+      ]
+    },
+    "node_order_dispatched_en": {
+      "type": "interactive_button",
+      "text": "Good news! Your order #{order_id} is out for delivery 🚚\nTrack it live here 👉 {tracking_link}",
+      "buttons": [
+        { "id": "btn_support", "title": "💬 Contact Support", "nextNode": "node_support_suggestion_en" },
+        { "id": "btn_main_menu", "title": "🏠 Main Menu", "nextNode": "node_main_menu_en" }
+      ]
+    },
+    "node_order_delivered_en": {
+      "type": "interactive_button",
+      "text": "Your order #{order_id} has been delivered! 📦✅ How would you rate your experience?",
+      "buttons": [
+        { "id": "rating_good", "title": "😍 Loved it", "nextNode": "node_feedback_thanks_en" },
+        { "id": "rating_ok", "title": "🙂 It was okay", "nextNode": "node_feedback_thanks_en" },
+        { "id": "rating_bad", "title": "😕 Had an issue", "nextNode": "node_support_suggestion_en" }
+      ]
+    },
+    "node_feedback_thanks_en": {
+      "type": "interactive_button",
+      "text": "Thank you for shopping with us! ✨ We hope to see you again soon.",
+      "buttons": [
+        { "id": "btn_main_menu", "title": "🏠 Main Menu", "nextNode": "node_main_menu_en" }
+      ]
+    },
+
+    "node_order_confirmed_hi": {
+      "type": "interactive_button",
+      "text": "आपका ऑर्डर कन्फर्म हो गया है! 🎉\nऑर्डर #{order_id}\nसामान: {items}\nडिलीवरी की उम्मीद: {delivery_date}",
+      "buttons": [
+        { "id": "btn_view_order", "title": "📦 ऑर्डर विवरण देखें", "nextNode": "node_order_details_link_hi" },
+        { "id": "btn_support", "title": "💬 सहायता से संपर्क करें", "nextNode": "node_support_suggestion_hi" },
+        { "id": "btn_shop_more", "title": "🛍️ खरीदारी जारी रखें", "nextNode": "node_shop_more_link_hi" }
+      ]
+    },
+    "node_order_details_link_hi": {
+      "type": "interactive_button",
+      "text": "आपके ऑर्डर का लिंक यहाँ है: 👉 https://newfashionbrand.example.com/orders/{order_id}",
+      "buttons": [
+        { "id": "btn_previous", "title": "🔙 पिछला कदम", "nextNode": "node_order_confirmed_hi" },
+        { "id": "btn_main_menu", "title": "🏠 मुख्य मेनू", "nextNode": "node_main_menu_hi" }
+      ]
+    },
+    "node_shop_more_link_hi": {
+      "type": "interactive_button",
+      "text": "हमारा स्टोर लिंक यहाँ है: 👉 https://newfashionbrand.example.com",
+      "buttons": [
+        { "id": "btn_previous", "title": "🔙 पिछला कदम", "nextNode": "node_order_confirmed_hi" },
+        { "id": "btn_main_menu", "title": "🏠 मुख्य मेनू", "nextNode": "node_main_menu_hi" }
+      ]
+    },
+    "node_order_dispatched_hi": {
+      "type": "interactive_button",
+      "text": "खुशखबरी! आपका ऑर्डर #{order_id} डिलीवरी के लिए निकल चुका है 🚚\nयहां लाइव ट्रैक करें 👉 {tracking_link}",
+      "buttons": [
+        { "id": "btn_support", "title": "💬 सहायता से संपर्क करें", "nextNode": "node_support_suggestion_hi" },
+        { "id": "btn_main_menu", "title": "🏠 मुख्य मेनू", "nextNode": "node_main_menu_hi" }
+      ]
+    },
+    "node_order_delivered_hi": {
+      "type": "interactive_button",
+      "text": "का ऑर्डर #{order_id} डिलीवर हो गया है! 📦✅ आप अपने अनुभव को कैसे रेट करेंगे?",
+      "buttons": [
+        { "id": "rating_good", "title": "😍 बहुत पसंद आया", "nextNode": "node_feedback_thanks_hi" },
+        { "id": "rating_ok", "title": "🙂 ठीक था", "nextNode": "node_feedback_thanks_hi" },
+        { "id": "rating_bad", "title": "😕 कोई समस्या थी", "nextNode": "node_support_suggestion_hi" }
+      ]
+    },
+    "node_feedback_thanks_hi": {
+      "type": "interactive_button",
+      "text": "हमारे साथ खरीदारी करने के लिए धन्यवाद! ✨ जल्द फिर मिलेंगे।",
+      "buttons": [
+        { "id": "btn_main_menu", "title": "🏠 मुख्य मेनू", "nextNode": "node_main_menu_hi" }
+      ]
+    },
+
+    "node_order_confirmed_mr": {
+      "type": "interactive_button",
+      "text": "तुमची ऑर्डर कन्फर्म झाली आहे! 🎉\nऑर्डर #{order_id}\nवस्तू: {items}\nअपेक्षित डिलिव्हरी: {delivery_date}",
+      "buttons": [
+        { "id": "btn_view_order", "title": "📦 ऑर्डर तपशील पहा", "nextNode": "node_order_details_link_mr" },
+        { "id": "btn_support", "title": "💬 सपोर्टशी संपर्क करा", "nextNode": "node_support_suggestion_mr" },
+        { "id": "btn_shop_more", "title": "🛍️ खरेदी सुरू ठेवा", "nextNode": "node_shop_more_link_mr" }
+      ]
+    },
+    "node_order_details_link_mr": {
+      "type": "interactive_button",
+      "text": "तुमच्या ऑर्डरची लिंक येथे आहे: 👉 https://newfashionbrand.example.com/orders/{order_id}",
+      "buttons": [
+        { "id": "btn_previous", "title": "🔙 मागील पाऊल", "nextNode": "node_order_confirmed_mr" },
+        { "id": "btn_main_menu", "title": "🏠 मुख्य मेनू", "nextNode": "node_main_menu_mr" }
+      ]
+    },
+    "node_shop_more_link_mr": {
+      "type": "interactive_button",
+      "text": "आमची स्टोअर लिंक येथे आहे: 👉 https://newfashionbrand.example.com",
+      "buttons": [
+        { "id": "btn_previous", "title": "🔙 मागील पाऊल", "nextNode": "node_order_confirmed_mr" },
+        { "id": "btn_main_menu", "title": "🏠 मुख्य मेनू", "nextNode": "node_main_menu_mr" }
+      ]
+    },
+    "node_order_dispatched_mr": {
+      "type": "interactive_button",
+      "text": "आनंदाची बातमी! तुमची ऑर्डर #{order_id} डिलिव्हरीसाठी निघाली आहे 🚚\nइथे लाइव्ह ट्रॅक करा 👉 {tracking_link}",
+      "buttons": [
+        { "id": "btn_support", "title": "💬 सपोर्टशी संपर्क करा", "nextNode": "node_support_suggestion_mr" },
+        { "id": "btn_main_menu", "title": "🏠 मुख्य मेनू", "nextNode": "node_main_menu_mr" }
+      ]
+    },
+    "node_order_delivered_mr": {
+      "type": "interactive_button",
+      "text": "तुमची ऑर्डर #{order_id} डिलिव्हर झाली आहे! 📦✅ तुम्ही तुमचा अनुभव कसा rate कराल?",
+      "buttons": [
+        { "id": "rating_good", "title": "😍 खूप आवडले", "nextNode": "node_feedback_thanks_mr" },
+        { "id": "rating_ok", "title": "🙂 ठीक होते", "nextNode": "node_feedback_thanks_mr" },
+        { "id": "rating_bad", "title": "😕 काही समस्या होती", "nextNode": "node_support_suggestion_mr" }
+      ]
+    },
+    "node_feedback_thanks_mr": {
+      "type": "interactive_button",
+      "text": "आमच्याकडून खरेदी केल्याबद्दल धन्यवाद! ✨ लवकरच पुन्हा भेटूया.",
+      "buttons": [
+        { "id": "btn_main_menu", "title": "🏠 मुख्य मेनू", "nextNode": "node_main_menu_mr" }
+      ]
+    },
+
+    "node_cart_reminder_en": {
+      "type": "interactive_button",
+      "text": "Hey! You left {item_name} (₹{item_price}) in your cart 👗\nComplete your order now and get {discount_code} for 5% off!",
+      "buttons": [
+        { "id": "btn_complete_order", "title": "🛒 Complete My Order", "nextNode": "node_cart_link_en" },
+        { "id": "btn_no_thanks", "title": "🙅 No Thanks", "nextNode": "node_cart_dismiss_en" }
+      ]
+    },
+    "node_cart_link_en": {
+      "type": "interactive_button",
+      "text": "Here is your cart link: 👉 {cart_link}",
+      "buttons": [
+        { "id": "btn_previous", "title": "🔙 Previous Step", "nextNode": "node_cart_reminder_en" },
+        { "id": "btn_main_menu", "title": "🏠 Main Menu", "nextNode": "node_main_menu_en" }
+      ]
+    },
+    "node_cart_dismiss_en": {
+      "type": "interactive_button",
+      "text": "No problem! Your cart will be saved in case you change your mind. 😊",
+      "buttons": [
+        { "id": "btn_main_menu", "title": "🏠 Main Menu", "nextNode": "node_main_menu_en" }
+      ]
+    },
+
+    "node_cart_reminder_hi": {
+      "type": "interactive_button",
+      "text": "अरे! आपने {item_name} (₹{item_price}) अपनी कार्ट में छोड़ दिया है 👗\nअभी ऑर्डर पूरा करें और पाएं {discount_code} पर 5% की छूट!",
+      "buttons": [
+        { "id": "btn_complete_order", "title": "🛒 ऑर्डर पूरा करें", "nextNode": "node_cart_link_hi" },
+        { "id": "btn_no_thanks", "title": "🙅 नहीं धन्यवाद", "nextNode": "node_cart_dismiss_hi" }
+      ]
+    },
+    "node_cart_link_hi": {
+      "type": "interactive_button",
+      "text": "आपकी कार्ट का लिंक यहाँ है: 👉 {cart_link}",
+      "buttons": [
+        { "id": "btn_previous", "title": "🔙 पिछला कदम", "nextNode": "node_cart_reminder_hi" },
+        { "id": "btn_main_menu", "title": "🏠 मुख्य मेनू", "nextNode": "node_main_menu_hi" }
+      ]
+    },
+    "node_cart_dismiss_hi": {
+      "type": "interactive_button",
+      "text": "कोई बात नहीं! आपकी कार्ट सुरक्षित रहेगी, जब चाहें ऑर्डर पूरा कर सकते हैं। 😊",
+      "buttons": [
+        { "id": "btn_main_menu", "title": "🏠 मुख्य मेनू", "nextNode": "node_main_menu_hi" }
+      ]
+    },
+
+    "node_cart_reminder_mr": {
+      "type": "interactive_button",
+      "text": "अरे! तुम्ही {item_name} (₹{item_price}) तुमच्या कार्टमध्ये सोडले आहे 👗\nआता ऑर्डर पूर्ण करा आणि मिळवा {discount_code} वर 5% सूट!",
+      "buttons": [
+        { "id": "btn_complete_order", "title": "🛒 ऑर्डर पूर्ण करा", "nextNode": "node_cart_link_mr" },
+        { "id": "btn_no_thanks", "title": "🙅 नको धन्यवाद", "nextNode": "node_cart_dismiss_mr" }
+      ]
+    },
+    "node_cart_link_mr": {
+      "type": "interactive_button",
+      "text": "तुमच्या कार्टची लिंक येथे आहे: 👉 {cart_link}",
+      "buttons": [
+        { "id": "btn_previous", "title": "🔙 मागील पाऊल", "nextNode": "node_cart_reminder_mr" },
+        { "id": "btn_main_menu", "title": "🏠 मुख्य मेनू", "nextNode": "node_main_menu_mr" }
+      ]
+    },
+    "node_cart_dismiss_mr": {
+      "type": "interactive_button",
+      "text": "हरकत नाही! तुमची कार्ट सुरक्षित राहील, तुम्ही कधीही ऑर्डर पूर्ण करू शकता. 😊",
+      "buttons": [
+        { "id": "btn_main_menu", "title": "🏠 मुख्य मेनू", "nextNode": "node_main_menu_mr" }
+      ]
+    }
+  }
+}

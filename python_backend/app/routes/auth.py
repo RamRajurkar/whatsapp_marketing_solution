@@ -68,9 +68,11 @@ async def registration_status():
 @limiter.limit("5/minute")
 async def register(request: Request, user_data: UserCreate):
     """Register a new user account (Only allowed if no user exists). Rate limited."""
-    existing_count = await db.db.users.count_documents({})
-    if existing_count > 0:
-        raise HTTPException(status_code=400, detail="Registration is disabled. A user is already registered.")
+    from app.config import settings
+    if settings.APP_MODE == "self_hosted":
+        existing_count = await db.db.users.count_documents({})
+        if existing_count > 0:
+            raise HTTPException(status_code=400, detail="Registration is disabled. A user is already registered.")
 
     existing = await db.db.users.find_one({"email": user_data.email})
     if existing:

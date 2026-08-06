@@ -32,6 +32,7 @@ class SendTemplateInConvoRequest(BaseModel):
     headerMediaUrl: Optional[str] = None             # URL for image/video/document headers
     headerMediaId: Optional[str] = None              # Media ID from WhatsApp API for image/video/document headers
     bodyParams: Optional[List[str]] = None           # Values for body variables {{1}}, {{2}}, etc.
+    buttonParams: Optional[List[str]] = None         # Values for button parameters (index-aligned with buttons array)
     carouselCards: Optional[List[dict]] = None       # Per-card params: {mediaUrl, bodyParams}
 
 
@@ -121,6 +122,24 @@ async def send_text(
     conversation = await db.db.conversations.find_one({"_id": ObjectId(conversation_id)})
     if not conversation:
         raise HTTPException(status_code=404, detail="Conversation not found")
+
+    # 24-hour customer service window check (Meta Policy Enforcement)
+    last_inbound = await db.db.messages.find_one(
+        {"conversationId": conversation_id, "direction": "inbound"},
+        sort=[("timestamp", -1)]
+    )
+    if not last_inbound:
+        raise HTTPException(
+            status_code=400,
+            detail="No customer inbound message found. You can only send template messages to initiate conversations."
+        )
+    last_inbound_time = last_inbound["timestamp"]
+    from datetime import timedelta
+    if _now() - last_inbound_time.replace(tzinfo=timezone.utc if last_inbound_time.tzinfo else None) > timedelta(hours=24):
+        raise HTTPException(
+            status_code=400,
+            detail="The 24-hour customer service window is closed. You can only send Meta-approved template messages outside this window."
+        )
 
     customer_phone = conversation["customerPhone"]
 
@@ -221,6 +240,24 @@ async def upload_and_send_media(
     conversation = await db.db.conversations.find_one({"_id": ObjectId(conversation_id)})
     if not conversation:
         raise HTTPException(status_code=404, detail="Conversation not found")
+
+    # 24-hour customer service window check (Meta Policy Enforcement)
+    last_inbound = await db.db.messages.find_one(
+        {"conversationId": conversation_id, "direction": "inbound"},
+        sort=[("timestamp", -1)]
+    )
+    if not last_inbound:
+        raise HTTPException(
+            status_code=400,
+            detail="No customer inbound message found. You can only send template messages to initiate conversations."
+        )
+    last_inbound_time = last_inbound["timestamp"]
+    from datetime import timedelta
+    if _now() - last_inbound_time.replace(tzinfo=timezone.utc if last_inbound_time.tzinfo else None) > timedelta(hours=24):
+        raise HTTPException(
+            status_code=400,
+            detail="The 24-hour customer service window is closed. You can only send Meta-approved template messages outside this window."
+        )
 
     customer_phone = conversation["customerPhone"]
     file_bytes = await file.read()
@@ -325,8 +362,13 @@ async def send_template_in_conversation(
 
     customer_phone = conversation["customerPhone"]
 
+    final_header_url = req.headerMediaUrl
+    final_header_id = req.headerMediaId
+
     if wa_token == "test_token":
         message_id = f"mock_tpl_{int(_now().timestamp())}"
+        status = "sent"
+        error_reason = None
     else:
         url     = f"https://graph.facebook.com/{settings.WA_API_VERSION}/{wa_phone_id}/messages"
         headers = {
@@ -338,44 +380,13 @@ async def send_template_in_conversation(
             "language": {"code": req.templateLanguage},
         }
 
-        # Handle local media URLs that Meta cannot download
-        final_header_url = req.headerMediaUrl
-        final_header_id = req.headerMediaId
-
-        if final_header_url and ("localhost" in final_header_url or "/uploads/" in final_header_url):
-            # It's a local file. We must upload it to Meta first to get a media_id
-            filename = final_header_url.split("/")[-1].split("?")[0]
-            local_path = os.path.join("uploads", "media", filename)
-            
-            if os.path.exists(local_path):
-                file_type, _ = mimetypes.guess_type(local_path)
-                file_type = file_type or "image/jpeg"
-                
-                with open(local_path, "rb") as f:
-                    file_bytes = f.read()
-                
-                # Compress image if too large for WhatsApp (5 MB limit)
-                file_bytes, filename, file_type = compress_image_bytes(file_bytes, filename, file_type)
-                
-                upload_url = f"https://graph.facebook.com/{settings.WA_API_VERSION}/{wa_phone_id}/media"
-                upload_files = {
-                    "file": (filename, file_bytes, file_type)
-                }
-                upload_data = {
-                    "messaging_product": "whatsapp"
-                }
-                upload_headers = {
-                    "Authorization": f"Bearer {wa_token}"
-                }
-                u_client = get_http_client()
-                u_resp = await u_client.post(upload_url, headers=upload_headers, data=upload_data, files=upload_files)
-                if u_resp.status_code in (200, 201):
-                    final_header_id = u_resp.json().get("id")
-                    final_header_url = None # Unset URL since we have ID
-                else:
-                    raise HTTPException(status_code=400, detail=f"Failed to auto-upload template media to WhatsApp: {u_resp.text}")
-            else:
-                raise HTTPException(status_code=400, detail=f"Local media file not found: {local_path}")
+        from app.utils.template_utils import process_header_media
+        final_header_url, final_header_id = await process_header_media(
+            header_media_url=req.headerMediaUrl,
+            header_media_id=req.headerMediaId,
+            wa_phone_id=wa_phone_id,
+            wa_token=wa_token,
+        )
 
         # Build components array for templates with media/variables/carousel
         if req.templateComponents:
@@ -385,6 +396,7 @@ async def send_template_in_conversation(
                 header_media_id=final_header_id,
                 body_params=req.bodyParams,
                 carousel_cards=req.carouselCards,
+                button_params=req.buttonParams,
             )
             if components:
                 template_payload["components"] = components
@@ -400,18 +412,38 @@ async def send_template_in_conversation(
         client = get_http_client()
         resp = await client.post(url, json=payload, headers=headers)
         if resp.status_code not in (200, 201):
-            raise HTTPException(status_code=400, detail=f"Failed to send template: {resp.text}")
-        message_id = resp.json().get("messages", [{}])[0].get("id", "unknown")
+            status = "failed"
+            message_id = "unknown"
+            try:
+                err_data = resp.json().get("error", {})
+                error_reason = err_data.get("message") or resp.text
+            except Exception:
+                error_reason = resp.text
+        else:
+            status = "sent"
+            error_reason = None
+            message_id = resp.json().get("messages", [{}])[0].get("id", "unknown")
 
     now          = _now()
     display_text = req.templateText if req.templateText else f"[Template: {req.templateName}]"
+    content_data = {
+        "text": display_text,
+        "templateName": req.templateName,
+        "templateLanguage": req.templateLanguage,
+        "headerMediaUrl": final_header_url,
+        "bodyParams": req.bodyParams or [],
+        "buttonParams": req.buttonParams or [],
+        "carouselCards": req.carouselCards or [],
+    }
+
     message_doc  = {
         "conversationId":    conversation_id,
         "whatsappMessageId": message_id,
         "direction":         "outbound",
         "type":              "template",
-        "content":           {"text": display_text, "templateName": req.templateName},
-        "status":            "sent",
+        "content":           content_data,
+        "status":            status,
+        "errorReason":       error_reason,
         "timestamp":         now,
         "createdAt":         now,
     }
@@ -427,4 +459,70 @@ async def send_template_in_conversation(
     await sio.emit("message:new",          emit_doc,                        room=conversation_id)
     await sio.emit("conversation:updated", {"conversationId": conversation_id})
 
+    if status == "failed":
+        raise HTTPException(status_code=400, detail=f"Failed to send template: {error_reason}")
+
     return message_doc
+
+
+@router.post("/{conversation_id}/messages/{message_id}/retry")
+async def retry_message(
+    conversation_id: str,
+    message_id: str,
+    current_user: dict = Depends(get_current_user),
+):
+    """Retry sending a failed message."""
+    wa_phone_id = current_user.get("waPhoneNumberId") or settings.WA_PHONE_NUMBER_ID
+    wa_token    = current_user.get("waAccessToken") or settings.WA_ACCESS_TOKEN
+
+    if not wa_phone_id or not wa_token:
+        raise HTTPException(status_code=400, detail="WhatsApp credentials not configured.")
+
+    conversation = await db.db.conversations.find_one({"_id": ObjectId(conversation_id)})
+    if not conversation:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+
+    message = await db.db.messages.find_one({"_id": ObjectId(message_id), "conversationId": conversation_id})
+    if not message:
+        raise HTTPException(status_code=404, detail="Message not found")
+
+    customer_phone = conversation["customerPhone"]
+
+    if message.get("type") == "text":
+        text_content = message.get("content", {}).get("text", "")
+        if not text_content:
+            raise HTTPException(status_code=400, detail="Message content empty")
+
+        url = f"https://graph.facebook.com/{settings.WA_API_VERSION}/{wa_phone_id}/messages"
+        headers = {"Authorization": f"Bearer {wa_token}", "Content-Type": "application/json"}
+        payload = {
+            "messaging_product": "whatsapp",
+            "recipient_type": "individual",
+            "to": customer_phone,
+            "type": "text",
+            "text": {"preview_url": False, "body": text_content},
+        }
+        client = get_http_client()
+        resp = await client.post(url, json=payload, headers=headers)
+        if resp.status_code not in (200, 201):
+            detail_err = resp.json().get("error", {}).get("message", resp.text)
+            await db.db.messages.update_one(
+                {"_id": ObjectId(message_id)},
+                {"$set": {"status": "failed", "errorReason": detail_err, "updatedAt": _now()}}
+            )
+            raise HTTPException(status_code=400, detail=f"Failed to retry message: {detail_err}")
+        
+        new_wa_id = resp.json().get("messages", [{}])[0].get("id", "unknown")
+        now = _now()
+        await db.db.messages.update_one(
+            {"_id": ObjectId(message_id)},
+            {"$set": {"whatsappMessageId": new_wa_id, "status": "sent", "errorReason": None, "updatedAt": now}}
+        )
+        updated_doc = await db.db.messages.find_one({"_id": ObjectId(message_id)})
+        updated_doc["_id"] = str(updated_doc["_id"])
+        emit_doc = {**updated_doc, "timestamp": updated_doc["timestamp"].isoformat(), "createdAt": updated_doc["createdAt"].isoformat()}
+        await sio.emit("message:status", emit_doc, room=conversation_id)
+        return updated_doc
+    else:
+        raise HTTPException(status_code=400, detail="Retrying this message type directly is not supported. Please use the template modal.")
+

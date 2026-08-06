@@ -1,0 +1,5 @@
+phone,customer_name,product_name,discount,coupon_code,checkout_link,brand_name,button_url_suffix
+918625067058,Ram Rajurkar,Leather Jacket,20,SAVE20,cart?item=jacket,Rathod Creation,cart?coupon=SAVE20
+917020534012,Shree,Leather Jacket,20,SAVE20,cart?item=jacket,Rathod Creation,cart?coupon=SAVE20
+918275169106,Mohan Mahajan,Leather Jacket,20,SAVE20,cart?item=jacket,Rathod Creation,cart?coupon=SAVE20
+917447875452,Prathamesh,Leather Jacket,20,SAVE20,cart?item=jacket,Rathod Creation,cart?coupon=SAVE20

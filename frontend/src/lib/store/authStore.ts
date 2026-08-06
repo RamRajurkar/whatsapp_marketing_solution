@@ -46,6 +46,19 @@ export const useAuthStore = create<AuthStore>()(
       },
       isAuthenticated: () => !!get().token,
     }),
-    { name: 'wa_auth' }
+    {
+      name: 'wa_auth',
+      onRehydrateStorage: () => {
+        return (state, error) => {
+          if (!error && state) {
+            if (state.token) {
+              setCookie('wa_token', state.token);
+            } else {
+              deleteCookie('wa_token');
+            }
+          }
+        };
+      },
+    }
   )
 );
