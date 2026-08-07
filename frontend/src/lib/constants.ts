@@ -1,22 +1,22 @@
 /**
  * Application constants
  */
-export const APP_NAME = 'RestoChat';
-export const APP_TAGLINE = 'Restaurant WhatsApp Manager';
+export const APP_NAME = 'BlackAngler WA';
+export const APP_TAGLINE = 'WhatsApp Wholesale & Marketing Platform';
 
 /**
  * Impact lines that rotate on the login page background,
  * showcasing the product's business value.
  */
 export const IMPACT_LINES = [
-  'Automate customer engagement via WhatsApp',
-  'Increase repeat orders by 40% with targeted broadcasts',
-  'Manage reservations and orders in real-time',
+  'Automate wholesale customer engagement via WhatsApp',
+  'Increase B2B repeat orders with targeted catalog broadcasts',
+  'Manage wholesale inquiries and leads in real-time',
   'Reduce response time to under 2 minutes',
-  'Drive revenue with personalized marketing campaigns',
+  'Drive revenue with personalized wholesale campaigns',
   'Track performance with powerful analytics dashboards',
   'Streamline operations with smart automation workflows',
-  'Build lasting customer relationships at scale',
+  'Build lasting wholesale customer relationships at scale',
 ];
 
 /**

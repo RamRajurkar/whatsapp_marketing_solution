@@ -36,6 +36,7 @@ class SendTemplateInConvoRequest(BaseModel):
     carouselCards: Optional[List[dict]] = None       # Per-card params: {mediaUrl, bodyParams}
 
 
+@router.get("")
 @router.get("/")
 async def get_conversations(
     search: Optional[str] = "",
@@ -324,6 +325,104 @@ async def upload_and_send_media(
         "direction":         "outbound",
         "type":              wa_media_type,
         "content":           {"text": display_text, "filename": filename, "mimeType": file_type},
+        "status":            "sent",
+        "timestamp":         now,
+        "createdAt":         now,
+    }
+    result = await db.db.messages.insert_one(message_doc)
+    message_doc["_id"] = str(result.inserted_id)
+
+    await db.db.conversations.update_one(
+        {"_id": ObjectId(conversation_id)},
+        {"$set": {"lastMessage": display_text, "lastMessageTime": now, "updatedAt": now}},
+    )
+
+    emit_doc = {**message_doc, "timestamp": now.isoformat(), "createdAt": now.isoformat()}
+    await sio.emit("message:new",          emit_doc,                        room=conversation_id)
+    await sio.emit("conversation:updated", {"conversationId": conversation_id})
+
+    return message_doc
+
+
+@router.post("/{conversation_id}/send-catalog-asset/{asset_id}")
+async def send_catalog_asset(
+    conversation_id: str,
+    asset_id: str,
+    current_user: dict = Depends(get_current_user),
+):
+    """Send an uploaded catalog/price list asset directly into a WhatsApp conversation."""
+    wa_phone_id = current_user.get("waPhoneNumberId") or settings.WA_PHONE_NUMBER_ID
+    wa_token    = current_user.get("waAccessToken") or settings.WA_ACCESS_TOKEN
+
+    if not wa_phone_id or not wa_token:
+        raise HTTPException(status_code=400, detail="WhatsApp credentials not configured.")
+
+    conversation = await db.db.conversations.find_one({"_id": ObjectId(conversation_id)})
+    if not conversation:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+
+    asset = await db.db.menu_assets.find_one({"_id": ObjectId(asset_id)})
+    if not asset:
+        raise HTTPException(status_code=404, detail="Catalog asset not found")
+
+    relative_url = asset["url"]
+    file_path = relative_url.lstrip("/")
+    if not os.path.exists(file_path):
+        raise HTTPException(status_code=404, detail=f"Catalog file not found on disk: {file_path}")
+
+    with open(file_path, "rb") as f:
+        file_bytes = f.read()
+
+    filename = asset.get("name", "Catalog.pdf")
+    mime_type = asset.get("mimeType", "application/pdf")
+    wa_media_type = "image" if asset.get("type") == "image" or mime_type.startswith("image/") else "document"
+
+    customer_phone = conversation["customerPhone"]
+    now = _now()
+
+    if wa_token == "test_token":
+        message_id = f"mock_cat_{int(now.timestamp())}"
+    else:
+        upload_url = f"https://graph.facebook.com/{settings.WA_API_VERSION}/{wa_phone_id}/media"
+        upload_headers = {"Authorization": f"Bearer {wa_token}"}
+        upload_files = {"file": (filename, file_bytes, mime_type)}
+        upload_data = {"messaging_product": "whatsapp"}
+
+        client = get_http_client()
+        upload_resp = await client.post(upload_url, headers=upload_headers, data=upload_data, files=upload_files)
+        if upload_resp.status_code not in (200, 201):
+            raise HTTPException(status_code=400, detail=f"Failed to upload media to WhatsApp: {upload_resp.text}")
+        media_id = upload_resp.json().get("id")
+
+        send_url = f"https://graph.facebook.com/{settings.WA_API_VERSION}/{wa_phone_id}/messages"
+        send_headers = {
+            "Authorization": f"Bearer {wa_token}",
+            "Content-Type": "application/json",
+        }
+        media_obj = {"id": media_id, "caption": f"📖 {filename}"}
+        if wa_media_type == "document":
+            media_obj["filename"] = filename
+
+        send_payload = {
+            "messaging_product": "whatsapp",
+            "recipient_type": "individual",
+            "to": customer_phone,
+            "type": wa_media_type,
+            wa_media_type: media_obj,
+        }
+
+        resp = await client.post(send_url, json=send_payload, headers=send_headers)
+        if resp.status_code not in (200, 201):
+            raise HTTPException(status_code=400, detail=f"Failed to send catalog: {resp.text}")
+        message_id = resp.json().get("messages", [{}])[0].get("id", "unknown")
+
+    display_text = f"📖 Catalog: {filename}"
+    message_doc = {
+        "conversationId":    conversation_id,
+        "whatsappMessageId": message_id,
+        "direction":         "outbound",
+        "type":              wa_media_type,
+        "content":           {"text": display_text, "filename": filename, "mimeType": mime_type, "mediaUrl": asset.get("url")},
         "status":            "sent",
         "timestamp":         now,
         "createdAt":         now,

@@ -7,7 +7,7 @@ def get_http_client() -> httpx.AsyncClient:
     global _client
     if _client is None:
         _client = httpx.AsyncClient(
-            timeout=30.0,
+            timeout=httpx.Timeout(connect=60.0, read=180.0, write=180.0, pool=60.0),
             limits=httpx.Limits(max_connections=50, max_keepalive_connections=20)
         )
     return _client

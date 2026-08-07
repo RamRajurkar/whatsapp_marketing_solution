@@ -2,29 +2,59 @@
   "flowId": "rathod_wholesale_flow",
   "startNode": "node_language",
   "nodes": {
-
     "node_language": {
       "type": "interactive_button",
-      "text": "Welcome to Rathod Creation! 🧵\nPlease choose your preferred language to continue / अपनी भाषा चुनें / आपली भाषा निवडा:\n\n(Type 'stop' anytime to end conversation)",
+      "text": "Welcome to Rathod Creation! \ud83e\uddf5\nPlease choose your preferred language to continue / \u0905\u092a\u0928\u0940 \u092d\u093e\u0937\u093e \u091a\u0941\u0928\u0947\u0902 / \u0906\u092a\u0932\u0940 \u092d\u093e\u0937\u093e \u0928\u093f\u0935\u0921\u093e:\n\n(Type 'stop' anytime to end conversation)",
       "buttons": [
-        { "id": "lang_en", "title": "English", "nextNode": "node_welcome_en" },
-        { "id": "lang_hi", "title": "हिंदी", "nextNode": "node_welcome_hi" },
-        { "id": "lang_mr", "title": "मराठी", "nextNode": "node_welcome_mr" }
+        {
+          "id": "lang_en",
+          "title": "English",
+          "nextNode": "node_welcome_en"
+        },
+        {
+          "id": "lang_hi",
+          "title": "\u0939\u093f\u0902\u0926\u0940",
+          "nextNode": "node_welcome_hi"
+        },
+        {
+          "id": "lang_mr",
+          "title": "\u092e\u0930\u093e\u0920\u0940",
+          "nextNode": "node_welcome_mr"
+        }
       ]
     },
-
     "node_welcome_en": {
       "type": "interactive_list",
-      "text": "Welcome to Rathod Creation Wholesale! 🧵\nHow can we help you today? Please select an option from the menu below:\n\n(Type 'stop' anytime to end conversation)",
+      "text": "Welcome to Rathod Creation Wholesale! \ud83e\uddf5\nHow can we help you today? Please select an option from the menu below:\n\n(Type 'stop' anytime to end conversation)",
       "buttonText": "Select Option",
       "sections": [
         {
           "title": "Select Option",
           "rows": [
-            { "id": "btn_catalog", "title": "🛍️ View Catalog", "description": "Browse our products and designs", "nextNode": "node_catalog_en" },
-            { "id": "btn_enquiry", "title": "📦 Product Enquiry", "description": "Enquire about wholesale orders", "nextNode": "node_enquiry_start_en" },
-            { "id": "btn_owner", "title": "💬 Talk to Our Team", "description": "Chat with our customer support team", "nextNode": "node_talk_owner_en" },
-            { "id": "btn_previous", "title": "🔙 Previous Step", "description": "Go back to language choice", "nextNode": "node_language" }
+            {
+              "id": "btn_catalog",
+              "title": "\ud83d\udecd\ufe0f View Catalog",
+              "description": "Browse our products and designs",
+              "nextNode": "node_catalog_en"
+            },
+            {
+              "id": "btn_enquiry",
+              "title": "\ud83d\udce6 Product Enquiry",
+              "description": "Enquire about wholesale orders",
+              "nextNode": "node_enquiry_start_en"
+            },
+            {
+              "id": "btn_owner",
+              "title": "\ud83d\udcac Talk to Our Team",
+              "description": "Chat with our customer support team",
+              "nextNode": "node_talk_owner_en"
+            },
+            {
+              "id": "btn_previous",
+              "title": "\ud83d\udd19 Previous Step",
+              "description": "Go back to language choice",
+              "nextNode": "node_language"
+            }
           ]
         }
       ]
@@ -37,10 +67,30 @@
         {
           "title": "Options",
           "rows": [
-            { "id": "btn_full_catalog", "title": "📖 Full Catalog", "description": "View all collections at once", "nextNode": "node_cat_full_en" },
-            { "id": "btn_by_category", "title": "🗂️ Browse Category", "description": "Filter collections by item type", "nextNode": "node_catalog_categories_en" },
-            { "id": "btn_previous", "title": "🔙 Previous Step", "description": "Return to main welcome menu", "nextNode": "node_welcome_en" },
-            { "id": "btn_main_menu", "title": "🏠 Main Menu", "description": "Go to home screen", "nextNode": "node_welcome_en" }
+            {
+              "id": "btn_full_catalog",
+              "title": "\ud83d\udcd6 Full Catalog",
+              "description": "View all collections at once",
+              "nextNode": "node_cat_full_en"
+            },
+            {
+              "id": "btn_by_category",
+              "title": "\ud83d\uddc2\ufe0f Browse Category",
+              "description": "Filter collections by item type",
+              "nextNode": "node_catalog_categories_en"
+            },
+            {
+              "id": "btn_previous",
+              "title": "\ud83d\udd19 Previous Step",
+              "description": "Return to main welcome menu",
+              "nextNode": "node_welcome_en"
+            },
+            {
+              "id": "btn_main_menu",
+              "title": "\ud83c\udfe0 Main Menu",
+              "description": "Go to home screen",
+              "nextNode": "node_welcome_en"
+            }
           ]
         }
       ]
@@ -53,64 +103,139 @@
         {
           "title": "Main Categories",
           "rows": [
-            { "id": "btn_sarees", "title": "🥻 Sarees", "description": "Browse our sarees collection", "nextNode": "node_cat_sarees_en" },
-            { "id": "btn_kurtis", "title": "👚 Kurtis", "description": "Browse our kurtis collection", "nextNode": "node_cat_kurtis_en" },
-            { "id": "btn_lehengas", "title": "✨ Lehengas", "description": "Browse our lehengas collection", "nextNode": "node_cat_lehengas_en" },
-            { "id": "btn_new_arrivals", "title": "🆕 New Arrivals", "description": "Browse our latest new arrivals", "nextNode": "node_cat_newarrivals_en" },
-            { "id": "btn_full_catalog", "title": "📖 Full Catalog", "description": "Complete collection directory", "nextNode": "node_cat_full_en" },
-            { "id": "btn_previous", "title": "🔙 Previous Step", "description": "Go back to catalog menu", "nextNode": "node_catalog_en" },
-            { "id": "btn_main_menu", "title": "🏠 Main Menu", "description": "Go to home screen", "nextNode": "node_welcome_en" }
+            {
+              "id": "btn_sarees",
+              "title": "\ud83e\udd7b Sarees",
+              "description": "Browse our sarees collection",
+              "nextNode": "node_cat_sarees_en"
+            },
+            {
+              "id": "btn_kurtis",
+              "title": "\ud83d\udc5a Kurtis",
+              "description": "Browse our kurtis collection",
+              "nextNode": "node_cat_kurtis_en"
+            },
+            {
+              "id": "btn_lehengas",
+              "title": "\u2728 Lehengas",
+              "description": "Browse our lehengas collection",
+              "nextNode": "node_cat_lehengas_en"
+            },
+            {
+              "id": "btn_new_arrivals",
+              "title": "\ud83c\udd95 New Arrivals",
+              "description": "Browse our latest new arrivals",
+              "nextNode": "node_cat_newarrivals_en"
+            },
+            {
+              "id": "btn_full_catalog",
+              "title": "\ud83d\udcd6 Full Catalog",
+              "description": "Complete collection directory",
+              "nextNode": "node_cat_full_en"
+            },
+            {
+              "id": "btn_previous",
+              "title": "\ud83d\udd19 Previous Step",
+              "description": "Go back to catalog menu",
+              "nextNode": "node_catalog_en"
+            },
+            {
+              "id": "btn_main_menu",
+              "title": "\ud83c\udfe0 Main Menu",
+              "description": "Go to home screen",
+              "nextNode": "node_welcome_en"
+            }
           ]
         }
       ]
     },
     "node_cat_full_en": {
       "type": "interactive_button",
-      "text": "Here is our complete product catalog: 📖\n👉 https://rathodwholesale.example.com/catalog/full",
+      "text": "Here is our complete product catalog: \ud83d\udcd6\n\ud83d\udc49 https://rathodwholesale.example.com/catalog/full",
       "buttons": [
-        { "id": "btn_previous", "title": "🔙 Previous Step", "nextNode": "node_catalog_en" },
-        { "id": "btn_main_menu", "title": "🏠 Main Menu", "nextNode": "node_welcome_en" }
+        {
+          "id": "btn_previous",
+          "title": "\ud83d\udd19 Previous Step",
+          "nextNode": "node_catalog_en"
+        },
+        {
+          "id": "btn_main_menu",
+          "title": "\ud83c\udfe0 Main Menu",
+          "nextNode": "node_welcome_en"
+        }
       ]
     },
     "node_cat_sarees_en": {
       "type": "interactive_button",
-      "text": "Here is our sarees collection: 🥻\n👉 https://rathodwholesale.example.com/catalog/sarees",
+      "text": "Here is our sarees collection: \ud83e\udd7b\n\ud83d\udc49 https://rathodwholesale.example.com/catalog/sarees",
       "buttons": [
-        { "id": "btn_previous", "title": "🔙 Previous Step", "nextNode": "node_catalog_categories_en" },
-        { "id": "btn_main_menu", "title": "🏠 Main Menu", "nextNode": "node_welcome_en" }
+        {
+          "id": "btn_previous",
+          "title": "\ud83d\udd19 Previous Step",
+          "nextNode": "node_catalog_categories_en"
+        },
+        {
+          "id": "btn_main_menu",
+          "title": "\ud83c\udfe0 Main Menu",
+          "nextNode": "node_welcome_en"
+        }
       ]
     },
     "node_cat_kurtis_en": {
       "type": "interactive_button",
-      "text": "Here is our kurtis collection: 👚\n👉 https://rathodwholesale.example.com/catalog/kurtis",
+      "text": "Here is our kurtis collection: \ud83d\udc5a\n\ud83d\udc49 https://rathodwholesale.example.com/catalog/kurtis",
       "buttons": [
-        { "id": "btn_previous", "title": "🔙 Previous Step", "nextNode": "node_catalog_categories_en" },
-        { "id": "btn_main_menu", "title": "🏠 Main Menu", "nextNode": "node_welcome_en" }
+        {
+          "id": "btn_previous",
+          "title": "\ud83d\udd19 Previous Step",
+          "nextNode": "node_catalog_categories_en"
+        },
+        {
+          "id": "btn_main_menu",
+          "title": "\ud83c\udfe0 Main Menu",
+          "nextNode": "node_welcome_en"
+        }
       ]
     },
     "node_cat_lehengas_en": {
       "type": "interactive_button",
-      "text": "Here is our lehengas collection: ✨\n👉 https://rathodwholesale.example.com/catalog/lehengas",
+      "text": "Here is our lehengas collection: \u2728\n\ud83d\udc49 https://rathodwholesale.example.com/catalog/lehengas",
       "buttons": [
-        { "id": "btn_previous", "title": "🔙 Previous Step", "nextNode": "node_catalog_categories_en" },
-        { "id": "btn_main_menu", "title": "🏠 Main Menu", "nextNode": "node_welcome_en" }
+        {
+          "id": "btn_previous",
+          "title": "\ud83d\udd19 Previous Step",
+          "nextNode": "node_catalog_categories_en"
+        },
+        {
+          "id": "btn_main_menu",
+          "title": "\ud83c\udfe0 Main Menu",
+          "nextNode": "node_welcome_en"
+        }
       ]
     },
     "node_cat_newarrivals_en": {
       "type": "interactive_button",
-      "text": "Check out our latest new arrivals: 🆕\n👉 https://rathodwholesale.example.com/catalog/new-arrivals",
+      "text": "Check out our latest new arrivals: \ud83c\udd95\n\ud83d\udc49 https://rathodwholesale.example.com/catalog/new-arrivals",
       "buttons": [
-        { "id": "btn_previous", "title": "🔙 Previous Step", "nextNode": "node_catalog_categories_en" },
-        { "id": "btn_main_menu", "title": "🏠 Main Menu", "nextNode": "node_welcome_en" }
+        {
+          "id": "btn_previous",
+          "title": "\ud83d\udd19 Previous Step",
+          "nextNode": "node_catalog_categories_en"
+        },
+        {
+          "id": "btn_main_menu",
+          "title": "\ud83c\udfe0 Main Menu",
+          "nextNode": "node_welcome_en"
+        }
       ]
     },
     "node_enquiry_start_en": {
       "type": "collect_input",
-      "text": "Please share the product name or style code of the item you want to enquire about: 📝\n\n(Type MENU anytime to go back to the main menu)",
+      "text": "Please share the product name or style code of the item you want to enquire about: \ud83d\udcdd\n\n(Type MENU anytime to go back to the main menu)",
       "saveContextKey": "product_query",
       "validation": {
         "type": "text",
-        "errorMessage": "❌ Please share a product name or style code so we can help you."
+        "errorMessage": "\u274c Please share a product name or style code so we can help you."
       },
       "nextNode": "node_enquiry_qty_en"
     },
@@ -122,338 +247,747 @@
         {
           "title": "Quantity Ranges",
           "rows": [
-            { "id": "qty_5_10", "title": "5-10 pieces", "nextNode": "node_enquiry_confirm_en" },
-            { "id": "qty_10_20", "title": "10-20 pieces", "nextNode": "node_enquiry_confirm_en" },
-            { "id": "qty_20_plus", "title": "20+ pieces", "nextNode": "node_enquiry_confirm_en" },
-            { "id": "btn_previous", "title": "🔙 Previous Step", "nextNode": "node_enquiry_start_en" },
-            { "id": "btn_main_menu", "title": "🏠 Main Menu", "nextNode": "node_welcome_en" }
+            {
+              "id": "qty_5_10",
+              "title": "5-10 pieces",
+              "nextNode": "node_enquiry_comments_prompt"
+            },
+            {
+              "id": "qty_10_20",
+              "title": "10-20 pieces",
+              "nextNode": "node_enquiry_comments_prompt"
+            },
+            {
+              "id": "qty_20_plus",
+              "title": "20+ pieces",
+              "nextNode": "node_enquiry_comments_prompt"
+            },
+            {
+              "id": "btn_previous",
+              "title": "\ud83d\udd19 Previous Step",
+              "nextNode": "node_enquiry_start_en"
+            },
+            {
+              "id": "btn_main_menu",
+              "title": "\ud83c\udfe0 Main Menu",
+              "nextNode": "node_welcome_en"
+            }
           ]
         }
       ]
     },
     "node_enquiry_confirm_en": {
       "type": "interactive_button",
-      "text": "Thank you. We have received your enquiry for *{product_query}*. Our team will contact you shortly on this number with pricing details! 📞",
+      "text": "Thank you. We have received your enquiry for *{product_query}*. Our team will contact you shortly on this number with pricing details! \ud83d\udcde",
       "buttons": [
-        { "id": "btn_another_product", "title": "📦 Enquire Product", "nextNode": "node_enquiry_start_en" },
-        { "id": "btn_previous", "title": "🔙 Previous Step", "nextNode": "node_enquiry_start_en" },
-        { "id": "btn_main_menu", "title": "🏠 Main Menu", "nextNode": "node_welcome_en" }
+        {
+          "id": "btn_another_product",
+          "title": "\ud83d\udce6 Enquire Product",
+          "nextNode": "node_enquiry_start_en"
+        },
+        {
+          "id": "btn_previous",
+          "title": "\ud83d\udd19 Previous Step",
+          "nextNode": "node_enquiry_start_en"
+        },
+        {
+          "id": "btn_main_menu",
+          "title": "\ud83c\udfe0 Main Menu",
+          "nextNode": "node_welcome_en"
+        }
       ]
     },
     "node_talk_owner_en": {
       "type": "interactive_button",
-      "text": "Connecting you to our customer support team now. Someone will respond to you here shortly! 📞",
+      "text": "Connecting you to our customer support team now. Someone will respond to you here shortly! \ud83d\udcde",
       "buttons": [
-        { "id": "btn_browse_meanwhile", "title": "🛍️ Browse Catalog", "nextNode": "node_catalog_en" },
-        { "id": "btn_previous", "title": "🔙 Previous Step", "nextNode": "node_welcome_en" },
-        { "id": "btn_main_menu", "title": "🏠 Main Menu", "nextNode": "node_welcome_en" }
+        {
+          "id": "btn_browse_meanwhile",
+          "title": "\ud83d\udecd\ufe0f Browse Catalog",
+          "nextNode": "node_catalog_en"
+        },
+        {
+          "id": "btn_previous",
+          "title": "\ud83d\udd19 Previous Step",
+          "nextNode": "node_welcome_en"
+        },
+        {
+          "id": "btn_main_menu",
+          "title": "\ud83c\udfe0 Main Menu",
+          "nextNode": "node_welcome_en"
+        }
       ]
     },
-
     "node_welcome_hi": {
       "type": "interactive_list",
-      "text": "राठौड़ क्रिएशन होलसेल में आपका स्वागत है! 🧵\nहम आपकी किस प्रकार सहायता कर सकते हैं? कृपया नीचे दिए गए मेनू से एक विकल्प चुनें:\n\n(बातचीत समाप्त करने के लिए किसी भी समय 'stop' टाइप करें)",
-      "buttonText": "विकल्प चुनें",
+      "text": "\u0930\u093e\u0920\u094c\u0921\u093c \u0915\u094d\u0930\u093f\u090f\u0936\u0928 \u0939\u094b\u0932\u0938\u0947\u0932 \u092e\u0947\u0902 \u0906\u092a\u0915\u093e \u0938\u094d\u0935\u093e\u0917\u0924 \u0939\u0948! \ud83e\uddf5\n\u0939\u092e \u0906\u092a\u0915\u0940 \u0915\u093f\u0938 \u092a\u094d\u0930\u0915\u093e\u0930 \u0938\u0939\u093e\u092f\u0924\u093e \u0915\u0930 \u0938\u0915\u0924\u0947 \u0939\u0948\u0902? \u0915\u0943\u092a\u092f\u093e \u0928\u0940\u091a\u0947 \u0926\u093f\u090f \u0917\u090f \u092e\u0947\u0928\u0942 \u0938\u0947 \u090f\u0915 \u0935\u093f\u0915\u0932\u094d\u092a \u091a\u0941\u0928\u0947\u0902:\n\n(\u092c\u093e\u0924\u091a\u0940\u0924 \u0938\u092e\u093e\u092a\u094d\u0924 \u0915\u0930\u0928\u0947 \u0915\u0947 \u0932\u093f\u090f \u0915\u093f\u0938\u0940 \u092d\u0940 \u0938\u092e\u092f 'stop' \u091f\u093e\u0907\u092a \u0915\u0930\u0947\u0902)",
+      "buttonText": "\u0935\u093f\u0915\u0932\u094d\u092a \u091a\u0941\u0928\u0947\u0902",
       "sections": [
         {
-          "title": "विकल्प",
+          "title": "\u0935\u093f\u0915\u0932\u094d\u092a",
           "rows": [
-            { "id": "btn_catalog", "title": "🛍️ कैटलॉग देखें", "description": "हमारे संग्रहों को ब्राउज़ करें", "nextNode": "node_catalog_hi" },
-            { "id": "btn_enquiry", "title": "📦 प्रोडक्ट पूछताछ", "description": "थोक ऑर्डर के बारे में पूछें", "nextNode": "node_enquiry_start_hi" },
-            { "id": "btn_owner", "title": "💬 टीम से बात करें", "description": "हमारे ग्राहक सहायता से चैट करें", "nextNode": "node_talk_owner_hi" },
-            { "id": "btn_previous", "title": "🔙 पिछला कदम", "description": "भाषा चयन पर वापस जाएं", "nextNode": "node_language" }
+            {
+              "id": "btn_catalog",
+              "title": "\ud83d\udecd\ufe0f \u0915\u0948\u091f\u0932\u0949\u0917 \u0926\u0947\u0916\u0947\u0902",
+              "description": "\u0939\u092e\u093e\u0930\u0947 \u0938\u0902\u0917\u094d\u0930\u0939\u094b\u0902 \u0915\u094b \u092c\u094d\u0930\u093e\u0909\u091c\u093c \u0915\u0930\u0947\u0902",
+              "nextNode": "node_catalog_hi"
+            },
+            {
+              "id": "btn_enquiry",
+              "title": "\ud83d\udce6 \u092a\u094d\u0930\u094b\u0921\u0915\u094d\u091f \u092a\u0942\u091b\u0924\u093e\u091b",
+              "description": "\u0925\u094b\u0915 \u0911\u0930\u094d\u0921\u0930 \u0915\u0947 \u092c\u093e\u0930\u0947 \u092e\u0947\u0902 \u092a\u0942\u091b\u0947\u0902",
+              "nextNode": "node_enquiry_start_hi"
+            },
+            {
+              "id": "btn_owner",
+              "title": "\ud83d\udcac \u091f\u0940\u092e \u0938\u0947 \u092c\u093e\u0924 \u0915\u0930\u0947\u0902",
+              "description": "\u0939\u092e\u093e\u0930\u0947 \u0917\u094d\u0930\u093e\u0939\u0915 \u0938\u0939\u093e\u092f\u0924\u093e \u0938\u0947 \u091a\u0948\u091f \u0915\u0930\u0947\u0902",
+              "nextNode": "node_talk_owner_hi"
+            },
+            {
+              "id": "btn_previous",
+              "title": "\ud83d\udd19 \u092a\u093f\u091b\u0932\u093e \u0915\u0926\u092e",
+              "description": "\u092d\u093e\u0937\u093e \u091a\u092f\u0928 \u092a\u0930 \u0935\u093e\u092a\u0938 \u091c\u093e\u090f\u0902",
+              "nextNode": "node_language"
+            }
           ]
         }
       ]
     },
     "node_catalog_hi": {
       "type": "interactive_list",
-      "text": "आप हमारे कैटलॉग को कैसे देखना पसंद करेंगे?",
-      "buttonText": "कैटलॉग देखें",
+      "text": "\u0906\u092a \u0939\u092e\u093e\u0930\u0947 \u0915\u0948\u091f\u0932\u0949\u0917 \u0915\u094b \u0915\u0948\u0938\u0947 \u0926\u0947\u0916\u0928\u093e \u092a\u0938\u0902\u0926 \u0915\u0930\u0947\u0902\u0917\u0947?",
+      "buttonText": "\u0915\u0948\u091f\u0932\u0949\u0917 \u0926\u0947\u0916\u0947\u0902",
       "sections": [
         {
-          "title": "विकल्प",
+          "title": "\u0935\u093f\u0915\u0932\u094d\u092a",
           "rows": [
-            { "id": "btn_full_catalog", "title": "📖 पूरा कैटलॉग", "description": "हमारा संपूर्ण लुकबुक देखें", "nextNode": "node_cat_full_hi" },
-            { "id": "btn_by_category", "title": "🗂️ श्रेणी अनुसार", "description": "आइटम प्रकार द्वारा फ़िल्टर करें", "nextNode": "node_catalog_categories_hi" },
-            { "id": "btn_previous", "title": "🔙 पिछला कदम", "description": "मुख्य मेनू पर वापस जाएं", "nextNode": "node_welcome_hi" },
-            { "id": "btn_main_menu", "title": "🏠 मुख्य मेनू", "description": "होम स्क्रीन पर जाएं", "nextNode": "node_welcome_hi" }
+            {
+              "id": "btn_full_catalog",
+              "title": "\ud83d\udcd6 \u092a\u0942\u0930\u093e \u0915\u0948\u091f\u0932\u0949\u0917",
+              "description": "\u0939\u092e\u093e\u0930\u093e \u0938\u0902\u092a\u0942\u0930\u094d\u0923 \u0932\u0941\u0915\u092c\u0941\u0915 \u0926\u0947\u0916\u0947\u0902",
+              "nextNode": "node_cat_full_hi"
+            },
+            {
+              "id": "btn_by_category",
+              "title": "\ud83d\uddc2\ufe0f \u0936\u094d\u0930\u0947\u0923\u0940 \u0905\u0928\u0941\u0938\u093e\u0930",
+              "description": "\u0906\u0907\u091f\u092e \u092a\u094d\u0930\u0915\u093e\u0930 \u0926\u094d\u0935\u093e\u0930\u093e \u092b\u093c\u093f\u0932\u094d\u091f\u0930 \u0915\u0930\u0947\u0902",
+              "nextNode": "node_catalog_categories_hi"
+            },
+            {
+              "id": "btn_previous",
+              "title": "\ud83d\udd19 \u092a\u093f\u091b\u0932\u093e \u0915\u0926\u092e",
+              "description": "\u092e\u0941\u0916\u094d\u092f \u092e\u0947\u0928\u0942 \u092a\u0930 \u0935\u093e\u092a\u0938 \u091c\u093e\u090f\u0902",
+              "nextNode": "node_welcome_hi"
+            },
+            {
+              "id": "btn_main_menu",
+              "title": "\ud83c\udfe0 \u092e\u0941\u0916\u094d\u092f \u092e\u0947\u0928\u0942",
+              "description": "\u0939\u094b\u092e \u0938\u094d\u0915\u094d\u0930\u0940\u0928 \u092a\u0930 \u091c\u093e\u090f\u0902",
+              "nextNode": "node_welcome_hi"
+            }
           ]
         }
       ]
     },
     "node_catalog_categories_hi": {
       "type": "interactive_list",
-      "text": "कृपया नीचे दिए गए विकल्पों में से एक श्रेणी चुनें:",
-      "buttonText": "श्रेणी चुनें",
+      "text": "\u0915\u0943\u092a\u092f\u093e \u0928\u0940\u091a\u0947 \u0926\u093f\u090f \u0917\u090f \u0935\u093f\u0915\u0932\u094d\u092a\u094b\u0902 \u092e\u0947\u0902 \u0938\u0947 \u090f\u0915 \u0936\u094d\u0930\u0947\u0923\u0940 \u091a\u0941\u0928\u0947\u0902:",
+      "buttonText": "\u0936\u094d\u0930\u0947\u0923\u0940 \u091a\u0941\u0928\u0947\u0902",
       "sections": [
         {
-          "title": "श्रेणियां",
+          "title": "\u0936\u094d\u0930\u0947\u0923\u093f\u092f\u093e\u0902",
           "rows": [
-            { "id": "btn_sarees", "title": "🥻 साड़ियां", "description": "हमारा साड़ियों का संग्रह देखें", "nextNode": "node_cat_sarees_hi" },
-            { "id": "btn_kurtis", "title": "👚 कुर्तियां", "description": "हमारा कुर्तियों का संग्रह देखें", "nextNode": "node_cat_kurtis_hi" },
-            { "id": "btn_lehengas", "title": "✨ लहंगे", "description": "हमारा लहंगों का संग्रह देखें", "nextNode": "node_cat_lehengas_hi" },
-            { "id": "btn_new_arrivals", "title": "🆕 नई वस्तुएं", "description": "हमारी नवीनतम नई वस्तुएं देखें", "nextNode": "node_cat_newarrivals_hi" },
-            { "id": "btn_full_catalog", "title": "📖 पूरा कैटलॉग", "description": "संपूर्ण लुकबुक निर्देशिका", "nextNode": "node_cat_full_hi" },
-            { "id": "btn_previous", "title": "🔙 पिछला कदम", "description": "कैटलॉग मेनू पर वापस जाएं", "nextNode": "node_catalog_hi" },
-            { "id": "btn_main_menu", "title": "🏠 मुख्य मेनू", "description": "होम स्क्रीन पर जाएं", "nextNode": "node_welcome_hi" }
+            {
+              "id": "btn_sarees",
+              "title": "\ud83e\udd7b \u0938\u093e\u0921\u093c\u093f\u092f\u093e\u0902",
+              "description": "\u0939\u092e\u093e\u0930\u093e \u0938\u093e\u0921\u093c\u093f\u092f\u094b\u0902 \u0915\u093e \u0938\u0902\u0917\u094d\u0930\u0939 \u0926\u0947\u0916\u0947\u0902",
+              "nextNode": "node_cat_sarees_hi"
+            },
+            {
+              "id": "btn_kurtis",
+              "title": "\ud83d\udc5a \u0915\u0941\u0930\u094d\u0924\u093f\u092f\u093e\u0902",
+              "description": "\u0939\u092e\u093e\u0930\u093e \u0915\u0941\u0930\u094d\u0924\u093f\u092f\u094b\u0902 \u0915\u093e \u0938\u0902\u0917\u094d\u0930\u0939 \u0926\u0947\u0916\u0947\u0902",
+              "nextNode": "node_cat_kurtis_hi"
+            },
+            {
+              "id": "btn_lehengas",
+              "title": "\u2728 \u0932\u0939\u0902\u0917\u0947",
+              "description": "\u0939\u092e\u093e\u0930\u093e \u0932\u0939\u0902\u0917\u094b\u0902 \u0915\u093e \u0938\u0902\u0917\u094d\u0930\u0939 \u0926\u0947\u0916\u0947\u0902",
+              "nextNode": "node_cat_lehengas_hi"
+            },
+            {
+              "id": "btn_new_arrivals",
+              "title": "\ud83c\udd95 \u0928\u0908 \u0935\u0938\u094d\u0924\u0941\u090f\u0902",
+              "description": "\u0939\u092e\u093e\u0930\u0940 \u0928\u0935\u0940\u0928\u0924\u092e \u0928\u0908 \u0935\u0938\u094d\u0924\u0941\u090f\u0902 \u0926\u0947\u0916\u0947\u0902",
+              "nextNode": "node_cat_newarrivals_hi"
+            },
+            {
+              "id": "btn_full_catalog",
+              "title": "\ud83d\udcd6 \u092a\u0942\u0930\u093e \u0915\u0948\u091f\u0932\u0949\u0917",
+              "description": "\u0938\u0902\u092a\u0942\u0930\u094d\u0923 \u0932\u0941\u0915\u092c\u0941\u0915 \u0928\u093f\u0930\u094d\u0926\u0947\u0936\u093f\u0915\u093e",
+              "nextNode": "node_cat_full_hi"
+            },
+            {
+              "id": "btn_previous",
+              "title": "\ud83d\udd19 \u092a\u093f\u091b\u0932\u093e \u0915\u0926\u092e",
+              "description": "\u0915\u0948\u091f\u0932\u0949\u0917 \u092e\u0947\u0928\u0942 \u092a\u0930 \u0935\u093e\u092a\u0938 \u091c\u093e\u090f\u0902",
+              "nextNode": "node_catalog_hi"
+            },
+            {
+              "id": "btn_main_menu",
+              "title": "\ud83c\udfe0 \u092e\u0941\u0916\u094d\u092f \u092e\u0947\u0928\u0942",
+              "description": "\u0939\u094b\u092e \u0938\u094d\u0915\u094d\u0930\u0940\u0928 \u092a\u0930 \u091c\u093e\u090f\u0902",
+              "nextNode": "node_welcome_hi"
+            }
           ]
         }
       ]
     },
     "node_cat_full_hi": {
       "type": "interactive_button",
-      "text": "हमारा संपूर्ण उत्पाद संग्रह यहाँ देखें: 📖\n👉 https://rathodwholesale.example.com/catalog/full",
+      "text": "\u0939\u092e\u093e\u0930\u093e \u0938\u0902\u092a\u0942\u0930\u094d\u0923 \u0909\u0924\u094d\u092a\u093e\u0926 \u0938\u0902\u0917\u094d\u0930\u0939 \u092f\u0939\u093e\u0901 \u0926\u0947\u0916\u0947\u0902: \ud83d\udcd6\n\ud83d\udc49 https://rathodwholesale.example.com/catalog/full",
       "buttons": [
-        { "id": "btn_previous", "title": "🔙 पिछला कदम", "nextNode": "node_catalog_hi" },
-        { "id": "btn_main_menu", "title": "🏠 मुख्य मेनू", "nextNode": "node_welcome_hi" }
+        {
+          "id": "btn_previous",
+          "title": "\ud83d\udd19 \u092a\u093f\u091b\u0932\u093e \u0915\u0926\u092e",
+          "nextNode": "node_catalog_hi"
+        },
+        {
+          "id": "btn_main_menu",
+          "title": "\ud83c\udfe0 \u092e\u0941\u0916\u094d\u092f \u092e\u0947\u0928\u0942",
+          "nextNode": "node_welcome_hi"
+        }
       ]
     },
     "node_cat_sarees_hi": {
       "type": "interactive_button",
-      "text": "यहाँ हमारा साड़ियों का संग्रह देखें: 🥻\n👉 https://rathodwholesale.example.com/catalog/sarees",
+      "text": "\u092f\u0939\u093e\u0901 \u0939\u092e\u093e\u0930\u093e \u0938\u093e\u0921\u093c\u093f\u092f\u094b\u0902 \u0915\u093e \u0938\u0902\u0917\u094d\u0930\u0939 \u0926\u0947\u0916\u0947\u0902: \ud83e\udd7b\n\ud83d\udc49 https://rathodwholesale.example.com/catalog/sarees",
       "buttons": [
-        { "id": "btn_previous", "title": "🔙 पिछला कदम", "nextNode": "node_catalog_categories_hi" },
-        { "id": "btn_main_menu", "title": "🏠 मुख्य मेनू", "nextNode": "node_welcome_hi" }
+        {
+          "id": "btn_previous",
+          "title": "\ud83d\udd19 \u092a\u093f\u091b\u0932\u093e \u0915\u0926\u092e",
+          "nextNode": "node_catalog_categories_hi"
+        },
+        {
+          "id": "btn_main_menu",
+          "title": "\ud83c\udfe0 \u092e\u0941\u0916\u094d\u092f \u092e\u0947\u0928\u0942",
+          "nextNode": "node_welcome_hi"
+        }
       ]
     },
     "node_cat_kurtis_hi": {
       "type": "interactive_button",
-      "text": "यहाँ हमारा कुर्तियों का संग्रह देखें: 👚\n👉 https://rathodwholesale.example.com/catalog/kurtis",
+      "text": "\u092f\u0939\u093e\u0901 \u0939\u092e\u093e\u0930\u093e \u0915\u0941\u0930\u094d\u0924\u093f\u092f\u094b\u0902 \u0915\u093e \u0938\u0902\u0917\u094d\u0930\u0939 \u0926\u0947\u0916\u0947\u0902: \ud83d\udc5a\n\ud83d\udc49 https://rathodwholesale.example.com/catalog/kurtis",
       "buttons": [
-        { "id": "btn_previous", "title": "🔙 पिछला कदम", "nextNode": "node_catalog_categories_hi" },
-        { "id": "btn_main_menu", "title": "🏠 मुख्य मेनू", "nextNode": "node_welcome_hi" }
+        {
+          "id": "btn_previous",
+          "title": "\ud83d\udd19 \u092a\u093f\u091b\u0932\u093e \u0915\u0926\u092e",
+          "nextNode": "node_catalog_categories_hi"
+        },
+        {
+          "id": "btn_main_menu",
+          "title": "\ud83c\udfe0 \u092e\u0941\u0916\u094d\u092f \u092e\u0947\u0928\u0942",
+          "nextNode": "node_welcome_hi"
+        }
       ]
     },
     "node_cat_lehengas_hi": {
       "type": "interactive_button",
-      "text": "यहाँ हमारा लहंगों का संग्रह देखें: ✨\n👉 https://rathodwholesale.example.com/catalog/lehengas",
+      "text": "\u092f\u0939\u093e\u0901 \u0939\u092e\u093e\u0930\u093e \u0932\u0939\u0902\u0917\u094b\u0902 \u0915\u093e \u0938\u0902\u0917\u094d\u0930\u0939 \u0926\u0947\u0916\u0947\u0902: \u2728\n\ud83d\udc49 https://rathodwholesale.example.com/catalog/lehengas",
       "buttons": [
-        { "id": "btn_previous", "title": "🔙 पिछला कदम", "nextNode": "node_catalog_categories_hi" },
-        { "id": "btn_main_menu", "title": "🏠 मुख्य मेनू", "nextNode": "node_welcome_hi" }
+        {
+          "id": "btn_previous",
+          "title": "\ud83d\udd19 \u092a\u093f\u091b\u0932\u093e \u0915\u0926\u092e",
+          "nextNode": "node_catalog_categories_hi"
+        },
+        {
+          "id": "btn_main_menu",
+          "title": "\ud83c\udfe0 \u092e\u0941\u0916\u094d\u092f \u092e\u0947\u0928\u0942",
+          "nextNode": "node_welcome_hi"
+        }
       ]
     },
     "node_cat_newarrivals_hi": {
       "type": "interactive_button",
-      "text": "हमारी नवीनतम नई वस्तुएं देखें: 🆕\n👉 https://rathodwholesale.example.com/catalog/new-arrivals",
+      "text": "\u0939\u092e\u093e\u0930\u0940 \u0928\u0935\u0940\u0928\u0924\u092e \u0928\u0908 \u0935\u0938\u094d\u0924\u0941\u090f\u0902 \u0926\u0947\u0916\u0947\u0902: \ud83c\udd95\n\ud83d\udc49 https://rathodwholesale.example.com/catalog/new-arrivals",
       "buttons": [
-        { "id": "btn_previous", "title": "🔙 पिछला कदम", "nextNode": "node_catalog_categories_hi" },
-        { "id": "btn_main_menu", "title": "🏠 मुख्य मेनू", "nextNode": "node_welcome_hi" }
+        {
+          "id": "btn_previous",
+          "title": "\ud83d\udd19 \u092a\u093f\u091b\u0932\u093e \u0915\u0926\u092e",
+          "nextNode": "node_catalog_categories_hi"
+        },
+        {
+          "id": "btn_main_menu",
+          "title": "\ud83c\udfe0 \u092e\u0941\u0916\u094d\u092f \u092e\u0947\u0928\u0942",
+          "nextNode": "node_welcome_hi"
+        }
       ]
     },
     "node_enquiry_start_hi": {
       "type": "collect_input",
-      "text": "कृपया उस उत्पाद का नाम या स्टाइल कोड साझा करें जिसके बारे में आप पूछताछ करना चाहते हैं: 📝\n\n(मुख्य मेनू पर वापस जाने के लिए कभी भी MENU टाइप करें)",
+      "text": "\u0915\u0943\u092a\u092f\u093e \u0909\u0938 \u0909\u0924\u094d\u092a\u093e\u0926 \u0915\u093e \u0928\u093e\u092e \u092f\u093e \u0938\u094d\u091f\u093e\u0907\u0932 \u0915\u094b\u0921 \u0938\u093e\u091d\u093e \u0915\u0930\u0947\u0902 \u091c\u093f\u0938\u0915\u0947 \u092c\u093e\u0930\u0947 \u092e\u0947\u0902 \u0906\u092a \u092a\u0942\u091b\u0924\u093e\u091b \u0915\u0930\u0928\u093e \u091a\u093e\u0939\u0924\u0947 \u0939\u0948\u0902: \ud83d\udcdd\n\n(\u092e\u0941\u0916\u094d\u092f \u092e\u0947\u0928\u0942 \u092a\u0930 \u0935\u093e\u092a\u0938 \u091c\u093e\u0928\u0947 \u0915\u0947 \u0932\u093f\u090f \u0915\u092d\u0940 \u092d\u0940 MENU \u091f\u093e\u0907\u092a \u0915\u0930\u0947\u0902)",
       "saveContextKey": "product_query",
       "validation": {
         "type": "text",
-        "errorMessage": "❌ कृपया उत्पाद का नाम या स्टाइल कोड भेजें।"
+        "errorMessage": "\u274c \u0915\u0943\u092a\u092f\u093e \u0909\u0924\u094d\u092a\u093e\u0926 \u0915\u093e \u0928\u093e\u092e \u092f\u093e \u0938\u094d\u091f\u093e\u0907\u0932 \u0915\u094b\u0921 \u092d\u0947\u091c\u0947\u0902\u0964"
       },
       "nextNode": "node_enquiry_qty_hi"
     },
     "node_enquiry_qty_hi": {
       "type": "interactive_list",
-      "text": "धन्यवाद। कृपया वह थोक मात्रा सीमा चुनें जिसे आप ऑर्डर करना चाहते हैं:",
-      "buttonText": "मात्रा चुनें",
+      "text": "\u0927\u0928\u094d\u092f\u0935\u093e\u0926\u0964 \u0915\u0943\u092a\u092f\u093e \u0935\u0939 \u0925\u094b\u0915 \u092e\u093e\u0924\u094d\u0930\u093e \u0938\u0940\u092e\u093e \u091a\u0941\u0928\u0947\u0902 \u091c\u093f\u0938\u0947 \u0906\u092a \u0911\u0930\u094d\u0921\u0930 \u0915\u0930\u0928\u093e \u091a\u093e\u0939\u0924\u0947 \u0939\u0948\u0902:",
+      "buttonText": "\u092e\u093e\u0924\u094d\u0930\u093e \u091a\u0941\u0928\u0947\u0902",
       "sections": [
         {
-          "title": "मात्रा सीमा",
+          "title": "\u092e\u093e\u0924\u094d\u0930\u093e \u0938\u0940\u092e\u093e",
           "rows": [
-            { "id": "qty_5_10", "title": "5-10 पीस", "nextNode": "node_enquiry_confirm_hi" },
-            { "id": "qty_10_20", "title": "10-20 पीस", "nextNode": "node_enquiry_confirm_hi" },
-            { "id": "qty_20_plus", "title": "20+ पीस", "nextNode": "node_enquiry_confirm_hi" },
-            { "id": "btn_previous", "title": "🔙 पिछला कदम", "nextNode": "node_enquiry_start_hi" },
-            { "id": "btn_main_menu", "title": "🏠 मुख्य मेनू", "nextNode": "node_welcome_hi" }
+            {
+              "id": "qty_5_10",
+              "title": "5-10 \u092a\u0940\u0938",
+              "nextNode": "node_enquiry_confirm_hi"
+            },
+            {
+              "id": "qty_10_20",
+              "title": "10-20 \u092a\u0940\u0938",
+              "nextNode": "node_enquiry_confirm_hi"
+            },
+            {
+              "id": "qty_20_plus",
+              "title": "20+ \u092a\u0940\u0938",
+              "nextNode": "node_enquiry_confirm_hi"
+            },
+            {
+              "id": "btn_previous",
+              "title": "\ud83d\udd19 \u092a\u093f\u091b\u0932\u093e \u0915\u0926\u092e",
+              "nextNode": "node_enquiry_start_hi"
+            },
+            {
+              "id": "btn_main_menu",
+              "title": "\ud83c\udfe0 \u092e\u0941\u0916\u094d\u092f \u092e\u0947\u0928\u0942",
+              "nextNode": "node_welcome_hi"
+            }
           ]
         }
       ]
     },
     "node_enquiry_confirm_hi": {
       "type": "interactive_button",
-      "text": "धन्यवाद। हमें *{product_query}* के लिए आपकी पूछताछ मिल गई है। हमारी टीम जल्द ही आपसे इस नंबर पर कीमतों के साथ संपर्क करेगी! 📞",
+      "text": "\u0927\u0928\u094d\u092f\u0935\u093e\u0926\u0964 \u0939\u092e\u0947\u0902 *{product_query}* \u0915\u0947 \u0932\u093f\u090f \u0906\u092a\u0915\u0940 \u092a\u0942\u091b\u0924\u093e\u091b \u092e\u093f\u0932 \u0917\u0908 \u0939\u0948\u0964 \u0939\u092e\u093e\u0930\u0940 \u091f\u0940\u092e \u091c\u0932\u094d\u0926 \u0939\u0940 \u0906\u092a\u0938\u0947 \u0907\u0938 \u0928\u0902\u092c\u0930 \u092a\u0930 \u0915\u0940\u092e\u0924\u094b\u0902 \u0915\u0947 \u0938\u093e\u0925 \u0938\u0902\u092a\u0930\u094d\u0915 \u0915\u0930\u0947\u0917\u0940! \ud83d\udcde",
       "buttons": [
-        { "id": "btn_another_product", "title": "📦 और पूछताछ", "nextNode": "node_enquiry_start_hi" },
-        { "id": "btn_previous", "title": "🔙 पिछला कदम", "nextNode": "node_enquiry_start_hi" },
-        { "id": "btn_main_menu", "title": "🏠 मुख्य मेनू", "nextNode": "node_welcome_hi" }
+        {
+          "id": "btn_another_product",
+          "title": "\ud83d\udce6 \u0914\u0930 \u092a\u0942\u091b\u0924\u093e\u091b",
+          "nextNode": "node_enquiry_start_hi"
+        },
+        {
+          "id": "btn_previous",
+          "title": "\ud83d\udd19 \u092a\u093f\u091b\u0932\u093e \u0915\u0926\u092e",
+          "nextNode": "node_enquiry_start_hi"
+        },
+        {
+          "id": "btn_main_menu",
+          "title": "\ud83c\udfe0 \u092e\u0941\u0916\u094d\u092f \u092e\u0947\u0928\u0942",
+          "nextNode": "node_welcome_hi"
+        }
       ]
     },
     "node_talk_owner_hi": {
       "type": "interactive_button",
-      "text": "आपको हमारे ग्राहक सहायता विभाग से जोड़ा जा रहा है। कोई प्रतिनिधि जल्द ही आपसे यहाँ संपर्क करेगा! 📞",
+      "text": "\u0906\u092a\u0915\u094b \u0939\u092e\u093e\u0930\u0947 \u0917\u094d\u0930\u093e\u0939\u0915 \u0938\u0939\u093e\u092f\u0924\u093e \u0935\u093f\u092d\u093e\u0917 \u0938\u0947 \u091c\u094b\u0921\u093c\u093e \u091c\u093e \u0930\u0939\u093e \u0939\u0948\u0964 \u0915\u094b\u0908 \u092a\u094d\u0930\u0924\u093f\u0928\u093f\u0927\u093f \u091c\u0932\u094d\u0926 \u0939\u0940 \u0906\u092a\u0938\u0947 \u092f\u0939\u093e\u0901 \u0938\u0902\u092a\u0930\u094d\u0915 \u0915\u0930\u0947\u0917\u093e! \ud83d\udcde",
       "buttons": [
-        { "id": "btn_browse_meanwhile", "title": "🛍️ कैटलॉग देखें", "nextNode": "node_catalog_hi" },
-        { "id": "btn_previous", "title": "🔙 पिछला कदम", "nextNode": "node_welcome_hi" },
-        { "id": "btn_main_menu", "title": "🏠 मुख्य मेनू", "nextNode": "node_welcome_hi" }
+        {
+          "id": "btn_browse_meanwhile",
+          "title": "\ud83d\udecd\ufe0f \u0915\u0948\u091f\u0932\u0949\u0917 \u0926\u0947\u0916\u0947\u0902",
+          "nextNode": "node_catalog_hi"
+        },
+        {
+          "id": "btn_previous",
+          "title": "\ud83d\udd19 \u092a\u093f\u091b\u0932\u093e \u0915\u0926\u092e",
+          "nextNode": "node_welcome_hi"
+        },
+        {
+          "id": "btn_main_menu",
+          "title": "\ud83c\udfe0 \u092e\u0941\u0916\u094d\u092f \u092e\u0947\u0928\u0942",
+          "nextNode": "node_welcome_hi"
+        }
       ]
     },
-
     "node_welcome_mr": {
       "type": "interactive_list",
-      "text": "राठोड क्रिएशन होलसेलमध्ये आपले स्वागत आहे! 🧵\nआम्ही तुम्हाला कशी मदत करू शकतो? कृपया खालील मेनूमधून एक पर्याय निवडा:\n\n(संभाषण समाप्त करण्यासाठी कोणत्याही वेळी 'stop' टाईप करा)",
-      "buttonText": "पर्याय निवडा",
+      "text": "\u0930\u093e\u0920\u094b\u0921 \u0915\u094d\u0930\u093f\u090f\u0936\u0928 \u0939\u094b\u0932\u0938\u0947\u0932\u092e\u0927\u094d\u092f\u0947 \u0906\u092a\u0932\u0947 \u0938\u094d\u0935\u093e\u0917\u0924 \u0906\u0939\u0947! \ud83e\uddf5\n\u0906\u092e\u094d\u0939\u0940 \u0924\u0941\u092e\u094d\u0939\u093e\u0932\u093e \u0915\u0936\u0940 \u092e\u0926\u0924 \u0915\u0930\u0942 \u0936\u0915\u0924\u094b? \u0915\u0943\u092a\u092f\u093e \u0916\u093e\u0932\u0940\u0932 \u092e\u0947\u0928\u0942\u092e\u0927\u0942\u0928 \u090f\u0915 \u092a\u0930\u094d\u092f\u093e\u092f \u0928\u093f\u0935\u0921\u093e:\n\n(\u0938\u0902\u092d\u093e\u0937\u0923 \u0938\u092e\u093e\u092a\u094d\u0924 \u0915\u0930\u0923\u094d\u092f\u093e\u0938\u093e\u0920\u0940 \u0915\u094b\u0923\u0924\u094d\u092f\u093e\u0939\u0940 \u0935\u0947\u0933\u0940 'stop' \u091f\u093e\u0908\u092a \u0915\u0930\u093e)",
+      "buttonText": "\u092a\u0930\u094d\u092f\u093e\u092f \u0928\u093f\u0935\u0921\u093e",
       "sections": [
         {
-          "title": "पर्याय",
+          "title": "\u092a\u0930\u094d\u092f\u093e\u092f",
           "rows": [
-            { "id": "btn_catalog", "title": "🛍️ कॅटलॉग पहा", "description": "आमचे कलेक्शन ब्राउझ करा", "nextNode": "node_catalog_mr" },
-            { "id": "btn_enquiry", "title": "📦 प्रॉडक्ट चौकशी", "description": "घाऊक ऑर्डरबद्दल चौकशी करा", "nextNode": "node_enquiry_start_mr" },
-            { "id": "btn_owner", "title": "💬 टीमशी बोला", "description": "आमच्या ग्राहक प्रतिनिधीशी बोला", "nextNode": "node_talk_owner_mr" },
-            { "id": "btn_previous", "title": "🔙 मागील पाऊल", "description": "भाषा निवडीवर परत जा", "nextNode": "node_language" }
+            {
+              "id": "btn_catalog",
+              "title": "\ud83d\udecd\ufe0f \u0915\u0945\u091f\u0932\u0949\u0917 \u092a\u0939\u093e",
+              "description": "\u0906\u092e\u091a\u0947 \u0915\u0932\u0947\u0915\u094d\u0936\u0928 \u092c\u094d\u0930\u093e\u0909\u091d \u0915\u0930\u093e",
+              "nextNode": "node_catalog_mr"
+            },
+            {
+              "id": "btn_enquiry",
+              "title": "\ud83d\udce6 \u092a\u094d\u0930\u0949\u0921\u0915\u094d\u091f \u091a\u094c\u0915\u0936\u0940",
+              "description": "\u0918\u093e\u090a\u0915 \u0911\u0930\u094d\u0921\u0930\u092c\u0926\u094d\u0926\u0932 \u091a\u094c\u0915\u0936\u0940 \u0915\u0930\u093e",
+              "nextNode": "node_enquiry_start_mr"
+            },
+            {
+              "id": "btn_owner",
+              "title": "\ud83d\udcac \u091f\u0940\u092e\u0936\u0940 \u092c\u094b\u0932\u093e",
+              "description": "\u0906\u092e\u091a\u094d\u092f\u093e \u0917\u094d\u0930\u093e\u0939\u0915 \u092a\u094d\u0930\u0924\u093f\u0928\u093f\u0927\u0940\u0936\u0940 \u092c\u094b\u0932\u093e",
+              "nextNode": "node_talk_owner_mr"
+            },
+            {
+              "id": "btn_previous",
+              "title": "\ud83d\udd19 \u092e\u093e\u0917\u0940\u0932 \u092a\u093e\u090a\u0932",
+              "description": "\u092d\u093e\u0937\u093e \u0928\u093f\u0935\u0921\u0940\u0935\u0930 \u092a\u0930\u0924 \u091c\u093e",
+              "nextNode": "node_language"
+            }
           ]
         }
       ]
     },
     "node_catalog_mr": {
       "type": "interactive_list",
-      "text": "तुम्ही आमचे कॅटलॉग कशा प्रकारे पाहू इच्छिता?",
-      "buttonText": "कॅटलॉग पहा",
+      "text": "\u0924\u0941\u092e\u094d\u0939\u0940 \u0906\u092e\u091a\u0947 \u0915\u0945\u091f\u0932\u0949\u0917 \u0915\u0936\u093e \u092a\u094d\u0930\u0915\u093e\u0930\u0947 \u092a\u093e\u0939\u0942 \u0907\u091a\u094d\u091b\u093f\u0924\u093e?",
+      "buttonText": "\u0915\u0945\u091f\u0932\u0949\u0917 \u092a\u0939\u093e",
       "sections": [
         {
-          "title": "पर्याय",
+          "title": "\u092a\u0930\u094d\u092f\u093e\u092f",
           "rows": [
-            { "id": "btn_full_catalog", "title": "📖 संपूर्ण कॅटलॉग", "description": "संपूर्ण लुकबुक पहा", "nextNode": "node_cat_full_mr" },
-            { "id": "btn_by_category", "title": "🗂️ श्रेणीनुसार", "description": "प्रकारानुसार फिल्टर करा", "nextNode": "node_catalog_categories_mr" },
-            { "id": "btn_previous", "title": "🔙 मागील पाऊल", "description": "मुख्य मेनूवर परत जा", "nextNode": "node_welcome_mr" },
-            { "id": "btn_main_menu", "title": "🏠 मुख्य मेनू", "description": "होम स्क्रीनवर जा", "nextNode": "node_welcome_mr" }
+            {
+              "id": "btn_full_catalog",
+              "title": "\ud83d\udcd6 \u0938\u0902\u092a\u0942\u0930\u094d\u0923 \u0915\u0945\u091f\u0932\u0949\u0917",
+              "description": "\u0938\u0902\u092a\u0942\u0930\u094d\u0923 \u0932\u0941\u0915\u092c\u0941\u0915 \u092a\u0939\u093e",
+              "nextNode": "node_cat_full_mr"
+            },
+            {
+              "id": "btn_by_category",
+              "title": "\ud83d\uddc2\ufe0f \u0936\u094d\u0930\u0947\u0923\u0940\u0928\u0941\u0938\u093e\u0930",
+              "description": "\u092a\u094d\u0930\u0915\u093e\u0930\u093e\u0928\u0941\u0938\u093e\u0930 \u092b\u093f\u0932\u094d\u091f\u0930 \u0915\u0930\u093e",
+              "nextNode": "node_catalog_categories_mr"
+            },
+            {
+              "id": "btn_previous",
+              "title": "\ud83d\udd19 \u092e\u093e\u0917\u0940\u0932 \u092a\u093e\u090a\u0932",
+              "description": "\u092e\u0941\u0916\u094d\u092f \u092e\u0947\u0928\u0942\u0935\u0930 \u092a\u0930\u0924 \u091c\u093e",
+              "nextNode": "node_welcome_mr"
+            },
+            {
+              "id": "btn_main_menu",
+              "title": "\ud83c\udfe0 \u092e\u0941\u0916\u094d\u092f \u092e\u0947\u0928\u0942",
+              "description": "\u0939\u094b\u092e \u0938\u094d\u0915\u094d\u0930\u0940\u0928\u0935\u0930 \u091c\u093e",
+              "nextNode": "node_welcome_mr"
+            }
           ]
         }
       ]
     },
     "node_catalog_categories_mr": {
       "type": "interactive_list",
-      "text": "कृपया खालील पर्यायांमधून एक श्रेणी निवडा:",
-      "buttonText": "श्रेणी निवडा",
+      "text": "\u0915\u0943\u092a\u092f\u093e \u0916\u093e\u0932\u0940\u0932 \u092a\u0930\u094d\u092f\u093e\u092f\u093e\u0902\u092e\u0927\u0942\u0928 \u090f\u0915 \u0936\u094d\u0930\u0947\u0923\u0940 \u0928\u093f\u0935\u0921\u093e:",
+      "buttonText": "\u0936\u094d\u0930\u0947\u0923\u0940 \u0928\u093f\u0935\u0921\u093e",
       "sections": [
         {
-          "title": "श्रेणी",
+          "title": "\u0936\u094d\u0930\u0947\u0923\u0940",
           "rows": [
-            { "id": "btn_sarees", "title": "🥻 साड्या", "description": "आमचे साड्यांचे कलेक्शन पहा", "nextNode": "node_cat_sarees_mr" },
-            { "id": "btn_kurtis", "title": "👚 कुर्त्या", "description": "आमचे कुर्त्यांचे कलेक्शन पहा", "nextNode": "node_cat_kurtis_mr" },
-            { "id": "btn_lehengas", "title": "✨ लेहेंगा", "description": "आमचे लेहेंग्यांचे कलेक्शन पहा", "nextNode": "node_cat_lehengas_mr" },
-            { "id": "btn_new_arrivals", "title": "🆕 नवीन आगमन", "description": "आमचे नवीन कलेक्शन पहा", "nextNode": "node_cat_newarrivals_mr" },
-            { "id": "btn_full_catalog", "title": "📖 संपूर्ण कॅटलॉग", "description": "संपूर्ण लुकबुक निर्देशिका", "nextNode": "node_cat_full_mr" },
-            { "id": "btn_previous", "title": "🔙 मागील पाऊल", "description": "कॅटलॉग मेनूवर परत जा", "nextNode": "node_catalog_mr" },
-            { "id": "btn_main_menu", "title": "🏠 मुख्य मेनू", "description": "होम स्क्रीनवर जा", "nextNode": "node_welcome_mr" }
+            {
+              "id": "btn_sarees",
+              "title": "\ud83e\udd7b \u0938\u093e\u0921\u094d\u092f\u093e",
+              "description": "\u0906\u092e\u091a\u0947 \u0938\u093e\u0921\u094d\u092f\u093e\u0902\u091a\u0947 \u0915\u0932\u0947\u0915\u094d\u0936\u0928 \u092a\u0939\u093e",
+              "nextNode": "node_cat_sarees_mr"
+            },
+            {
+              "id": "btn_kurtis",
+              "title": "\ud83d\udc5a \u0915\u0941\u0930\u094d\u0924\u094d\u092f\u093e",
+              "description": "\u0906\u092e\u091a\u0947 \u0915\u0941\u0930\u094d\u0924\u094d\u092f\u093e\u0902\u091a\u0947 \u0915\u0932\u0947\u0915\u094d\u0936\u0928 \u092a\u0939\u093e",
+              "nextNode": "node_cat_kurtis_mr"
+            },
+            {
+              "id": "btn_lehengas",
+              "title": "\u2728 \u0932\u0947\u0939\u0947\u0902\u0917\u093e",
+              "description": "\u0906\u092e\u091a\u0947 \u0932\u0947\u0939\u0947\u0902\u0917\u094d\u092f\u093e\u0902\u091a\u0947 \u0915\u0932\u0947\u0915\u094d\u0936\u0928 \u092a\u0939\u093e",
+              "nextNode": "node_cat_lehengas_mr"
+            },
+            {
+              "id": "btn_new_arrivals",
+              "title": "\ud83c\udd95 \u0928\u0935\u0940\u0928 \u0906\u0917\u092e\u0928",
+              "description": "\u0906\u092e\u091a\u0947 \u0928\u0935\u0940\u0928 \u0915\u0932\u0947\u0915\u094d\u0936\u0928 \u092a\u0939\u093e",
+              "nextNode": "node_cat_newarrivals_mr"
+            },
+            {
+              "id": "btn_full_catalog",
+              "title": "\ud83d\udcd6 \u0938\u0902\u092a\u0942\u0930\u094d\u0923 \u0915\u0945\u091f\u0932\u0949\u0917",
+              "description": "\u0938\u0902\u092a\u0942\u0930\u094d\u0923 \u0932\u0941\u0915\u092c\u0941\u0915 \u0928\u093f\u0930\u094d\u0926\u0947\u0936\u093f\u0915\u093e",
+              "nextNode": "node_cat_full_mr"
+            },
+            {
+              "id": "btn_previous",
+              "title": "\ud83d\udd19 \u092e\u093e\u0917\u0940\u0932 \u092a\u093e\u090a\u0932",
+              "description": "\u0915\u0945\u091f\u0932\u0949\u0917 \u092e\u0947\u0928\u0942\u0935\u0930 \u092a\u0930\u0924 \u091c\u093e",
+              "nextNode": "node_catalog_mr"
+            },
+            {
+              "id": "btn_main_menu",
+              "title": "\ud83c\udfe0 \u092e\u0941\u0916\u094d\u092f \u092e\u0947\u0928\u0942",
+              "description": "\u0939\u094b\u092e \u0938\u094d\u0915\u094d\u0930\u0940\u0928\u0935\u0930 \u091c\u093e",
+              "nextNode": "node_welcome_mr"
+            }
           ]
         }
       ]
     },
     "node_cat_full_mr": {
       "type": "interactive_button",
-      "text": "आमचे संपूर्ण उत्पादन संग्रह येथे पहा: 📖\n👉 https://rathodwholesale.example.com/catalog/full",
+      "text": "\u0906\u092e\u091a\u0947 \u0938\u0902\u092a\u0942\u0930\u094d\u0923 \u0909\u0924\u094d\u092a\u093e\u0926\u0928 \u0938\u0902\u0917\u094d\u0930\u0939 \u092f\u0947\u0925\u0947 \u092a\u0939\u093e: \ud83d\udcd6\n\ud83d\udc49 https://rathodwholesale.example.com/catalog/full",
       "buttons": [
-        { "id": "btn_previous", "title": "🔙 मागील पाऊल", "nextNode": "node_catalog_mr" },
-        { "id": "btn_main_menu", "title": "🏠 मुख्य मेनू", "nextNode": "node_welcome_mr" }
+        {
+          "id": "btn_previous",
+          "title": "\ud83d\udd19 \u092e\u093e\u0917\u0940\u0932 \u092a\u093e\u090a\u0932",
+          "nextNode": "node_catalog_mr"
+        },
+        {
+          "id": "btn_main_menu",
+          "title": "\ud83c\udfe0 \u092e\u0941\u0916\u094d\u092f \u092e\u0947\u0928\u0942",
+          "nextNode": "node_welcome_mr"
+        }
       ]
     },
     "node_cat_sarees_mr": {
       "type": "interactive_button",
-      "text": "येथे आमचे साडी कलेक्शन पहा: 🥻\n👉 https://rathodwholesale.example.com/catalog/sarees",
+      "text": "\u092f\u0947\u0925\u0947 \u0906\u092e\u091a\u0947 \u0938\u093e\u0921\u0940 \u0915\u0932\u0947\u0915\u094d\u0936\u0928 \u092a\u0939\u093e: \ud83e\udd7b\n\ud83d\udc49 https://rathodwholesale.example.com/catalog/sarees",
       "buttons": [
-        { "id": "btn_previous", "title": "🔙 मागील पाऊल", "nextNode": "node_catalog_categories_mr" },
-        { "id": "btn_main_menu", "title": "🏠 मुख्य मेनू", "nextNode": "node_welcome_mr" }
+        {
+          "id": "btn_previous",
+          "title": "\ud83d\udd19 \u092e\u093e\u0917\u0940\u0932 \u092a\u093e\u090a\u0932",
+          "nextNode": "node_catalog_categories_mr"
+        },
+        {
+          "id": "btn_main_menu",
+          "title": "\ud83c\udfe0 \u092e\u0941\u0916\u094d\u092f \u092e\u0947\u0928\u0942",
+          "nextNode": "node_welcome_mr"
+        }
       ]
     },
     "node_cat_kurtis_mr": {
       "type": "interactive_button",
-      "text": "येथे आमचे कुर्त्यांचे कलेक्शन पहा: 👚\n👉 https://rathodwholesale.example.com/catalog/kurtis",
+      "text": "\u092f\u0947\u0925\u0947 \u0906\u092e\u091a\u0947 \u0915\u0941\u0930\u094d\u0924\u094d\u092f\u093e\u0902\u091a\u0947 \u0915\u0932\u0947\u0915\u094d\u0936\u0928 \u092a\u0939\u093e: \ud83d\udc5a\n\ud83d\udc49 https://rathodwholesale.example.com/catalog/kurtis",
       "buttons": [
-        { "id": "btn_previous", "title": "🔙 मागील पाऊल", "nextNode": "node_catalog_categories_mr" },
-        { "id": "btn_main_menu", "title": "🏠 मुख्य मेनू", "nextNode": "node_welcome_mr" }
+        {
+          "id": "btn_previous",
+          "title": "\ud83d\udd19 \u092e\u093e\u0917\u0940\u0932 \u092a\u093e\u090a\u0932",
+          "nextNode": "node_catalog_categories_mr"
+        },
+        {
+          "id": "btn_main_menu",
+          "title": "\ud83c\udfe0 \u092e\u0941\u0916\u094d\u092f \u092e\u0947\u0928\u0942",
+          "nextNode": "node_welcome_mr"
+        }
       ]
     },
     "node_cat_lehengas_mr": {
       "type": "interactive_button",
-      "text": "येथे आमचे लेहेंगा कलेक्शन पहा: ✨\n👉 https://rathodwholesale.example.com/catalog/lehengas",
+      "text": "\u092f\u0947\u0925\u0947 \u0906\u092e\u091a\u0947 \u0932\u0947\u0939\u0947\u0902\u0917\u093e \u0915\u0932\u0947\u0915\u094d\u0936\u0928 \u092a\u0939\u093e: \u2728\n\ud83d\udc49 https://rathodwholesale.example.com/catalog/lehengas",
       "buttons": [
-        { "id": "btn_previous", "title": "🔙 मागील पाऊल", "nextNode": "node_catalog_categories_mr" },
-        { "id": "btn_main_menu", "title": "🏠 मुख्य मेनू", "nextNode": "node_welcome_mr" }
+        {
+          "id": "btn_previous",
+          "title": "\ud83d\udd19 \u092e\u093e\u0917\u0940\u0932 \u092a\u093e\u090a\u0932",
+          "nextNode": "node_catalog_categories_mr"
+        },
+        {
+          "id": "btn_main_menu",
+          "title": "\ud83c\udfe0 \u092e\u0941\u0916\u094d\u092f \u092e\u0947\u0928\u0942",
+          "nextNode": "node_welcome_mr"
+        }
       ]
     },
     "node_cat_newarrivals_mr": {
       "type": "interactive_button",
-      "text": "आमचे नवीन आगमन पहा: 🆕\n👉 https://rathodwholesale.example.com/catalog/new-arrivals",
+      "text": "\u0906\u092e\u091a\u0947 \u0928\u0935\u0940\u0928 \u0906\u0917\u092e\u0928 \u092a\u0939\u093e: \ud83c\udd95\n\ud83d\udc49 https://rathodwholesale.example.com/catalog/new-arrivals",
       "buttons": [
-        { "id": "btn_previous", "title": "🔙 मागील पाऊल", "nextNode": "node_catalog_categories_mr" },
-        { "id": "btn_main_menu", "title": "🏠 मुख्य मेनू", "nextNode": "node_welcome_mr" }
+        {
+          "id": "btn_previous",
+          "title": "\ud83d\udd19 \u092e\u093e\u0917\u0940\u0932 \u092a\u093e\u090a\u0932",
+          "nextNode": "node_catalog_categories_mr"
+        },
+        {
+          "id": "btn_main_menu",
+          "title": "\ud83c\udfe0 \u092e\u0941\u0916\u094d\u092f \u092e\u0947\u0928\u0942",
+          "nextNode": "node_welcome_mr"
+        }
       ]
     },
     "node_enquiry_start_mr": {
       "type": "collect_input",
-      "text": "कृपया आपण चौकशी करू इच्छित असलेल्या उत्पादनाचे नाव किंवा स्टाईल कोड सामायिक करा: 📝\n\n(मुख्य मेनूवर परत जाण्यासाठी कधीही MENU टाईप करा)",
+      "text": "\u0915\u0943\u092a\u092f\u093e \u0906\u092a\u0923 \u091a\u094c\u0915\u0936\u0940 \u0915\u0930\u0942 \u0907\u091a\u094d\u091b\u093f\u0924 \u0905\u0938\u0932\u0947\u0932\u094d\u092f\u093e \u0909\u0924\u094d\u092a\u093e\u0926\u0928\u093e\u091a\u0947 \u0928\u093e\u0935 \u0915\u093f\u0902\u0935\u093e \u0938\u094d\u091f\u093e\u0908\u0932 \u0915\u094b\u0921 \u0938\u093e\u092e\u093e\u092f\u093f\u0915 \u0915\u0930\u093e: \ud83d\udcdd\n\n(\u092e\u0941\u0916\u094d\u092f \u092e\u0947\u0928\u0942\u0935\u0930 \u092a\u0930\u0924 \u091c\u093e\u0923\u094d\u092f\u093e\u0938\u093e\u0920\u0940 \u0915\u0927\u0940\u0939\u0940 MENU \u091f\u093e\u0908\u092a \u0915\u0930\u093e)",
       "saveContextKey": "product_query",
       "validation": {
         "type": "text",
-        "errorMessage": "❌ कृपया उत्पादनाचे नाव किंवा स्टाईल कोड पाठवा."
+        "errorMessage": "\u274c \u0915\u0943\u092a\u092f\u093e \u0909\u0924\u094d\u092a\u093e\u0926\u0928\u093e\u091a\u0947 \u0928\u093e\u0935 \u0915\u093f\u0902\u0935\u093e \u0938\u094d\u091f\u093e\u0908\u0932 \u0915\u094b\u0921 \u092a\u093e\u0920\u0935\u093e."
       },
       "nextNode": "node_enquiry_qty_mr"
     },
     "node_enquiry_qty_mr": {
       "type": "interactive_list",
-      "text": "धन्यवाद. कृपया घाऊक प्रमाण श्रेणी निवडा जे आपण ऑर्डर करू इच्छिता:",
-      "buttonText": "प्रमाण निवडा",
+      "text": "\u0927\u0928\u094d\u092f\u0935\u093e\u0926. \u0915\u0943\u092a\u092f\u093e \u0918\u093e\u090a\u0915 \u092a\u094d\u0930\u092e\u093e\u0923 \u0936\u094d\u0930\u0947\u0923\u0940 \u0928\u093f\u0935\u0921\u093e \u091c\u0947 \u0906\u092a\u0923 \u0911\u0930\u094d\u0921\u0930 \u0915\u0930\u0942 \u0907\u091a\u094d\u091b\u093f\u0924\u093e:",
+      "buttonText": "\u092a\u094d\u0930\u092e\u093e\u0923 \u0928\u093f\u0935\u0921\u093e",
       "sections": [
         {
-          "title": "प्रमाण श्रेणी",
+          "title": "\u092a\u094d\u0930\u092e\u093e\u0923 \u0936\u094d\u0930\u0947\u0923\u0940",
           "rows": [
-            { "id": "qty_5_10", "title": "5-10 नग", "nextNode": "node_enquiry_confirm_mr" },
-            { "id": "qty_10_20", "title": "10-20 नग", "nextNode": "node_enquiry_confirm_mr" },
-            { "id": "qty_20_plus", "title": "20+ नग", "nextNode": "node_enquiry_confirm_mr" },
-            { "id": "btn_previous", "title": "🔙 मागील पाऊल", "nextNode": "node_enquiry_start_mr" },
-            { "id": "btn_main_menu", "title": "🏠 मुख्य मेनू", "nextNode": "node_welcome_mr" }
+            {
+              "id": "qty_5_10",
+              "title": "5-10 \u0928\u0917",
+              "nextNode": "node_enquiry_confirm_mr"
+            },
+            {
+              "id": "qty_10_20",
+              "title": "10-20 \u0928\u0917",
+              "nextNode": "node_enquiry_confirm_mr"
+            },
+            {
+              "id": "qty_20_plus",
+              "title": "20+ \u0928\u0917",
+              "nextNode": "node_enquiry_confirm_mr"
+            },
+            {
+              "id": "btn_previous",
+              "title": "\ud83d\udd19 \u092e\u093e\u0917\u0940\u0932 \u092a\u093e\u090a\u0932",
+              "nextNode": "node_enquiry_start_mr"
+            },
+            {
+              "id": "btn_main_menu",
+              "title": "\ud83c\udfe0 \u092e\u0941\u0916\u094d\u092f \u092e\u0947\u0928\u0942",
+              "nextNode": "node_welcome_mr"
+            }
           ]
         }
       ]
     },
     "node_enquiry_confirm_mr": {
       "type": "interactive_button",
-      "text": "धन्यवाद. आम्हाला तुमची *{product_query}* साठी चौकशी मिळाली आहे. आमची टीम लवकरच आपल्याशी या नंबरवर किंमतीसह संपर्क साधेल! 📞",
+      "text": "\u0927\u0928\u094d\u092f\u0935\u093e\u0926. \u0906\u092e\u094d\u0939\u093e\u0932\u093e \u0924\u0941\u092e\u091a\u0940 *{product_query}* \u0938\u093e\u0920\u0940 \u091a\u094c\u0915\u0936\u0940 \u092e\u093f\u0933\u093e\u0932\u0940 \u0906\u0939\u0947. \u0906\u092e\u091a\u0940 \u091f\u0940\u092e \u0932\u0935\u0915\u0930\u091a \u0906\u092a\u0932\u094d\u092f\u093e\u0936\u0940 \u092f\u093e \u0928\u0902\u092c\u0930\u0935\u0930 \u0915\u093f\u0902\u092e\u0924\u0940\u0938\u0939 \u0938\u0902\u092a\u0930\u094d\u0915 \u0938\u093e\u0927\u0947\u0932! \ud83d\udcde",
       "buttons": [
-        { "id": "btn_another_product", "title": "📦 आणखी चौकशी", "nextNode": "node_enquiry_start_mr" },
-        { "id": "btn_previous", "title": "🔙 मागील पाऊल", "nextNode": "node_enquiry_start_mr" },
-        { "id": "btn_main_menu", "title": "🏠 मुख्य मेनू", "nextNode": "node_welcome_mr" }
+        {
+          "id": "btn_another_product",
+          "title": "\ud83d\udce6 \u0906\u0923\u0916\u0940 \u091a\u094c\u0915\u0936\u0940",
+          "nextNode": "node_enquiry_start_mr"
+        },
+        {
+          "id": "btn_previous",
+          "title": "\ud83d\udd19 \u092e\u093e\u0917\u0940\u0932 \u092a\u093e\u090a\u0932",
+          "nextNode": "node_enquiry_start_mr"
+        },
+        {
+          "id": "btn_main_menu",
+          "title": "\ud83c\udfe0 \u092e\u0941\u0916\u094d\u092f \u092e\u0947\u0928\u0942",
+          "nextNode": "node_welcome_mr"
+        }
       ]
     },
     "node_talk_owner_mr": {
       "type": "interactive_button",
-      "text": "तुम्हाला आमच्या ग्राहक प्रतिनिधीशी जोडले जात आहे. आमचे प्रतिनिधी लवकरच आपल्याशी येथे संपर्क साधतील! 📞",
+      "text": "\u0924\u0941\u092e\u094d\u0939\u093e\u0932\u093e \u0906\u092e\u091a\u094d\u092f\u093e \u0917\u094d\u0930\u093e\u0939\u0915 \u092a\u094d\u0930\u0924\u093f\u0928\u093f\u0927\u0940\u0936\u0940 \u091c\u094b\u0921\u0932\u0947 \u091c\u093e\u0924 \u0906\u0939\u0947. \u0906\u092e\u091a\u0947 \u092a\u094d\u0930\u0924\u093f\u0928\u093f\u0927\u0940 \u0932\u0935\u0915\u0930\u091a \u0906\u092a\u0932\u094d\u092f\u093e\u0936\u0940 \u092f\u0947\u0925\u0947 \u0938\u0902\u092a\u0930\u094d\u0915 \u0938\u093e\u0927\u0924\u0940\u0932! \ud83d\udcde",
       "buttons": [
-        { "id": "btn_browse_meanwhile", "title": "🛍️ कॅटलॉग पहा", "nextNode": "node_catalog_mr" },
-        { "id": "btn_previous", "title": "🔙 मागील पाऊल", "nextNode": "node_welcome_mr" },
-        { "id": "btn_main_menu", "title": "🏠 मुख्य मेनू", "nextNode": "node_welcome_mr" }
+        {
+          "id": "btn_browse_meanwhile",
+          "title": "\ud83d\udecd\ufe0f \u0915\u0945\u091f\u0932\u0949\u0917 \u092a\u0939\u093e",
+          "nextNode": "node_catalog_mr"
+        },
+        {
+          "id": "btn_previous",
+          "title": "\ud83d\udd19 \u092e\u093e\u0917\u0940\u0932 \u092a\u093e\u090a\u0932",
+          "nextNode": "node_welcome_mr"
+        },
+        {
+          "id": "btn_main_menu",
+          "title": "\ud83c\udfe0 \u092e\u0941\u0916\u094d\u092f \u092e\u0947\u0928\u0942",
+          "nextNode": "node_welcome_mr"
+        }
       ]
     },
-
     "node_enquiry_qty_menu": {
       "type": "interactive_list",
-      "text": "Thank you for enquiring about *{product_name}* (Code: {product_code} | Cat: {product_cat}).\n\nHow many pieces are you looking to order? 📦\n\n(Type 'stop' anytime to end conversation)",
+      "text": "Thank you for enquiring about *{product_name}* (Code: {product_code} | Cat: {product_cat}).\n\nHow many pieces are you looking to order? \ud83d\udce6\n\n(Type 'stop' anytime to end conversation)",
       "buttonText": "Select Quantity",
       "sections": [
         {
           "title": "Options",
           "rows": [
-            { "id": "qty_range", "title": "10 to 30 pcs", "description": "Order between 10 and 30 pieces", "nextNode": "node_enquiry_qty_range_menu" },
-            { "id": "qty_30_plus", "title": "30+ pcs", "description": "Order more than 30 pieces", "nextNode": "node_enquiry_qty_save_30_plus" },
-            { "id": "qty_custom", "title": "Custom Qty", "description": "Type a custom quantity number", "nextNode": "node_enquiry_qty_custom_prompt" },
-            { "id": "btn_previous", "title": "🔙 Previous Step", "description": "Return to category list", "nextNode": "node_catalog_categories_en" },
-            { "id": "btn_main_menu", "title": "🏠 Main Menu", "description": "Return to main home menu", "nextNode": "node_welcome_en" }
+            {
+              "id": "qty_range",
+              "title": "10 to 30 pcs",
+              "description": "Order between 10 and 30 pieces",
+              "nextNode": "node_enquiry_qty_range_menu"
+            },
+            {
+              "id": "qty_30_plus",
+              "title": "30+ pcs",
+              "description": "Order more than 30 pieces",
+              "nextNode": "node_enquiry_qty_save_30_plus"
+            },
+            {
+              "id": "qty_custom",
+              "title": "Custom Qty",
+              "description": "Type a custom quantity number",
+              "nextNode": "node_enquiry_qty_custom_prompt"
+            },
+            {
+              "id": "btn_previous",
+              "title": "\ud83d\udd19 Previous Step",
+              "description": "Return to category list",
+              "nextNode": "node_catalog_categories_en"
+            },
+            {
+              "id": "btn_main_menu",
+              "title": "\ud83c\udfe0 Main Menu",
+              "description": "Return to main home menu",
+              "nextNode": "node_welcome_en"
+            }
           ]
         }
       ]
     },
     "node_enquiry_qty_range_menu": {
       "type": "interactive_list",
-      "text": "Please select your quantity range: 📦",
+      "text": "Please select your quantity range: \ud83d\udce6",
       "buttonText": "Select Range",
       "sections": [
         {
           "title": "Select Range",
           "rows": [
-            { "id": "qty_10_15", "title": "10-15 pcs", "description": "10 to 15 pieces", "nextNode": "node_enquiry_qty_save_10_15" },
-            { "id": "qty_15_20", "title": "15-20 pcs", "description": "15 to 20 pieces", "nextNode": "node_enquiry_qty_save_15_20" },
-            { "id": "qty_21_30", "title": "21-30 pcs", "description": "21 to 30 pieces", "nextNode": "node_enquiry_qty_save_21_30" },
-            { "id": "btn_previous", "title": "🔙 Previous Step", "description": "Return to quantity options", "nextNode": "node_enquiry_qty_menu" },
-            { "id": "btn_main_menu", "title": "🏠 Main Menu", "description": "Return to main home menu", "nextNode": "node_welcome_en" }
+            {
+              "id": "qty_10_15",
+              "title": "10-15 pcs",
+              "description": "10 to 15 pieces",
+              "nextNode": "node_enquiry_qty_save_10_15"
+            },
+            {
+              "id": "qty_15_20",
+              "title": "15-20 pcs",
+              "description": "15 to 20 pieces",
+              "nextNode": "node_enquiry_qty_save_15_20"
+            },
+            {
+              "id": "qty_21_30",
+              "title": "21-30 pcs",
+              "description": "21 to 30 pieces",
+              "nextNode": "node_enquiry_qty_save_21_30"
+            },
+            {
+              "id": "btn_previous",
+              "title": "\ud83d\udd19 Previous Step",
+              "description": "Return to quantity options",
+              "nextNode": "node_enquiry_qty_menu"
+            },
+            {
+              "id": "btn_main_menu",
+              "title": "\ud83c\udfe0 Main Menu",
+              "description": "Return to main home menu",
+              "nextNode": "node_welcome_en"
+            }
           ]
         }
       ]
@@ -492,18 +1026,21 @@
     },
     "node_enquiry_qty_custom_prompt": {
       "type": "collect_input",
-      "text": "Please type your custom quantity number below: 🔢",
+      "text": "Please type your custom quantity number below: \ud83d\udd22",
       "saveContextKey": "quantity",
       "validation": {
         "type": "number",
-        "errorMessage": "❌ Invalid quantity. Please enter a valid number (e.g. 25)."
+        "errorMessage": "\u274c Invalid quantity. Please enter a valid number (e.g. 25)."
       },
       "nextNode": "node_enquiry_comments_prompt"
     },
     "node_enquiry_comments_prompt": {
       "type": "collect_input",
-      "text": "Do you have any comments or specific requirements? If not, please type NA. ✉️",
+      "text": "Do you have any special requirements or notes? (e.g. specific colors, GST invoice, packing preference, or urgent delivery) \ud83d\udcdd\n\nType your requirement below, or reply *No* to skip:",
       "saveContextKey": "comments",
+      "validation": {
+        "type": "text"
+      },
       "nextNode": "node_enquiry_finalize"
     },
     "node_enquiry_finalize": {
@@ -519,7 +1056,8 @@
     },
     "node_enquiry_thankyou": {
       "type": "text",
-      "text": "✅ Thank you! Your wholesale enquiry has been successfully registered.\n\n*Product*: {product_name} ({product_code})\n*Category*: {product_cat} / {product_subcat}\n*Quantity*: {quantity}\n*Requirements*: {comments}\n\nOur team will contact you shortly on this number with pricing details. 💬"
+      "text": "\u2705 Thank you! Your wholesale enquiry has been successfully registered.\n\n*Product*: {product_name} ({product_code})\n*Quantity*: {quantity}\n*Requirements*: {comments}\n\nOur sales team will contact you shortly on this WhatsApp number with wholesale pricing details! \ud83d\udcac",
+      "endSession": true
     }
   }
 }

@@ -10,9 +10,9 @@ import { format, isToday, isYesterday } from 'date-fns';
 import { formatIndianPhone } from '@/lib/phone';
 import {
   MessageSquare, Search, User, CalendarDays, Zap, Paperclip,
-  Send, Loader2, Image, FileText, Check, CheckCheck,
+  Send, Loader2, Image, Image as ImageIcon, FileText, Check, CheckCheck,
   Inbox as InboxIcon, Hand, Plus, X, AlertCircle, Clock, Smile,
-  Trash2, Video, UserCircle, RotateCw,
+  Trash2, Video, UserCircle, RotateCw, BookOpen,
 } from 'lucide-react';
 import EmojiPicker from 'emoji-picker-react';
 
@@ -915,13 +915,24 @@ export default function InboxPage() {
   const [messageText, setMessageText] = useState('');
   const [search, setSearch] = useState('');
   const [showQuickReplies, setShowQuickReplies] = useState(false);
+  const [showCatalogPicker, setShowCatalogPicker] = useState(false);
   const [newConvModal, setNewConvModal] = useState(false);
   const [templateModal, setTemplateModal] = useState(false);
+interface PendingAttachment {
+  id: string;
+  file: File;
+  previewUrl: string;
+  isImage: boolean;
+  name: string;
+  sizeStr: string;
+}
+
   const [templateModalMsg, setTemplateModalMsg] = useState<any>(null);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [showProfilePanel, setShowProfilePanel] = useState(false);
   const [profileData, setProfileData] = useState<any>(null);
   const [uploadingFile, setUploadingFile] = useState(false);
+  const [pendingAttachments, setPendingAttachments] = useState<PendingAttachment[]>([]);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -939,6 +950,23 @@ export default function InboxPage() {
   const { data: quickReplies } = useQuery({
     queryKey: ['quickReplies'],
     queryFn: () => api.get('/api/quick-replies').then(r => r.data),
+  });
+  const { data: catalogItems } = useQuery({
+    queryKey: ['catalogs'],
+    queryFn: () => api.get('/api/menu').then(r => r.data),
+  });
+  const sendCatalogAssetMutation = useMutation({
+    mutationFn: (assetId: string) => api.post(`/api/conversations/${selectedConvId}/send-catalog-asset/${assetId}`),
+    onSuccess: (res) => {
+      setShowCatalogPicker(false);
+      toast.success('Catalog sent successfully!');
+      queryClient.setQueryData(['messages', selectedConvId], (old: any) => {
+        if (!old) return { messages: [res.data] };
+        return { ...old, messages: [...old.messages, res.data] };
+      });
+      queryClient.invalidateQueries({ queryKey: ['conversations'] });
+    },
+    onError: (err: any) => toast.error(err.response?.data?.detail || 'Failed to send catalog'),
   });
   const sendText = useMutation({
     mutationFn: (text: string) => api.post(`/api/conversations/${selectedConvId}/send-text`, { text }),
@@ -1025,30 +1053,102 @@ export default function InboxPage() {
   const messages = messagesData?.messages || [];
   const conversations = convData?.conversations || [];
   
-  const handleSend = (e: React.FormEvent) => { e.preventDefault(); if (!messageText.trim() || !selectedConvId) return; sendText.mutate(messageText.trim()); };
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+    
+    const newAttachments: PendingAttachment[] = files.map(file => {
+      const isImg = file.type.startsWith('image/');
+      const sizeKB = (file.size / 1024).toFixed(0);
+      const sizeMB = (file.size / (1024 * 1024)).toFixed(1);
+      const sizeStr = file.size > 1024 * 1024 ? `${sizeMB} MB` : `${sizeKB} KB`;
+      
+      return {
+        id: `att_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+        file,
+        previewUrl: isImg ? URL.createObjectURL(file) : '',
+        isImage: isImg,
+        name: file.name,
+        sizeStr
+      };
+    });
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file || !selectedConvId) return;
+    setPendingAttachments(prev => [...prev, ...newAttachments]);
     e.target.value = '';
-    setUploadingFile(true);
-    try {
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('caption', '');
-      const res = await api.post(`/api/conversations/${selectedConvId}/upload-and-send`, formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      });
-      toast.success('File sent!');
-      queryClient.setQueryData(['messages', selectedConvId], (old: any) => {
-        if (!old) return { messages: [res.data] };
-        return { ...old, messages: [...old.messages, res.data] };
-      });
-      queryClient.invalidateQueries({ queryKey: ['conversations'] });
-    } catch (err: any) {
-      toast.error(err.response?.data?.detail || 'Failed to send file');
-    } finally {
-      setUploadingFile(false);
+  };
+
+  const removeAttachment = (id: string) => {
+    setPendingAttachments(prev => {
+      const target = prev.find(a => a.id === id);
+      if (target?.previewUrl) URL.revokeObjectURL(target.previewUrl);
+      return prev.filter(a => a.id !== id);
+    });
+  };
+
+  const [uploadingQueue, setUploadingQueue] = useState<{ id: string; name: string; isImage: boolean; previewUrl: string; sizeStr: string; caption?: string }[]>([]);
+
+  const handleSend = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedConvId) return;
+
+    const trimmedText = messageText.trim();
+    if (!trimmedText && pendingAttachments.length === 0) return;
+
+    if (pendingAttachments.length > 0) {
+      setUploadingFile(true);
+      const queue = [...pendingAttachments];
+      
+      // Populate live in-chat uploading bubbles queue
+      setUploadingQueue(queue.map((q, idx) => ({
+        id: q.id,
+        name: q.name,
+        isImage: q.isImage,
+        previewUrl: q.previewUrl,
+        sizeStr: q.sizeStr,
+        caption: idx === 0 ? trimmedText : ''
+      })));
+
+      setPendingAttachments([]); // Clear bottom tray UI immediately
+      setMessageText('');
+      
+      try {
+        for (let i = 0; i < queue.length; i++) {
+          const item = queue[i];
+          const formData = new FormData();
+          formData.append('file', item.file);
+          // Attach text caption to first file if text is present
+          if (i === 0 && trimmedText) {
+            formData.append('caption', trimmedText);
+          } else {
+            formData.append('caption', '');
+          }
+
+          const res = await api.post(`/api/conversations/${selectedConvId}/upload-and-send`, formData, {
+            headers: { 'Content-Type': 'multipart/form-data' },
+          });
+
+          // Update messages in React Query
+          queryClient.setQueryData(['messages', selectedConvId], (old: any) => {
+            if (!old) return { messages: [res.data] };
+            return { ...old, messages: [...old.messages, res.data] };
+          });
+
+          // Remove item from live in-chat uploading bubbles queue
+          setUploadingQueue(prev => prev.filter(u => u.id !== item.id));
+
+          if (item.previewUrl) URL.revokeObjectURL(item.previewUrl);
+        }
+
+        toast.success(queue.length > 1 ? `${queue.length} files sent successfully!` : 'Attachment sent!');
+        queryClient.invalidateQueries({ queryKey: ['conversations'] });
+      } catch (err: any) {
+        toast.error(err.response?.data?.detail || 'Failed to send attachment(s)');
+      } finally {
+        setUploadingFile(false);
+        setUploadingQueue([]);
+      }
+    } else if (trimmedText) {
+      sendText.mutate(trimmedText);
     }
   };
 
@@ -1174,107 +1274,148 @@ export default function InboxPage() {
                     <FileText size={14} /> Template
                   </button>
                   <button className="btn-secondary" style={{ padding: '8px 14px', fontSize: '13px' }} onClick={handleShowProfile}><User size={14} /> Profile</button>
-                  <a href="/reservations"><button className="btn-secondary" style={{ padding: '8px 14px', fontSize: '13px' }}><CalendarDays size={14} /> Reserve</button></a>
                   <button className="btn-secondary" style={{ padding: '8px 14px', fontSize: '13px', color: '#ef4444', borderColor: '#fecaca' }} onClick={() => { if (confirm('Delete this chat?')) deleteConv.mutate(selectedConvId!); }}><Trash2 size={14} /></button>
                 </div>
               </>)}
             </div>
             <div ref={messagesContainerRef} style={{ flex: 1, overflowY: 'auto', padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: '8px', backgroundColor: '#efeae2', backgroundImage: 'url("https://user-images.githubusercontent.com/15075759/28719144-86dc0f70-73b1-11e7-911d-60d70fcded21.png")', backgroundRepeat: 'repeat' }}>
               {msgLoading ? <div style={{ textAlign: 'center', color: '#9ca3af', paddingTop: '40px' }}>Loading...</div>
-              : messages.length === 0 ? <div style={{ textAlign: 'center', color: '#9ca3af', paddingTop: '60px' }}><Hand size={40} style={{ color: '#d1d5db', marginBottom: '12px' }} /><div>No messages yet. Send the first message!</div></div>
-              : messages.map((msg: any, idx: number) => {
-                const prevMsg = idx > 0 ? messages[idx - 1] : null;
-                const curLabel = getDateLabel(msg.timestamp);
-                const prevLabel = prevMsg ? getDateLabel(prevMsg.timestamp) : '';
-                const showDateSep = curLabel !== prevLabel;
-                return (
-                <div key={msg._id}>
-                  {showDateSep && curLabel && (
-                    <div style={{ display: 'flex', justifyContent: 'center', margin: '12px 0' }}>
-                      <span style={{ background: '#e2dacc', color: '#54656f', fontSize: '12px', fontWeight: '600', padding: '4px 14px', borderRadius: '8px', boxShadow: '0 1px 1px rgba(0,0,0,0.08)' }}>{curLabel}</span>
-                    </div>
-                  )}
-                  <div style={{ display: 'flex', justifyContent: msg.direction === 'outbound' ? 'flex-end' : 'flex-start', animation: 'fadeIn 0.2s ease', marginBottom: '4px' }}>
-                  <div style={{ maxWidth: '68%' }}>
-                    <div className={msg.direction === 'outbound' ? 'msg-outbound' : 'msg-inbound'} style={{ padding: '10px 14px' }}>
-                      {msg.type === 'text' && <p style={{ margin: 0, fontSize: '14px', lineHeight: '1.5', wordBreak: 'break-word' }}>{msg.content?.text}</p>}
-                      {msg.type === 'template' && (
-                        <div>
-                          {msg.content?.mediaUrl && <img src={msg.content.mediaUrl} alt="Template Header" style={{ maxWidth: '240px', borderRadius: '8px', marginBottom: '8px' }} />}
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <FileText size={16} style={{ color: '#6b7280', flexShrink: 0 }} />
-                            <p style={{ margin: 0, fontSize: '14px', lineHeight: '1.5', fontStyle: 'italic', color: '#6b7280' }}>{msg.content?.text || `[Template: ${msg.content?.templateName}]`}</p>
+              : messages.length === 0 && uploadingQueue.length === 0 ? <div style={{ textAlign: 'center', color: '#9ca3af', paddingTop: '60px' }}><Hand size={40} style={{ color: '#d1d5db', marginBottom: '12px' }} /><div>No messages yet. Send the first message!</div></div>
+              : (
+                <>
+                  {messages.map((msg: any, idx: number) => {
+                    const prevMsg = idx > 0 ? messages[idx - 1] : null;
+                    const curLabel = getDateLabel(msg.timestamp);
+                    const prevLabel = prevMsg ? getDateLabel(prevMsg.timestamp) : '';
+                    const showDateSep = curLabel !== prevLabel;
+                    return (
+                      <div key={msg._id}>
+                        {showDateSep && curLabel && (
+                          <div style={{ display: 'flex', justifyContent: 'center', margin: '12px 0' }}>
+                            <span style={{ background: '#e2dacc', color: '#54656f', fontSize: '12px', fontWeight: '600', padding: '4px 14px', borderRadius: '8px', boxShadow: '0 1px 1px rgba(0,0,0,0.08)' }}>{curLabel}</span>
+                          </div>
+                        )}
+                        <div style={{ display: 'flex', justifyContent: msg.direction === 'outbound' ? 'flex-end' : 'flex-start', animation: 'fadeIn 0.2s ease', marginBottom: '4px' }}>
+                          <div style={{ maxWidth: '68%' }}>
+                            <div className={msg.direction === 'outbound' ? 'msg-outbound' : 'msg-inbound'} style={{ padding: '10px 14px' }}>
+                              {msg.type === 'text' && <p style={{ margin: 0, fontSize: '14px', lineHeight: '1.5', wordBreak: 'break-word' }}>{msg.content?.text}</p>}
+                              {msg.type === 'template' && (
+                                <div>
+                                  {msg.content?.mediaUrl && <img src={msg.content.mediaUrl} alt="Template Header" style={{ maxWidth: '240px', borderRadius: '8px', marginBottom: '8px' }} />}
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <FileText size={16} style={{ color: '#6b7280', flexShrink: 0 }} />
+                                    <p style={{ margin: 0, fontSize: '14px', lineHeight: '1.5', fontStyle: 'italic', color: '#6b7280' }}>{msg.content?.text || `[Template: ${msg.content?.templateName}]`}</p>
+                                  </div>
+                                </div>
+                              )}
+                              {msg.type === 'image' && <div>{msg.content?.mediaUrl ? <img src={msg.content.mediaUrl} alt="Image" style={{ maxWidth: '240px', borderRadius: '8px' }} /> : <p style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '6px' }}><Image size={16} /> Image</p>}</div>}
+                              {msg.type === 'video' && <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><Video size={20} style={{ color: '#6b7280' }} /><span style={{ fontSize: '13px', color: '#6b7280' }}>{msg.content?.text || '[Video]'}</span></div>}
+                              {msg.type === 'document' && <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}><FileText size={24} /><div><div style={{ fontSize: '13px', fontWeight: '600' }}>{msg.content?.filename || 'Document'}</div></div></div>}
+                              {!['text', 'image', 'video', 'document', 'template'].includes(msg.type) && <p style={{ margin: 0 }}>{msg.content?.text || `[${msg.type}]`}</p>}
+                            </div>
+                            <div style={{ fontSize: '11px', color: '#9ca3af', marginTop: '3px', textAlign: msg.direction === 'outbound' ? 'right' : 'left', display: 'flex', gap: '6px', justifyContent: msg.direction === 'outbound' ? 'flex-end' : 'flex-start', alignItems: 'center' }}>
+                              {getMessageTime(msg.timestamp)}
+                              {msg.direction === 'outbound' && (
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                  <span 
+                                    title={msg.status === 'failed' ? (msg.errorReason || 'Message delivery failed. Click retry button or check settings.') : undefined}
+                                    style={{ 
+                                      color: msg.status === 'read' ? '#53bdeb' : 
+                                             msg.status === 'delivered' ? '#9ca3af' :
+                                             msg.status === 'failed' ? '#ef4444' : '#9ca3af',
+                                      cursor: msg.status === 'failed' ? 'pointer' : 'default',
+                                      display: 'inline-flex',
+                                      alignItems: 'center'
+                                    }}
+                                    onClick={() => {
+                                      if (msg.status === 'failed' && msg.errorReason) {
+                                        toast.error(`Failed: ${msg.errorReason}`, { duration: 5000 });
+                                      }
+                                    }}
+                                  >
+                                    {msg.status === 'read' ? <CheckCheck size={14} /> : 
+                                     msg.status === 'delivered' ? <CheckCheck size={14} /> :
+                                     msg.status === 'sent' ? <Check size={14} /> : 
+                                     msg.status === 'failed' ? <AlertCircle size={14} /> : 
+                                     <Clock size={12} />}
+                                  </span>
+                                  {msg.status === 'failed' && (
+                                    <button
+                                      onClick={() => {
+                                        if (msg.type === 'template') {
+                                          setTemplateModalMsg(msg);
+                                          setTemplateModal(true);
+                                        } else {
+                                          retryMsg.mutate(msg._id);
+                                        }
+                                      }}
+                                      disabled={retryMsg.isPending}
+                                      title="Click to retry resending"
+                                      style={{
+                                        background: '#fee2e2',
+                                        border: '1px solid #fca5a5',
+                                        borderRadius: '4px',
+                                        padding: '1px 6px',
+                                        fontSize: '10px',
+                                        color: '#991b1b',
+                                        cursor: 'pointer',
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: '2px',
+                                        fontWeight: '600'
+                                      }}
+                                    >
+                                      <RotateCw size={10} className={retryMsg.isPending ? 'spin' : ''} /> Retry
+                                    </button>
+                                  )}
+                                </div>
+                              )}
+                            </div>
                           </div>
                         </div>
-                      )}
-                      {msg.type === 'image' && <div>{msg.content?.mediaUrl ? <img src={msg.content.mediaUrl} alt="Image" style={{ maxWidth: '240px', borderRadius: '8px' }} /> : <p style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '6px' }}><Image size={16} /> Image</p>}</div>}
-                      {msg.type === 'video' && <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><Video size={20} style={{ color: '#6b7280' }} /><span style={{ fontSize: '13px', color: '#6b7280' }}>{msg.content?.text || '[Video]'}</span></div>}
-                      {msg.type === 'document' && <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}><FileText size={24} /><div><div style={{ fontSize: '13px', fontWeight: '600' }}>{msg.content?.filename || 'Document'}</div></div></div>}
-                      {!['text', 'image', 'video', 'document', 'template'].includes(msg.type) && <p style={{ margin: 0 }}>{msg.content?.text || `[${msg.type}]`}</p>}
-                    </div>
-                    <div style={{ fontSize: '11px', color: '#9ca3af', marginTop: '3px', textAlign: msg.direction === 'outbound' ? 'right' : 'left', display: 'flex', gap: '6px', justifyContent: msg.direction === 'outbound' ? 'flex-end' : 'flex-start', alignItems: 'center' }}>
-                      {getMessageTime(msg.timestamp)}
-                      {msg.direction === 'outbound' && (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                          <span 
-                            title={msg.status === 'failed' ? (msg.errorReason || 'Message delivery failed. Click retry button or check settings.') : undefined}
-                            style={{ 
-                              color: msg.status === 'read' ? '#53bdeb' : 
-                                     msg.status === 'delivered' ? '#9ca3af' :
-                                     msg.status === 'failed' ? '#ef4444' : '#9ca3af',
-                              cursor: msg.status === 'failed' ? 'pointer' : 'default',
-                              display: 'inline-flex',
-                              alignItems: 'center'
-                            }}
-                            onClick={() => {
-                              if (msg.status === 'failed' && msg.errorReason) {
-                                toast.error(`Failed: ${msg.errorReason}`, { duration: 5000 });
-                              }
-                            }}
-                          >
-                            {msg.status === 'read' ? <CheckCheck size={14} /> : 
-                             msg.status === 'delivered' ? <CheckCheck size={14} /> :
-                             msg.status === 'sent' ? <Check size={14} /> : 
-                             msg.status === 'failed' ? <AlertCircle size={14} /> : 
-                             <Clock size={12} />}
-                          </span>
-                          {msg.status === 'failed' && (
-                            <button
-                              onClick={() => {
-                                if (msg.type === 'template') {
-                                  setTemplateModalMsg(msg);
-                                  setTemplateModal(true);
-                                } else {
-                                  retryMsg.mutate(msg._id);
-                                }
-                              }}
-                              disabled={retryMsg.isPending}
-                              title="Click to retry resending"
-                              style={{
-                                background: '#fee2e2',
-                                border: '1px solid #fca5a5',
-                                borderRadius: '4px',
-                                padding: '1px 6px',
-                                fontSize: '10px',
-                                color: '#991b1b',
-                                cursor: 'pointer',
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: '2px',
-                                fontWeight: '600'
-                              }}
-                            >
-                              <RotateCw size={10} className={retryMsg.isPending ? 'spin' : ''} /> Retry
-                            </button>
+                      </div>
+                    );
+                  })}
+                  {/* WhatsApp-Style Live Uploading Message Indicator Bubble */}
+                  {uploadingQueue.map(item => (
+                    <div key={item.id} style={{ display: 'flex', justifyContent: 'flex-end', animation: 'fadeIn 0.2s ease', marginBottom: '8px' }}>
+                      <div style={{ maxWidth: '68%' }}>
+                        <div className="msg-outbound" style={{ padding: '8px 10px', position: 'relative', overflow: 'hidden' }}>
+                          {item.isImage ? (
+                            <div style={{ position: 'relative', width: '220px', height: '160px', borderRadius: '8px', overflow: 'hidden' }}>
+                              <img src={item.previewUrl} alt={item.name} style={{ width: '100%', height: '100%', objectFit: 'cover', filter: 'brightness(0.65)' }} />
+                              <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: '6px' }}>
+                                <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: 'rgba(0,0,0,0.65)', border: '2px solid white', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                  <Loader2 size={20} style={{ color: 'white', animation: 'spin 1s linear infinite' }} />
+                                </div>
+                                <span style={{ fontSize: '11px', color: 'white', fontWeight: '600', textShadow: '0 1px 3px rgba(0,0,0,0.8)' }}>Uploading image...</span>
+                              </div>
+                            </div>
+                          ) : (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '6px 4px' }}>
+                              <div style={{ width: '36px', height: '36px', borderRadius: '8px', background: '#E8F5E9', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                                <Loader2 size={18} style={{ color: '#1B5E37', animation: 'spin 1s linear infinite' }} />
+                              </div>
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <div style={{ fontSize: '13px', fontWeight: '600', color: '#1a1a2e', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.name}</div>
+                                <div style={{ fontSize: '11px', color: '#6b7280' }}>Uploading... {item.sizeStr}</div>
+                              </div>
+                            </div>
+                          )}
+                          {item.caption && (
+                            <p style={{ margin: '6px 0 0', fontSize: '13px', color: '#1a1a2e' }}>{item.caption}</p>
                           )}
                         </div>
-                      )}
+                        <div style={{ fontSize: '11px', color: '#9ca3af', marginTop: '3px', textAlign: 'right', display: 'flex', gap: '4px', justifyContent: 'flex-end', alignItems: 'center' }}>
+                          <Clock size={12} style={{ color: '#9ca3af' }} />
+                          <span>Sending...</span>
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                </div>
-                </div>
-                );
-              })}
+                  ))}
+                </>
+              )}
+
               <div ref={messagesEndRef} />
             </div>
             {showQuickReplies && (
@@ -1285,11 +1426,164 @@ export default function InboxPage() {
                 </div>
               </div>
             )}
+            {/* Uploaded Catalogs & Price Lists Picker Tray */}
+            {showCatalogPicker && (
+              <div style={{ background: 'white', borderTop: '1px solid #e5e7eb', padding: '14px 20px', maxHeight: '220px', overflowY: 'auto' }}>
+                <div style={{ fontSize: '13px', fontWeight: '700', color: '#111827', marginBottom: '10px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <BookOpen size={16} style={{ color: '#1B5E37' }} /> Select Catalog or Price List to Send
+                  </span>
+                  <button type="button" onClick={() => setShowCatalogPicker(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9CA3AF' }}>
+                    <X size={16} />
+                  </button>
+                </div>
+
+                {(!catalogItems || catalogItems.length === 0) ? (
+                  <div style={{ padding: '16px', textAlign: 'center', color: '#6B7280', fontSize: '13px', background: '#F9FAFB', borderRadius: '12px', border: '1px dashed #D1D5DB' }}>
+                    No uploaded catalogs found. You can upload catalog PDFs & price lists in the <a href="/menu" target="_blank" style={{ color: '#1B5E37', fontWeight: '600', textDecoration: 'underline' }}>Catalogs & Price Lists</a> page.
+                  </div>
+                ) : (
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '10px' }}>
+                    {catalogItems.map((cat: any) => (
+                      <div
+                        key={cat._id}
+                        onClick={() => sendCatalogAssetMutation.mutate(cat._id)}
+                        style={{
+                          padding: '10px 14px',
+                          background: '#FAFBFC',
+                          border: '1px solid #E5E7EB',
+                          borderRadius: '10px',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '10px',
+                          transition: 'all 0.15s'
+                        }}
+                        onMouseEnter={e => (e.currentTarget.style.background = '#E8F5E9', e.currentTarget.style.borderColor = '#A7D5B8')}
+                        onMouseLeave={e => (e.currentTarget.style.background = '#FAFBFC', e.currentTarget.style.borderColor = '#E5E7EB')}
+                      >
+                        <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: cat.type === 'image' ? '#DCFCE7' : '#DBEAFE', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                          {cat.type === 'image' ? <ImageIcon size={16} style={{ color: '#16A34A' }} /> : <FileText size={16} style={{ color: '#2563EB' }} />}
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: '12px', fontWeight: '600', color: '#111827', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{cat.name}</div>
+                          <div style={{ fontSize: '10px', color: '#6B7280' }}>{cat.type === 'image' ? 'Rate Sheet Image' : 'PDF Catalog'}</div>
+                        </div>
+                        <button
+                          type="button"
+                          disabled={sendCatalogAssetMutation.isPending}
+                          style={{ padding: '4px 8px', fontSize: '11px', fontWeight: '600', borderRadius: '6px', background: '#1B5E37', color: 'white', border: 'none', cursor: 'pointer', flexShrink: 0 }}
+                        >
+                          {sendCatalogAssetMutation.isPending ? '...' : 'Send'}
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+            {/* WhatsApp-Style Attachment Staging Preview Tray */}
+            {pendingAttachments.length > 0 && (
+              <div style={{
+                background: '#F8FAFC',
+                borderTop: '1px solid #E2E8F0',
+                padding: '12px 16px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '12px',
+                overflowX: 'auto',
+                maxHeight: '130px'
+              }}>
+                {pendingAttachments.map(item => (
+                  <div key={item.id} style={{
+                    position: 'relative',
+                    borderRadius: '12px',
+                    overflow: 'hidden',
+                    border: '1px solid #CBD5E1',
+                    background: 'white',
+                    flexShrink: 0,
+                    width: item.isImage ? '80px' : '180px',
+                    height: '80px',
+                    display: 'flex',
+                    flexDirection: item.isImage ? 'column' : 'row',
+                    alignItems: 'center',
+                    padding: item.isImage ? 0 : '8px 10px',
+                    gap: '8px'
+                  }}>
+                    {item.isImage ? (
+                      <img src={item.previewUrl} alt={item.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    ) : (
+                      <>
+                        <div style={{ width: '36px', height: '36px', borderRadius: '8px', background: '#F1F5F9', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                          <FileText size={20} style={{ color: '#2563EB' }} />
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: '12px', fontWeight: '600', color: '#1E293B', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.name}</div>
+                          <div style={{ fontSize: '10px', color: '#64748B' }}>{item.sizeStr}</div>
+                        </div>
+                      </>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => removeAttachment(item.id)}
+                      style={{
+                        position: 'absolute',
+                        top: '4px',
+                        right: '4px',
+                        background: 'rgba(0,0,0,0.65)',
+                        border: 'none',
+                        borderRadius: '50%',
+                        width: '20px',
+                        height: '20px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: 'white',
+                        cursor: 'pointer',
+                        zIndex: 10
+                      }}
+                      title="Remove attachment"
+                    >
+                      <X size={12} />
+                    </button>
+                  </div>
+                ))}
+
+                {/* (+) Add More Files Button */}
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  style={{
+                    width: '80px',
+                    height: '80px',
+                    borderRadius: '12px',
+                    border: '2px dashed #CBD5E1',
+                    background: '#FFFFFF',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: 'pointer',
+                    color: '#64748B',
+                    gap: '4px',
+                    flexShrink: 0
+                  }}
+                  title="Add more files"
+                >
+                  <Plus size={20} />
+                  <span style={{ fontSize: '10px', fontWeight: '600' }}>Add More</span>
+                </button>
+              </div>
+            )}
+
             <div style={{ background: 'white', borderTop: '1px solid #374151', padding: '12px 16px', zIndex: 5 }}>
               <form onSubmit={handleSend} style={{ display: 'flex', gap: '10px', alignItems: 'flex-end' }}>
-                <button type="button" onClick={() => setShowQuickReplies(!showQuickReplies)} style={{ padding: '10px', background: showQuickReplies ? '#E8F5E9' : '#f9fafb', border: `1px solid ${showQuickReplies ? '#A7D5B8' : '#e5e7eb'}`, borderRadius: '10px', cursor: 'pointer', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Zap size={18} style={{ color: showQuickReplies ? '#1B5E37' : '#6b7280' }} /></button>
-                <input type="file" ref={fileInputRef} style={{ display: 'none' }} accept="image/*,video/*,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document" onChange={handleFileUpload} />
-                <button type="button" onClick={() => fileInputRef.current?.click()} disabled={uploadingFile} style={{ padding: '10px', background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '10px', cursor: 'pointer', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{uploadingFile ? <Loader2 size={18} style={{ color: '#6b7280', animation: 'spin 1s linear infinite' }} /> : <Paperclip size={18} style={{ color: '#6b7280' }} />}</button>
+                <button type="button" onClick={() => { setShowQuickReplies(!showQuickReplies); setShowCatalogPicker(false); }} title="Quick Replies" style={{ padding: '10px', background: showQuickReplies ? '#E8F5E9' : '#f9fafb', border: `1px solid ${showQuickReplies ? '#A7D5B8' : '#e5e7eb'}`, borderRadius: '10px', cursor: 'pointer', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Zap size={18} style={{ color: showQuickReplies ? '#1B5E37' : '#6b7280' }} /></button>
+                <button type="button" onClick={() => { setShowCatalogPicker(!showCatalogPicker); setShowQuickReplies(false); }} title="Send Catalogs & Price Lists" style={{ padding: '10px', background: showCatalogPicker ? '#E8F5E9' : '#f9fafb', border: `1px solid ${showCatalogPicker ? '#A7D5B8' : '#e5e7eb'}`, borderRadius: '10px', cursor: 'pointer', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><BookOpen size={18} style={{ color: showCatalogPicker ? '#1B5E37' : '#6b7280' }} /></button>
+                <input type="file" ref={fileInputRef} multiple style={{ display: 'none' }} accept="image/*,video/*,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document" onChange={handleFileSelect} />
+                <button type="button" onClick={() => fileInputRef.current?.click()} disabled={uploadingFile} style={{ padding: '10px', background: pendingAttachments.length > 0 ? '#E8F5E9' : '#f9fafb', border: `1px solid ${pendingAttachments.length > 0 ? '#A7D5B8' : '#e5e7eb'}`, borderRadius: '10px', cursor: 'pointer', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  {uploadingFile ? <Loader2 size={18} style={{ color: '#1B5E37', animation: 'spin 1s linear infinite' }} /> : <Paperclip size={18} style={{ color: pendingAttachments.length > 0 ? '#1B5E37' : '#6b7280' }} />}
+                </button>
                 <div style={{ position: 'relative' }}>
                   <button type="button" onClick={() => setShowEmojiPicker(!showEmojiPicker)} style={{ padding: '10px', background: showEmojiPicker ? '#E8F5E9' : '#f9fafb', border: `1px solid ${showEmojiPicker ? '#A7D5B8' : '#e5e7eb'}`, borderRadius: '10px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     <Smile size={18} style={{ color: showEmojiPicker ? '#1B5E37' : '#6b7280' }} />
@@ -1303,9 +1597,9 @@ export default function InboxPage() {
                     </div>
                   )}
                 </div>
-                <textarea value={messageText} onChange={e => setMessageText(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(e as any); } }} placeholder="Type a message..." rows={1} className="input-field" style={{ flex: 1, resize: 'none', maxHeight: '100px', fontFamily: 'Inter, sans-serif', lineHeight: '1.5' }} />
-                <button type="submit" disabled={!messageText.trim() || sendText.isPending} className="btn-primary" style={{ padding: '10px 18px', borderRadius: '10px', flexShrink: 0, opacity: (!messageText.trim() || sendText.isPending) ? 0.5 : 1 }}>
-                  {sendText.isPending ? <Loader2 size={18} /> : <><Send size={16} /> Send</>}
+                <textarea value={messageText} onChange={e => setMessageText(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(e as any); } }} placeholder={pendingAttachments.length > 0 ? "Add an optional caption..." : "Type a message..."} rows={1} className="input-field" style={{ flex: 1, resize: 'none', maxHeight: '100px', fontFamily: 'Inter, sans-serif', lineHeight: '1.5' }} />
+                <button type="submit" disabled={(!messageText.trim() && pendingAttachments.length === 0) || sendText.isPending || uploadingFile} className="btn-primary" style={{ padding: '10px 18px', borderRadius: '10px', flexShrink: 0, opacity: ((!messageText.trim() && pendingAttachments.length === 0) || sendText.isPending || uploadingFile) ? 0.5 : 1 }}>
+                  {(sendText.isPending || uploadingFile) ? <Loader2 size={18} className="spin" /> : <><Send size={16} /> Send</>}
                 </button>
               </form>
             </div>
@@ -1358,7 +1652,18 @@ export default function InboxPage() {
                   <div><span style={{ fontSize: '13px', color: '#6b7280', display: 'block', marginBottom: '6px' }}>Tags</span><div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>{profileData.tags.map((t: string, i: number) => <span key={i} className="tag-pill" style={{ background: '#E8F5E9', color: '#1B5E37' }}>{t}</span>)}</div></div>
                 )}
                 {profileData.notes && <div><span style={{ fontSize: '13px', color: '#6b7280', display: 'block', marginBottom: '4px' }}>Notes</span><span style={{ fontSize: '13px', color: '#374151' }}>{profileData.notes}</span></div>}
-                {profileData.lastSeen && <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ fontSize: '13px', color: '#6b7280' }}>Last Seen</span><span style={{ fontSize: '13px', fontWeight: '600', color: '#1a1a2e' }}>{format(safeDate(profileData.lastSeen), 'dd MMM yyyy, HH:mm')}</span></div>}
+                {(() => {
+                  const lastSeenVal = selectedConv?.lastMessageAt || selectedConv?.lastMessageTime || profileData?.lastSeen || profileData?.updatedAt;
+                  if (!lastSeenVal) return null;
+                  return (
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span style={{ fontSize: '13px', color: '#6b7280' }}>Last Seen</span>
+                      <span style={{ fontSize: '13px', fontWeight: '600', color: '#1a1a2e' }}>
+                        {format(safeDate(lastSeenVal), 'dd MMM yyyy, HH:mm')}
+                      </span>
+                    </div>
+                  );
+                })()}
                 {profileData.createdAt && <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ fontSize: '13px', color: '#6b7280' }}>Customer Since</span><span style={{ fontSize: '13px', fontWeight: '600', color: '#1a1a2e' }}>{format(safeDate(profileData.createdAt), 'dd MMM yyyy')}</span></div>}
               </div>
             </div>

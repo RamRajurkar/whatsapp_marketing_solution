@@ -7,12 +7,67 @@ import toast from 'react-hot-toast';
 import { Zap, Copy, Check, Pencil, Trash2, Plus, ClipboardList, Link, Image, Smile, X } from 'lucide-react';
 import EmojiPicker from 'emoji-picker-react';
 
-const DEFAULT_CATEGORIES = ['General', 'Menu', 'Timings', 'Location', 'Reservations', 'Promotions'];
+const DEFAULT_CATEGORIES = [
+  'Catalogs & Samples',
+  'Pricing & MOQ',
+  'Fabric Specifications',
+  'Order & Shipping',
+  'Custom Manufacturing',
+  'Payment & Terms',
+  'General'
+];
+
 const DEFAULT_REPLIES = [
-  { title: 'Menu', category: 'Menu', body: 'Here is our menu!\n\nWe serve a variety of dishes including appetizers, main courses, and desserts.\nFor the full menu, please visit our website or ask us to send the PDF menu.' },
-  { title: 'Opening Hours', category: 'Timings', body: 'Our opening hours:\n\nMonday - Friday: 11:00 AM - 10:00 PM\nSaturday - Sunday: 10:00 AM - 11:00 PM\n\nWe look forward to welcoming you!' },
-  { title: 'Location', category: 'Location', body: 'Find us here:\n\nAddress: [Your Restaurant Address]\n\nWe are located near [landmark]. Parking is available nearby.\n\nGoogle Maps: [link]' },
-  { title: 'Reservation Instructions', category: 'Reservations', body: 'To make a reservation:\n\n1. Share your name\n2. Preferred date and time\n3. Number of guests\n4. Any special requirements\n\nWe will confirm your booking within minutes!' },
+  {
+    title: '📖 Share Fabric & Apparel Catalog',
+    category: 'Catalogs & Samples',
+    body: 'Hello! Here is our latest wholesale fabric & apparel catalog featuring our newest seasonal collection. You can browse all designs, GSM specifications, and shade cards here: {catalog_url}. Let us know which design codes you would like to order or inquire about!'
+  },
+  {
+    title: '🧵 Swatch Card & Sample Book Request',
+    category: 'Catalogs & Samples',
+    body: 'We offer physical fabric sample swatches and hanger books for bulk buyers! Sample books are available for Rs 500 (100% refundable against your first bulk order). Kindly reply with your business address and GST number to dispatch your swatch card.'
+  },
+  {
+    title: '💰 Wholesale Rates & MOQ Policy',
+    category: 'Pricing & MOQ',
+    body: 'Our standard Wholesale Minimum Order Quantity (MOQ) is 200 meters per fabric shade or 50 pieces per style code. Bulk tiered pricing discounts are applicable for orders above 1,000 meters / 200 pieces. Would you like a customized quotation?'
+  },
+  {
+    title: '📊 Wholesale Price List & GST Terms',
+    category: 'Pricing & MOQ',
+    body: 'Our wholesale prices are quoted ex-factory (+ 5% GST and transport charges extra). Payment terms: 30% advance with order confirmation and balance 70% against LR dispatch copy.'
+  },
+  {
+    title: '🧶 Fabric Quality & GSM Specs',
+    category: 'Fabric Specifications',
+    body: 'Fabric Technical Specifications:\n• Material: 100% Pure Combed Cotton / Premium Rayon Blend\n• GSM: 180 - 220 GSM\n• Width (Panna): 58 - 60 inches\n• Color Fastness: 100% Guaranteed (Reactive Dyeing)\n• Shrinkage: < 2% (Pre-shrunk)'
+  },
+  {
+    title: '✂️ Custom Dyeing & Private Labeling (OEM)',
+    category: 'Custom Manufacturing',
+    body: 'We offer custom Pantone shade dyeing, rotary printing, digital printing, and custom label stitching for private brands! Custom dyeing MOQ is 500 meters per color with a turnaround time of 10-12 working days.'
+  },
+  {
+    title: '🚚 Shipping, Logistics & Dispatch',
+    category: 'Order & Shipping',
+    body: 'Orders are dispatched via trusted logistics partners (V-Trans, TCI, SafeExpress, or your preferred local transport). Standard dispatch turnaround is 24-48 hours after payment receipt. Lorry Receipt (LR) tracking copy is shared immediately upon dispatch.'
+  },
+  {
+    title: '🏦 Official Bank Account Details',
+    category: 'Payment & Terms',
+    body: 'Please find our official company bank account details below:\n• Account Name: Rathod Creation\n• Bank: HDFC Bank\n• A/C No: 50200012345678\n• IFSC Code: HDFC0001234\n• UPI ID: rathodcreation@hdfcbank\n\nPlease share the payment transfer screenshot for instant verification.'
+  },
+  {
+    title: '🏷️ Private Branding & Custom Packaging',
+    category: 'Custom Manufacturing',
+    body: 'We provide full private label packaging solutions including woven main neck labels, wash care tags, barcode stickers, and custom printed poly-bags. Share your brand artwork/tech-pack to get started!'
+  },
+  {
+    title: '📞 Wholesale Helpline & Assistance',
+    category: 'General',
+    body: 'Thank you for reaching out to Rathod Creation Wholesale! Our sales team is reviewing your query. You can also reach our direct wholesale desk at +91 98765 43210 for urgent order requests.'
+  }
 ];
 
 function QuickReplyCard({ reply, onEdit, onDelete }: any) {
@@ -122,7 +177,16 @@ export default function QuickRepliesPage() {
   const createMutation = useMutation({ mutationFn: (d: any) => api.post('/api/quick-replies', d), onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['quickReplies'] }); setModal({ open: false }); toast.success('Created!'); } });
   const updateMutation = useMutation({ mutationFn: ({ id, data }: any) => api.patch(`/api/quick-replies/${id}`, data), onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['quickReplies'] }); setModal({ open: false }); toast.success('Updated!'); } });
   const deleteMutation = useMutation({ mutationFn: (id: string) => api.delete(`/api/quick-replies/${id}`), onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['quickReplies'] }); toast.success('Deleted'); } });
-  const seedDefaults = async () => { for (const r of DEFAULT_REPLIES) { await api.post('/api/quick-replies', r); } queryClient.invalidateQueries({ queryKey: ['quickReplies'] }); toast.success('Default replies added!'); };
+  const seedDefaults = async () => {
+    try {
+      toast.loading('Loading Textile & Apparel templates...', { id: 'seed_toast' });
+      await api.post('/api/quick-replies/seed-textile');
+      queryClient.invalidateQueries({ queryKey: ['quickReplies'] });
+      toast.success('Textile Industry Quick Replies loaded successfully!', { id: 'seed_toast' });
+    } catch (e: any) {
+      toast.error(e.response?.data?.detail || 'Failed to seed templates', { id: 'seed_toast' });
+    }
+  };
   const filtered = (replies || []).filter((r: any) => !filterCat || r.category === filterCat);
   const handleSave = (form: any) => { if (modal.reply) updateMutation.mutate({ id: modal.reply._id, data: form }); else createMutation.mutate(form); };
 
@@ -149,7 +213,7 @@ export default function QuickRepliesPage() {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '12px' }}>
           <div><h1 className="page-title">Quick Replies</h1><p className="page-subtitle">Reusable message templates for common queries</p></div>
           <div style={{ display: 'flex', gap: '10px' }}>
-            {(!replies || replies.length === 0) && <button className="btn-secondary" onClick={seedDefaults}><ClipboardList size={14} /> Load Defaults</button>}
+            <button className="btn-secondary" onClick={seedDefaults} title="Add 10 Textile & Apparel Industry Quick Reply Templates"><ClipboardList size={14} /> Seed Textile Templates</button>
             <button className="btn-primary" onClick={() => setModal({ open: true })}><Zap size={14} /> New Reply</button>
           </div>
         </div>

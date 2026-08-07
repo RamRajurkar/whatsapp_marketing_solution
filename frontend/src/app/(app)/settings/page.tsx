@@ -4,16 +4,46 @@ import { useState, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '@/lib/api';
 import toast from 'react-hot-toast';
-import { Radio, UtensilsCrossed, Loader2, Save, Link, Plug, Lock, Palette, UploadCloud, Image as ImageIcon } from 'lucide-react';
+import { Radio, UtensilsCrossed, Loader2, Save, Link, Plug, Lock, Palette, UploadCloud, Image as ImageIcon, Volume2 } from 'lucide-react';
 import { useBranding } from '@/lib/hooks/useBranding';
 
 export default function SettingsPage() {
   const queryClient = useQueryClient();
   const [form, setForm] = useState<any>({});
   const [testing, setTesting] = useState(false);
+  const [testingWebhook, setTestingWebhook] = useState(false);
+  const [soundEnabled, setSoundEnabled] = useState(true);
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [updatingPassword, setUpdatingPassword] = useState(false);
+
+  useEffect(() => {
+    const saved = localStorage.getItem('notificationSoundEnabled');
+    if (saved !== null) {
+      setSoundEnabled(saved === 'true');
+    }
+  }, []);
+
+  const handleToggleSound = (enabled: boolean) => {
+    setSoundEnabled(enabled);
+    localStorage.setItem('notificationSoundEnabled', enabled ? 'true' : 'false');
+    toast.success(`Notification sound ${enabled ? 'enabled' : 'disabled'}`);
+  };
+
+  const handleTestSound = () => {
+    const soundEnabled = localStorage.getItem('notificationSoundEnabled') !== 'false';
+    if (!soundEnabled) {
+      toast.error('Sound is currently disabled. Enable sound above to hear alerts.');
+      return;
+    }
+    try {
+      const { playNotificationChime } = require('@/components/TopHeader');
+      playNotificationChime();
+      toast.success('Playing notification sound chime! 🔊');
+    } catch {
+      toast.success('Sound chime triggered');
+    }
+  };
 
   // Separate states for branding and API settings to avoid mixing them
   const [brandingForm, setBrandingForm] = useState<any>({});
@@ -23,13 +53,13 @@ export default function SettingsPage() {
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [uploadingBg, setUploadingBg] = useState(false);
 
-  const { data: settings, isLoading } = useQuery({ queryKey: ['settings'], queryFn: () => api.get('/api/settings').then(r => r.data) });
+  const { data: settings, isLoading } = useQuery({ queryKey: ['settings'], queryFn: () => api.get('/api/settings/').then(r => r.data) });
   const { data: brandingData, isLoading: brandingLoading } = useBranding();
 
   useEffect(() => { if (settings) setForm(settings); }, [settings]);
   useEffect(() => { if (brandingData) setBrandingForm(brandingData); }, [brandingData]);
 
-  const updateMutation = useMutation({ mutationFn: (data: any) => api.patch('/api/settings', data), onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['settings'] }); toast.success('Settings saved!'); }, onError: () => toast.error('Failed to save') });
+  const updateMutation = useMutation({ mutationFn: (data: any) => api.patch('/api/settings/', data), onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['settings'] }); toast.success('Settings saved!'); }, onError: () => toast.error('Failed to save') });
   const updateBrandingMutation = useMutation({ mutationFn: (data: any) => api.patch('/api/settings/branding', data), onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['branding'] }); toast.success('Branding saved!'); }, onError: () => toast.error('Failed to save branding') });
   
   const testConnection = async () => {
@@ -98,10 +128,117 @@ export default function SettingsPage() {
 
   if (isLoading || brandingLoading) return <div style={{ padding: '32px' }}><Loader2 className="animate-spin text-emerald-600" /></div>;
 
+  const testWebhook = async () => {
+    if (!form.leadsWebhookUrl) {
+      toast.error('Please enter your Outbound Lead Webhook URL first');
+      return;
+    }
+    setTestingWebhook(true);
+    try {
+      const { data } = await api.post('/api/settings/test-lead-webhook', { webhookUrl: form.leadsWebhookUrl });
+      if (data?.success) {
+        toast.success(`Test payload sent successfully to ${form.leadsWebhookUrl}! (Status: ${data.status_code || 200})`);
+      } else {
+        toast.error(`Webhook test failed: ${data?.error || 'Check server logs'}`);
+      }
+    } catch (err: any) {
+      toast.error(err.response?.data?.detail || 'Failed to dispatch test webhook');
+    } finally {
+      setTestingWebhook(false);
+    }
+  };
+
   return (
     <div>
-      <div className="page-header"><h1 className="page-title">Settings</h1><p className="page-subtitle">Configure your WhatsApp Business API and restaurant information</p></div>
+      <div className="page-header"><h1 className="page-title">Settings</h1><p className="page-subtitle">Configure your WhatsApp Business API, CRM Webhooks, and business information</p></div>
       <div style={{ padding: '0 32px', maxWidth: '720px' }}>
+        
+        {/* Outbound Lead Webhook Settings */}
+        <div className="glass-card" style={{ padding: '28px', marginBottom: '20px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '24px' }}>
+            <div style={{ width: '40px', height: '40px', borderRadius: '12px', background: 'linear-gradient(135deg, #2563EB, #1D4ED8)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Link size={20} color="white" />
+            </div>
+            <div>
+              <h2 style={{ margin: 0, fontSize: '17px', fontWeight: '700', color: '#1a1a2e' }}>Outbound CRM Lead Webhook</h2>
+              <p style={{ margin: 0, fontSize: '13px', color: '#6b7280' }}>Automatically POST captured leads to your central dashboard in real time</p>
+            </div>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <div>
+              <label style={{ fontSize: '13px', fontWeight: '500', color: '#374151', display: 'block', marginBottom: '6px' }}>
+                Central Dashboard Leads Webhook URL
+              </label>
+              <input
+                className="input-field"
+                value={form.leadsWebhookUrl || ''}
+                onChange={e => setForm({ ...form, leadsWebhookUrl: e.target.value })}
+                placeholder="https://your-central-dashboard.com/api/webhooks/whatsapp-leads"
+              />
+              <p style={{ margin: '6px 0 0', fontSize: '11px', color: '#6b7280' }}>
+                Whenever a customer completes a product inquiry on WhatsApp, a POST request with full lead details (product, code, quantity, notes, customer phone) will be automatically sent to this URL.
+              </p>
+            </div>
+            <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+              <button
+                onClick={testWebhook}
+                disabled={testingWebhook}
+                className="btn-secondary"
+                style={{ padding: '9px 18px', fontSize: '13px' }}
+              >
+                {testingWebhook ? <><Loader2 size={15} /> Sending Test...</> : '🧪 Send Test Webhook Payload'}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Notification Sound Settings */}
+        <div className="glass-card" style={{ padding: '28px', marginBottom: '20px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px' }}>
+            <div style={{ width: '40px', height: '40px', borderRadius: '12px', background: 'linear-gradient(135deg, #10B981, #059669)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Volume2 size={20} color="white" />
+            </div>
+            <div>
+              <h2 style={{ margin: 0, fontSize: '17px', fontWeight: '700', color: '#1a1a2e' }}>Notification Sound Alerts</h2>
+              <p style={{ margin: 0, fontSize: '13px', color: '#6b7280' }}>Play audio chime for incoming WhatsApp leads, chats, and messages</p>
+            </div>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px', background: '#F9FAFB', borderRadius: '12px', border: '1px solid #E5E7EB' }}>
+            <div>
+              <div style={{ fontWeight: '600', fontSize: '14px', color: '#111827' }}>Sound Notifications</div>
+              <div style={{ fontSize: '12px', color: '#6B7280' }}>Play audio chime when a new B2B lead or chat message arrives</div>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <button
+                onClick={handleTestSound}
+                className="btn-secondary"
+                style={{ padding: '7px 14px', fontSize: '12px' }}
+              >
+                🔊 Test Sound
+              </button>
+              <label style={{ position: 'relative', display: 'inline-block', width: '48px', height: '24px', cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  checked={soundEnabled}
+                  onChange={e => handleToggleSound(e.target.checked)}
+                  style={{ opacity: 0, width: 0, height: 0 }}
+                />
+                <span style={{
+                  position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+                  backgroundColor: soundEnabled ? '#10B981' : '#D1D5DB',
+                  borderRadius: '24px', transition: '0.2s'
+                }}>
+                  <span style={{
+                    position: 'absolute', content: '""', height: '18px', width: '18px',
+                    left: soundEnabled ? '26px' : '3px', bottom: '3px',
+                    backgroundColor: 'white', borderRadius: '50%', transition: '0.2s'
+                  }} />
+                </span>
+              </label>
+            </div>
+          </div>
+        </div>
+
         <div className="glass-card" style={{ padding: '28px', marginBottom: '20px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '24px' }}>
             <div style={{ width: '40px', height: '40px', borderRadius: '12px', background: 'linear-gradient(135deg, #1B5E37, #2E7D4F)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Radio size={20} color="white" /></div>

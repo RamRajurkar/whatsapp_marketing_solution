@@ -15,28 +15,97 @@ router = APIRouter()
 class ReservationStatusUpdate(BaseModel):
     status: str
 
+@router.get("")
 @router.get("/")
 async def get_reservations(
     status: Optional[str] = None,
     current_user: dict = Depends(get_current_user)
 ):
-    """Get all bookings, optionally filtered by status."""
+    """Get all captured wholesale product leads & inquiries."""
     tenant_filter = get_tenant_filter(current_user)
     query = {}
     if status and status != "All":
         query["status"] = status
         
     if tenant_filter:
-        if query:
-            query = {"$and": [query, tenant_filter]}
-        else:
-            query = tenant_filter
+        tenant_id = tenant_filter.get("tenantId")
+        if tenant_id:
+            tenant_clause = {"$or": [{"tenantId": tenant_id}, {"tenantId": None}, {"tenantId": {"$exists": False}}]}
+            if query:
+                query = {"$and": [query, tenant_clause]}
+            else:
+                query = tenant_clause
             
+    # Calculate total inquiry count per phone number to alert repeat leads
+    phone_counts = {}
+    async for r_doc in db.db.reservations.find(query if query else {}):
+        ph = str(r_doc.get("phone", "") or r_doc.get("customerPhone", ""))
+        if ph:
+            phone_counts[ph] = phone_counts.get(ph, 0) + 1
+
     reservations = []
     cursor = db.db.reservations.find(query).sort("createdAt", -1)
     async for res in cursor:
         res["_id"] = str(res["_id"])
+
+        # Parse Wholesale Lead CRM Fields
+        guest_name = str(res.get("guestName", ""))
+        date_str = str(res.get("date", ""))
+        time_str = str(res.get("time", ""))
+        phone = str(res.get("phone", "") or res.get("customerPhone", ""))
+        
+        # Resolve Customer Profile Name
+        customer_name = res.get("customerName")
+        if not customer_name or customer_name == phone:
+            cust = await db.db.customers.find_one({"phone": phone})
+            if cust and cust.get("name") and cust["name"] != phone:
+                customer_name = cust["name"]
+            else:
+                customer_name = guest_name if ("Wholesale Inquiry" not in guest_name and guest_name.strip()) else phone
+
+        # Extract product name
+        prod_name = res.get("productName")
+        if not prod_name:
+            if "Wholesale Inquiry:" in guest_name:
+                prod_name = guest_name.split("Wholesale Inquiry:")[1].strip()
+            else:
+                prod_name = guest_name or "General Product Inquiry"
+                
+        # Extract style code
+        style_code = res.get("styleCode")
+        if not style_code:
+            if "Code:" in date_str:
+                style_code = date_str.split("Code:")[1].strip()
+            else:
+                style_code = date_str or "N/A"
+                
+        # Extract quantity range
+        qty = res.get("quantityRange") or res.get("guests") or "N/A"
+        
+        # Extract requirements
+        reqs = res.get("requirements")
+        if not reqs:
+            if "Comments:" in time_str:
+                reqs = time_str.split("Comments:")[1].strip()
+            else:
+                reqs = time_str if time_str != "Now" else "No specific comments"
+
+        created_at = res.get("createdAt")
+        if hasattr(created_at, "isoformat"):
+            created_at = created_at.isoformat()
+
+        res["customerName"] = customer_name
+        res["productName"] = prod_name
+        res["styleCode"] = style_code
+        res["quantityRange"] = qty
+        res["requirements"] = reqs
+        res["customerPhone"] = phone
+        res["createdAt"] = created_at or _now().isoformat()
+        res["inquiryCount"] = phone_counts.get(phone, 1)
+        res["isRepeatLead"] = phone_counts.get(phone, 1) > 1
+        
         reservations.append(res)
+
     return {"data": reservations}
 
 @router.patch("/{res_id}/status")
@@ -45,8 +114,8 @@ async def update_reservation_status(
     data: ReservationStatusUpdate,
     current_user: dict = Depends(get_current_user)
 ):
-    """Update a reservation status (Pending, Confirmed, Cancelled, Completed)."""
-    if data.status not in ["Pending", "Confirmed", "Cancelled", "Completed"]:
+    """Update a lead/reservation status (Pending, Contacted, Confirmed, Completed, Cancelled)."""
+    if data.status not in ["Pending", "Contacted", "Confirmed", "Completed", "Cancelled"]:
         raise HTTPException(status_code=400, detail="Invalid status")
         
     tenant_filter = get_tenant_filter(current_user)
@@ -65,6 +134,13 @@ async def update_reservation_status(
     updated_res = await db.db.reservations.find_one(query)
     if updated_res:
         updated_res["_id"] = str(updated_res["_id"])
+        
+        # Dispatch Outbound Lead Status Webhook
+        try:
+            from app.services.webhook_dispatcher import dispatch_lead_webhook
+            await dispatch_lead_webhook(updated_res, event_type="lead.updated", tenant_id=current_user.get("_id"))
+        except Exception as wh_err:
+            print(f"[Lead Webhook Update Error] {wh_err}")
         
         # Trigger feedback message if completed
         if data.status == "Completed":

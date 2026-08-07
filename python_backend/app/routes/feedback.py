@@ -24,6 +24,7 @@ async def get_feedback_stats(current_user: dict = Depends(get_current_user)):
         
     return {"data": stats}
 
+@router.get("")
 @router.get("/")
 async def get_all_feedback(current_user: dict = Depends(get_current_user)):
     """Get all feedback items."""

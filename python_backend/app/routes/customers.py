@@ -27,6 +27,7 @@ class CustomerUpdate(BaseModel):
     tags: Optional[List[str]] = None
     notes: Optional[str] = None
 
+@router.get("")
 @router.get("/")
 async def get_customers(
     search: str = Query(""), 

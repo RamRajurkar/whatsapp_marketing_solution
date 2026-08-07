@@ -70,8 +70,8 @@ export default function MenuPage() {
       <div className="page-header">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
           <div>
-            <h1 className="page-title">Menu Management</h1>
-            <p className="page-subtitle">Upload and manage your restaurant menu files</p>
+            <h1 className="page-title">Catalogs & Price Lists</h1>
+            <p className="page-subtitle">Upload and manage your wholesale product catalog PDFs, lookbooks, and price lists</p>
           </div>
           {assets?.length > 0 && (
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 16px', background: '#E8F5E9', borderRadius: '10px' }}>
@@ -115,15 +115,15 @@ export default function MenuPage() {
           ) : (
             <>
               <Upload size={44} style={{ color: '#1B5E37', marginBottom: '16px' }} />
-              <h3 style={{ margin: '0 0 8px', color: '#1a1a2e', fontSize: '18px', fontWeight: '700' }}>Upload Menu Files</h3>
-              <p style={{ margin: '0 0 16px', color: '#6b7280', fontSize: '14px' }}>Drag & drop or click to upload PDF menus or menu images</p>
+              <h3 style={{ margin: '0 0 8px', color: '#1a1a2e', fontSize: '18px', fontWeight: '700' }}>Upload B2B Catalogs & Price Lists</h3>
+              <p style={{ margin: '0 0 16px', color: '#6b7280', fontSize: '14px' }}>Drag & drop or click to upload wholesale lookbooks, rate sheets, or product flyers</p>
               <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
-                <span className="tag-pill" style={{ background: '#FEE2E2', color: '#B91C1C' }}><FileText size={12} /> PDF</span>
-                <span className="tag-pill" style={{ background: '#DBEAFE', color: '#1D4ED8' }}><Image size={12} /> JPEG/PNG</span>
+                <span className="tag-pill" style={{ background: '#FEE2E2', color: '#B91C1C' }}><FileText size={12} /> PDF Catalog</span>
+                <span className="tag-pill" style={{ background: '#DBEAFE', color: '#1D4ED8' }}><Image size={12} /> Rate Sheet Image</span>
                 <span className="tag-pill" style={{ background: '#f3f4f6', color: '#6b7280' }}>Max 16MB</span>
               </div>
               <p style={{ margin: '16px 0 0', color: '#9ca3af', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '4px', justifyContent: 'center' }}>
-                <AlertCircle size={12} /> Files are stored locally on this machine
+                <AlertCircle size={12} /> Catalogs are stored locally and accessible for WhatsApp automated dispatch
               </p>
             </>
           )}
@@ -136,13 +136,14 @@ export default function MenuPage() {
           </div>
         ) : !assets?.length ? (
           <div className="glass-card" style={{ padding: '48px', textAlign: 'center', color: '#9ca3af' }}>
-            <UtensilsCrossed size={36} style={{ color: '#d1d5db', marginBottom: '12px' }} />
-            <p>No menu files uploaded yet.</p>
+            <FileText size={40} style={{ color: '#d1d5db', marginBottom: '12px' }} />
+            <h3 style={{ margin: '0 0 6px', fontSize: '16px', fontWeight: '600', color: '#374151' }}>No product catalogs uploaded yet</h3>
+            <p style={{ margin: 0, fontSize: '13px', color: '#6b7280' }}>Upload your wholesale lookbooks and rate cards above so buyers can receive them on WhatsApp.</p>
           </div>
         ) : (
           <div>
             <h3 style={{ margin: '0 0 16px', fontSize: '16px', fontWeight: '700', color: '#1a1a2e', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <FolderOpen size={18} style={{ color: '#1B5E37' }} /> Uploaded Menu Files ({assets.length})
+              <FolderOpen size={18} style={{ color: '#1B5E37' }} /> Available B2B Catalogs & Lookbooks ({assets.length})
             </h3>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '16px' }}>
               {assets.map((asset: any) => (
@@ -153,9 +154,9 @@ export default function MenuPage() {
                     <div style={{ fontSize: '11px', color: '#9ca3af', marginBottom: '12px' }}>{(asset.size / 1024).toFixed(0)} KB</div>
                     <div style={{ display: 'flex', gap: '8px' }}>
                       <a href={getViewUrl(asset)} target="_blank" rel="noopener noreferrer" style={{ flex: 1 }}>
-                        <button className="btn-secondary" style={{ width: '100%', padding: '8px', fontSize: '12px' }}><Eye size={12} /> View</button>
+                        <button className="btn-secondary" style={{ width: '100%', padding: '8px', fontSize: '12px' }}><Eye size={12} /> View Catalog</button>
                       </a>
-                      <button className="btn-danger" style={{ padding: '8px 12px', fontSize: '12px' }} onClick={() => { if (confirm('Delete this menu file?')) deleteMutation.mutate(asset._id); }}>
+                      <button className="btn-danger" style={{ padding: '8px 12px', fontSize: '12px' }} onClick={() => { if (confirm('Delete this catalog file?')) deleteMutation.mutate(asset._id); }}>
                         <Trash2 size={12} />
                       </button>
                     </div>

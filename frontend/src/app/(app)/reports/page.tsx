@@ -5,7 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 import api from '@/lib/api';
 import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { format } from 'date-fns';
-import { Users, MessageSquare, CalendarDays, Megaphone } from 'lucide-react';
+import { Users, MessageSquare, ClipboardList, Megaphone } from 'lucide-react';
 
 export default function ReportsPage() {
   const [days, setDays] = useState(7);
@@ -13,13 +13,12 @@ export default function ReportsPage() {
   const { data: dashboard } = useQuery({ queryKey: ['dashboard'], queryFn: () => api.get('/api/reports/dashboard').then(r => r.data) });
   const messageChart = data?.dailyMessages?.map((d: any) => ({ date: format(new Date(d._id), 'MMM d'), Received: d.inbound, Sent: d.outbound })) || [];
   const customerChart = data?.dailyCustomers?.map((d: any) => ({ date: format(new Date(d._id), 'MMM d'), 'New Customers': d.count })) || [];
-  const reservationChart = data?.dailyReservations?.map((d: any) => ({ date: format(new Date(d._id), 'MMM d'), Reservations: d.count })) || [];
 
   return (
     <div>
       <div className="page-header">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-          <div><h1 className="page-title">Reports & Analytics</h1><p className="page-subtitle">Track your restaurant&apos;s WhatsApp performance</p></div>
+          <div><h1 className="page-title">Reports & Analytics</h1><p className="page-subtitle">Track your WhatsApp marketing & performance</p></div>
           <div style={{ display: 'flex', gap: '8px' }}>
             {[7, 14, 30].map(d => (
               <button key={d} onClick={() => setDays(d)} style={{ padding: '8px 16px', borderRadius: '10px', border: '1.5px solid', fontSize: '13px', cursor: 'pointer', fontFamily: 'Inter, sans-serif', fontWeight: '600', background: days === d ? '#1B5E37' : 'white', color: days === d ? 'white' : '#374151', borderColor: days === d ? '#1B5E37' : '#e5e7eb' }}>{d}d</button>
@@ -38,11 +37,11 @@ export default function ReportsPage() {
             </div>
           </div>
         )}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', marginBottom: '28px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px', marginBottom: '28px' }}>
           {[
             { icon: Users, label: 'Total Customers', value: dashboard?.totalCustomers || 0, color: '#1B5E37', bg: '#E8F5E9' },
             { icon: MessageSquare, label: 'Total Messages', value: data?.totals?.messages || 0, color: '#1D4ED8', bg: '#DBEAFE' },
-            { icon: CalendarDays, label: 'Total Reservations', value: data?.totals?.reservations || 0, color: '#B45309', bg: '#FEF3C7' },
+            { icon: ClipboardList, label: 'Leads & Enquiries', value: data?.totals?.reservations || 0, color: '#B45309', bg: '#FEF3C7' },
             { icon: Megaphone, label: 'Broadcasts Sent', value: data?.totals?.broadcasts?.campaigns || 0, color: '#6D28D9', bg: '#EDE9FE' },
           ].map(stat => {
             const Icon = stat.icon;
@@ -77,12 +76,6 @@ export default function ReportsPage() {
             {isLoading ? <div className="skeleton" style={{ height: '200px' }} /> : customerChart.length > 0 ? (
               <ResponsiveContainer width="100%" height={200}><BarChart data={customerChart}><CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" /><XAxis dataKey="date" tick={{ fontSize: 11, fill: '#9ca3af' }} /><YAxis tick={{ fontSize: 11, fill: '#9ca3af' }} /><Tooltip contentStyle={{ borderRadius: '10px', fontSize: '12px' }} /><Bar dataKey="New Customers" fill="#1B5E37" radius={[4, 4, 0, 0]} /></BarChart></ResponsiveContainer>
             ) : <div style={{ height: '200px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#9ca3af', fontSize: '13px' }}>No data yet</div>}
-          </div>
-          <div className="glass-card" style={{ padding: '24px', gridColumn: '1 / -1' }}>
-            <h3 style={{ margin: '0 0 20px', fontSize: '15px', fontWeight: '700', color: '#1a1a2e', display: 'flex', alignItems: 'center', gap: '8px' }}><CalendarDays size={16} style={{ color: '#1B5E37' }} /> Reservations (Last {days} Days)</h3>
-            {isLoading ? <div className="skeleton" style={{ height: '180px' }} /> : reservationChart.length > 0 ? (
-              <ResponsiveContainer width="100%" height={180}><BarChart data={reservationChart}><CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" /><XAxis dataKey="date" tick={{ fontSize: 11, fill: '#9ca3af' }} /><YAxis tick={{ fontSize: 11, fill: '#9ca3af' }} /><Tooltip contentStyle={{ borderRadius: '10px', fontSize: '12px' }} /><Bar dataKey="Reservations" fill="#B45309" radius={[4, 4, 0, 0]} /></BarChart></ResponsiveContainer>
-            ) : <div style={{ height: '180px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#9ca3af', fontSize: '13px' }}>No data yet</div>}
           </div>
         </div>
       </div>

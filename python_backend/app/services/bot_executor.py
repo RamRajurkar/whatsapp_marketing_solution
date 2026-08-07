@@ -189,22 +189,27 @@ async def _execute_node_action(
     result = {"success": True}
     
     if action_type == "create_lead_or_booking":
-        # Resolve values
-        resolved_payload = {}
-        for k, v in payload_config.items():
-            if isinstance(v, str):
-                resolved_payload[k] = v.format(**context)
-            else:
-                resolved_payload[k] = v
-                
-        # Handle reservation/booking creation
-        guest_name = resolved_payload.get("fullName") or context.get("user_fullname") or phone_number
+        # Safe context resolution
+        prod_name = context.get("product_name") or "Product Inquiry"
+        if "Wholesale Inquiry:" in str(context.get("product_query", "")):
+            prod_name = context["product_query"].replace("Wholesale Inquiry:", "").strip()
+
+        prod_code = context.get("product_code") or "N/A"
+        qty_val = context.get("quantity") or context.get("quantityRange") or context.get("qty") or "N/A"
+        req_val = context.get("comments") or context.get("requirements") or "No specific notes"
+        guest_name = f"Wholesale Inquiry: {prod_name}"
+
         booking_doc = {
             "guestName": guest_name,
+            "productName": prod_name,
+            "styleCode": prod_code,
+            "quantityRange": qty_val,
+            "requirements": req_val,
             "phone": phone_number,
-            "guests": resolved_payload.get("guests") or resolved_payload.get("guestCount") or "1",
-            "date": resolved_payload.get("date") or "Today",
-            "time": resolved_payload.get("time") or "Now",
+            "customerPhone": phone_number,
+            "guests": qty_val,
+            "date": f"Code: {prod_code}",
+            "time": f"Comments: {req_val}",
             "status": "Pending",
             "createdAt": _now(),
             "updatedAt": _now()
@@ -222,6 +227,13 @@ async def _execute_node_action(
             "updatedAt": booking_doc["updatedAt"].isoformat()
         }
         await sio.emit("reservation:new", res_emit)
+
+        # Dispatch Outbound Webhook to External Dashboard (Product Inquiry)
+        try:
+            from app.services.webhook_dispatcher import dispatch_lead_webhook
+            await dispatch_lead_webhook(res_emit, event_type="lead.product_inquiry", inquiry_type="product_inquiry", tenant_id=tenant_id)
+        except Exception as wh_err:
+            print(f"[Lead Webhook Error] {wh_err}")
         
     elif action_type == "fetch_order_status":
         order_lookup = context.get("order_lookup", "").strip()
@@ -276,9 +288,31 @@ async def _execute_node_action(
         await sio.emit("support_ticket:new", ticket_emit)
         print(f"[CRM] Support Ticket Created: {ticket_emit}")
 
-    elif action_type == "send_menu":
-        # Resolve menu attachment URL or details if needed
-        pass
+        # Dispatch Outbound Webhook to External Dashboard (Support Request)
+        try:
+            from app.services.webhook_dispatcher import dispatch_lead_webhook
+            await dispatch_lead_webhook(ticket_emit, event_type="lead.support_request", inquiry_type="support_request", tenant_id=tenant_id)
+        except Exception as wh_err:
+            print(f"[Support Webhook Error] {wh_err}")
+
+    elif action_type in ("send_menu", "catalog_inquiry", "log_catalog_inquiry"):
+        cat_doc = {
+            "customerPhone": phone_number,
+            "catalogUrl": payload_config.get("catalogUrl") or "http://localhost/menu",
+            "notes": "Customer requested digital fabric & design catalog via WhatsApp",
+            "status": "New",
+            "createdAt": _now(),
+            "updatedAt": _now()
+        }
+        if tenant_id and getattr(settings, "APP_MODE", "self_hosted") == "saas":
+            cat_doc["tenantId"] = tenant_id
+
+        # Dispatch Outbound Webhook to External Dashboard (Catalog Inquiry)
+        try:
+            from app.services.webhook_dispatcher import dispatch_lead_webhook
+            await dispatch_lead_webhook(cat_doc, event_type="lead.catalog_inquiry", inquiry_type="catalog_inquiry", tenant_id=tenant_id)
+        except Exception as wh_err:
+            print(f"[Catalog Webhook Error] {wh_err}")
         
     elif action_type == "save_context":
         # Save static variables from payload to session context
@@ -299,6 +333,12 @@ async def execute_chatbot_flow(
     Resolves session history, parses triggers, executes logic nodes, 
     validates input, and sends structured responses.
     """
+    # 0. Check global chatbot active status
+    bot_settings = await db.db.bot_settings.find_one({})
+    if bot_settings and not bot_settings.get("isActive", False):
+        print("[Bot Executor] Chatbot is set to Inactive (isActive=False). Skipping auto-reply.")
+        return None
+
     # 1. Fetch chatbot flow schema
     flow_query = {}
     if tenant_id and getattr(settings, "APP_MODE", "self_hosted") == "saas":
@@ -603,6 +643,9 @@ async def execute_chatbot_flow(
                     if matched_row:
                         current_node_id = matched_row.get("nextNode")
                         input_accepted = True
+                        row_title = matched_row.get("title", "")
+                        context["quantity"] = row_title
+                        context["quantityRange"] = row_title
             
             # If not list reply, resend list prompt
             if not input_accepted:
@@ -647,7 +690,7 @@ async def execute_chatbot_flow(
             
             # Progress pointer
             current_node_id = node.get("nextNode")
-            if not current_node_id:
+            if not current_node_id or node.get("endSession"):
                 # End of flow — clean up session
                 await db.db.customer_sessions.delete_one({"phone": phone_number})
                 break

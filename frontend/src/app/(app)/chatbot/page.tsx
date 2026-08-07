@@ -586,9 +586,8 @@ export default function ChatbotPage() {
 
   // Unified save action
   const handleSave = () => {
-    if (activeTab === 'simple') {
-      updateSettingsMutation.mutate(form);
-    } else {
+    updateSettingsMutation.mutate(form);
+    if (activeTab === 'advanced') {
       if (jsonError) {
         toast.error(`Please resolve JSON errors first: ${jsonError}`);
         return;
@@ -600,6 +599,13 @@ export default function ChatbotPage() {
         toast.error(`Invalid JSON formatting: ${e.message}`);
       }
     }
+  };
+
+  const handleToggleActive = () => {
+    const nextState = !form.isActive;
+    const updatedForm = { ...form, isActive: nextState };
+    setForm(updatedForm);
+    updateSettingsMutation.mutate(updatedForm);
   };
 
   // Resolve parsed flow dynamically for simulator and preview
@@ -706,7 +712,7 @@ export default function ChatbotPage() {
                 </div>
               </div>
               <button
-                onClick={() => setForm({ ...form, isActive: !form.isActive })}
+                onClick={handleToggleActive}
                 style={{ background: 'none', border: 'none', cursor: 'pointer', color: form.isActive ? '#1B5E37' : '#9CA3AF', transition: 'color 0.2s' }}
                 aria-label="Toggle chatbot"
               >

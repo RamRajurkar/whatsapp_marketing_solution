@@ -179,16 +179,20 @@ async def _process_webhook_body(body: dict) -> dict:
                             },
                         )
 
-                    # Always sync profile name to customers and broadcast_recipients if name is provided
+                    # Always sync profile name and lastSeen timestamp to customer collection
+                    cust_set_fields = {"lastSeen": _now(), "updatedAt": _now()}
                     if customer_name and customer_name != "Unknown" and customer_name != phone_number:
-                        await db.db.customers.update_one(
-                            {"phone": phone_number},
-                            {"$set": {"name": customer_name, "updatedAt": _now()}}
-                        )
+                        cust_set_fields["name"] = customer_name
                         await db.db.broadcast_recipients.update_many(
                             {"customerPhone": phone_number},
                             {"$set": {"customerName": customer_name, "updatedAt": _now()}}
                         )
+
+                    await db.db.customers.update_one(
+                        {"phone": phone_number},
+                        {"$set": cust_set_fields, "$setOnInsert": {"createdAt": _now(), "phone": phone_number}},
+                        upsert=True
+                    )
 
                     # Save inbound message
                     message_doc = {

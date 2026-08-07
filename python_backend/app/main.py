@@ -115,7 +115,7 @@ async def lifespan(app: FastAPI):
     await close_http_client()
     await close_mongo_connection()
 
-app = FastAPI(title="RestoChat API", lifespan=lifespan, redirect_slashes=False)
+app = FastAPI(title="RestoChat API", lifespan=lifespan, redirect_slashes=True)
 
 # Attach rate limiter to app state
 app.state.limiter = limiter

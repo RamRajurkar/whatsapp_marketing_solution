@@ -5,13 +5,13 @@ import { Providers } from './providers';
 import type { Viewport } from 'next';
 
 export const metadata: Metadata = {
-  title: 'RestoChat — Restaurant WhatsApp Manager',
-  description: 'Manage your restaurant WhatsApp communications with ease. Real-time inbox, reservations, broadcasts and more.',
+  title: 'BlackAngler WA — WhatsApp Wholesale & Marketing Platform',
+  description: 'Manage your WhatsApp wholesale communications with ease. Real-time inbox, catalogs, broadcasts, and automation.',
   manifest: '/manifest.json',
   appleWebApp: {
     capable: true,
     statusBarStyle: 'default',
-    title: 'RestoChat',
+    title: 'BlackAngler WA',
   },
 };
 
@@ -34,6 +34,15 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         />
       </head>
       <body>
+        <script dangerouslySetInnerHTML={{ __html: `
+          if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
+            navigator.serviceWorker.getRegistrations().then(function(registrations) {
+              for(let registration of registrations) {
+                registration.unregister();
+              }
+            });
+          }
+        ` }} />
         <Providers>{children}</Providers>
       </body>
     </html>

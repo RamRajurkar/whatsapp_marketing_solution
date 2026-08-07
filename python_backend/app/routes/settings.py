@@ -23,7 +23,12 @@ class SettingsUpdate(BaseModel):
     waBusinessAccountId: Optional[str] = None
     waAccessToken: Optional[str] = None
     waVerifyToken: Optional[str] = None
+    leadsWebhookUrl: Optional[str] = None
     password: Optional[str] = None
+
+class TestWebhookRequest(BaseModel):
+    webhookUrl: str
+    inquiryType: Optional[str] = "product_inquiry"
 
 class BrandingUpdate(BaseModel):
     appName: Optional[str] = None
@@ -55,6 +60,7 @@ DEFAULT_BRANDING = {
     ]
 }
 
+@router.get("")
 @router.get("/")
 async def get_settings(current_user: dict = Depends(get_current_user)):
     # current_user already contains all user fields from get_current_user
@@ -67,9 +73,45 @@ async def get_settings(current_user: dict = Depends(get_current_user)):
         "waBusinessAccountId": current_user.get("waBusinessAccountId") or settings.WA_BUSINESS_ACCOUNT_ID or "",
         "waAccessToken": current_user.get("waAccessToken") or settings.WA_ACCESS_TOKEN or "",
         "waVerifyToken": current_user.get("waVerifyToken") or settings.WA_VERIFY_TOKEN or "",
+        "leadsWebhookUrl": current_user.get("leadsWebhookUrl") or os.getenv("OUTBOUND_LEADS_WEBHOOK_URL", ""),
         "email": current_user.get("email", "")
     }
 
+@router.post("/test-lead-webhook")
+async def test_lead_webhook(req: TestWebhookRequest, current_user: dict = Depends(get_current_user)):
+    """Dispatch a mock lead test payload to user's central dashboard webhook URL."""
+    from app.services.webhook_dispatcher import dispatch_lead_webhook
+    from datetime import datetime, timezone
+    
+    inq_type = getattr(req, "inquiryType", None) or "product_inquiry"
+    mock_lead = {
+        "_id": f"simulated_{inq_type}_9999",
+        "customerName": "Test Customer (Rathod Creation)",
+        "customerPhone": "918625067058",
+        "productName": "Silk Designer Saree",
+        "styleCode": "RC-SAREE-902",
+        "quantityRange": "20+ pieces",
+        "requirements": "Sample Test Webhook Payload from WhatsApp Platform",
+        "catalogUrl": "http://localhost/menu",
+        "issueDescription": "Customer requested assistance",
+        "status": "Pending",
+        "createdAt": datetime.now(timezone.utc).isoformat(),
+        "tenantId": str(current_user.get("_id"))
+    }
+    
+    # Dispatch webhook using provided req.webhookUrl
+    res = await dispatch_lead_webhook(
+        mock_lead, 
+        event_type=f"lead.{inq_type}", 
+        inquiry_type=inq_type, 
+        tenant_id=str(current_user.get("_id")),
+        override_webhook_url=req.webhookUrl
+    )
+    if res and not res.get("success"):
+        raise HTTPException(status_code=400, detail=res.get("error", "Failed to connect to test webhook URL"))
+    return res or {"success": True, "message": f"Test webhook for {inq_type} dispatched"}
+
+@router.patch("")
 @router.patch("/")
 async def update_settings(settings_data: SettingsUpdate, current_user: dict = Depends(get_current_user)):
     user_id = current_user["_id"]

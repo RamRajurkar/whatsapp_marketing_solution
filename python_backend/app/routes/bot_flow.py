@@ -79,6 +79,7 @@ DEFAULT_FLOW = {
     }
 }
 
+@router.get("")
 @router.get("/")
 async def get_chatbot_flow(current_user: dict = Depends(get_current_user)):
     """Fetch the active chatbot state-machine flow JSON."""
@@ -127,7 +128,10 @@ async def get_chatbot_flow(current_user: dict = Depends(get_current_user)):
         
     return flow
 
+@router.post("")
 @router.post("/")
+@router.put("")
+@router.put("/")
 async def update_chatbot_flow(
     data: FlowPayload,
     current_user: dict = Depends(get_current_user)

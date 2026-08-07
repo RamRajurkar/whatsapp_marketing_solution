@@ -19,6 +19,7 @@ class FAQItemUpdate(BaseModel):
     answer: Optional[str] = None
     isActive: Optional[bool] = None
 
+@router.get("")
 @router.get("/")
 async def get_faqs(current_user: dict = Depends(get_current_user)):
     """Get all FAQ items."""

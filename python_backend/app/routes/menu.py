@@ -89,6 +89,7 @@ async def upload_menu_file(
     return doc
 
 
+@router.get("")
 @router.get("/")
 async def list_menu_assets(current_user: dict = Depends(get_current_user)):
     """Retrieve all uploaded menu files."""

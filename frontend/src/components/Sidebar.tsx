@@ -14,7 +14,7 @@ import {
   Users,
   CalendarDays,
   Zap,
-  UtensilsCrossed,
+  BookOpen,
   Megaphone,
   BarChart3,
   Settings,
@@ -32,12 +32,12 @@ const menuItems = [
   { href: '/dashboard',     icon: LayoutDashboard, label: 'Dashboard' },
   { href: '/inbox',         icon: MessageSquare,   label: 'Inbox' },
   { href: '/chatbot',       icon: MessageCircle,   label: 'Chatbot' },
-  { href: '/faq',           icon: HelpCircle,      label: 'Smart FAQ' },
+  { href: '/faq',           icon: HelpCircle,      label: 'Smart FAQ', hidden: true },
   { href: '/customers',     icon: Users,           label: 'Customers' },
-  { href: '/reservations',  icon: CalendarDays,    label: 'Reservations' },
-  { href: '/feedback',      icon: Star,            label: 'Feedback' },
+  { href: '/reservations',  icon: CalendarDays,    label: 'Leads & Enquiries' },
+  { href: '/feedback',      icon: Star,            label: 'Feedback', hidden: true },
   { href: '/quick-replies', icon: Zap,             label: 'Quick Replies' },
-  { href: '/menu',          icon: UtensilsCrossed, label: 'Menu' },
+  { href: '/menu',          icon: BookOpen,        label: 'Catalogs & Price Lists' },
   { href: '/templates',     icon: MessageCircle,   label: 'Templates' },
   { href: '/broadcasts',    icon: Megaphone,       label: 'Broadcasts' },
   { href: '/media',         icon: Image,           label: 'Media' },
@@ -159,7 +159,7 @@ export function Sidebar() {
         {/* ── Menu section ── */}
         <div className="sidebar-section-label">Menu</div>
         <nav style={{ flex: 1 }}>
-          {menuItems.map((item) => {
+          {menuItems.filter(item => !item.hidden).map((item) => {
             const Icon     = item.icon;
             const isActive = pathname.startsWith(item.href);
             return (
@@ -197,7 +197,7 @@ export function Sidebar() {
             className="sidebar-link"
             onClick={() =>
               window.open(
-                `https://wa.me/917447875452?text=${encodeURIComponent('Hello! I need some help regarding the RestoChat system.')}`,
+                `https://wa.me/918625067058?text=${encodeURIComponent('Hello! I need assistance with BlackAngler WA WhatsApp Wholesale Platform.')}`,
                 '_blank'
               )
             }

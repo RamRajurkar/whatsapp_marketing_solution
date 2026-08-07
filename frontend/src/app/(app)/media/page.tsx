@@ -11,11 +11,17 @@ export default function MediaPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
 
-  const { data, isLoading } = useQuery({
+  const { data: mediaItems = [], isLoading } = useQuery({
     queryKey: ['media'],
     queryFn: async () => {
-      const res = await api.get('/api/media');
-      return res.data.media;
+      try {
+        const res = await api.get('/api/media/');
+        if (Array.isArray(res.data)) return res.data;
+        if (Array.isArray(res.data?.media)) return res.data.media;
+        return [];
+      } catch (e) {
+        return [];
+      }
     }
   });
 
@@ -107,7 +113,7 @@ export default function MediaPage() {
         <div style={{ background: 'white', borderRadius: '16px', border: '1px solid #e5e7eb', padding: '24px', minHeight: '400px' }}>
           {isLoading ? (
             <div style={{ textAlign: 'center', color: '#9ca3af', paddingTop: '80px' }}>Loading media...</div>
-          ) : !data || data.length === 0 ? (
+          ) : !Array.isArray(mediaItems) || mediaItems.length === 0 ? (
             <div style={{ textAlign: 'center', color: '#9ca3af', paddingTop: '80px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
               <ImageIcon size={48} style={{ color: '#d1d5db', marginBottom: '16px' }} />
               <h3 style={{ fontSize: '18px', fontWeight: '600', color: '#374151', margin: '0 0 8px' }}>No media uploaded</h3>
@@ -115,7 +121,7 @@ export default function MediaPage() {
             </div>
           ) : (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '20px' }}>
-              {data.map((item: any) => (
+              {mediaItems.map((item: any) => (
                 <div key={item._id} style={{ position: 'relative', borderRadius: '12px', overflow: 'hidden', border: '1px solid #e5e7eb', backgroundColor: '#f9fafb', group: 'true' }}>
                   <div style={{ paddingBottom: '100%', position: 'relative' }}>
                     <img 

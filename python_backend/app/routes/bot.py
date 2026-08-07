@@ -16,6 +16,7 @@ class BotSettingsUpdate(BaseModel):
     openHour: int = 11
     closeHour: int = 23
 
+@router.get("")
 @router.get("/")
 async def get_bot_settings(current_user: dict = Depends(get_current_user)):
     """Get chatbot settings."""
@@ -34,7 +35,12 @@ async def get_bot_settings(current_user: dict = Depends(get_current_user)):
     settings["_id"] = str(settings["_id"])
     return settings
 
+@router.post("")
 @router.post("/")
+@router.put("")
+@router.put("/")
+@router.patch("")
+@router.patch("/")
 async def update_bot_settings(data: BotSettingsUpdate, current_user: dict = Depends(get_current_user)):
     """Update chatbot settings."""
     doc = data.model_dump()
