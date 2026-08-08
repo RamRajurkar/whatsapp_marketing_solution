@@ -64,6 +64,8 @@ def send_broadcast(
     tenant_id: Optional[str] = None,
     recipient_phones: Optional[List[str]] = None,
     csv_audience: Optional[List[dict]] = None,
+    speed_mps: Optional[int] = None,
+    daily_tier_cap: Optional[int] = None,
 ):
     """
     Celery task entry point. Wraps the async sender in asyncio.run().
@@ -87,6 +89,8 @@ def send_broadcast(
                 tenant_id=tenant_id,
                 recipient_phones=recipient_phones,
                 csv_audience=csv_audience,
+                speed_mps=speed_mps,
+                daily_tier_cap=daily_tier_cap,
             )
         )
     except Exception as exc:
@@ -128,6 +132,8 @@ async def _async_send_broadcast(
     tenant_id: Optional[str] = None,
     recipient_phones: Optional[List[str]] = None,
     csv_audience: Optional[List[dict]] = None,
+    speed_mps: Optional[int] = None,
+    daily_tier_cap: Optional[int] = None,
 ):
     """
     Core async broadcast sender with rate limiting, error routing, and billing.
@@ -143,6 +149,23 @@ async def _async_send_broadcast(
         if not bc_doc or bc_doc.get("status") in ("paused", "cancelled", "completed"):
             print(f"[Broadcast Task] Skipping execution for {broadcast_id} as status is {bc_doc.get('status') if bc_doc else 'deleted'}")
             return
+
+        # Resolve dynamic rate limits (MPS and Daily Tier Cap) from settings / user profile / payload
+        effective_mps = speed_mps or (bc_doc.get("speedMps") if bc_doc else None) or 25
+        effective_daily_cap = daily_tier_cap or 250
+
+        if tenant_id:
+            try:
+                user_doc = await database.users.find_one({"_id": ObjectId(tenant_id)})
+            except Exception:
+                user_doc = await database.users.find_one({"_id": tenant_id})
+            if user_doc:
+                if not speed_mps and not bc_doc.get("speedMps") and user_doc.get("maxMpsLimit"):
+                    effective_mps = int(user_doc.get("maxMpsLimit"))
+                if not daily_tier_cap and user_doc.get("dailyTierLimit"):
+                    effective_daily_cap = int(user_doc.get("dailyTierLimit"))
+
+        print(f"[Broadcast Worker] Active Rate Limit Controls -> Max Speed: {effective_mps} MPS | Daily Tier Cap: {effective_daily_cap}")
 
         await database.broadcasts.update_one({"_id": obj_id}, {"$set": {"status": "sending", "updatedAt": _now()}})
 
@@ -197,6 +220,13 @@ async def _async_send_broadcast(
             )
             if components:
                 template_payload["components"] = components
+
+        # Resolve csv_audience from database.broadcast_audiences chunk storage if not passed directly
+        if not csv_audience and bc_doc and bc_doc.get("audienceType") == "csv":
+            aud_cursor = database.broadcast_audiences.find({"broadcastId": broadcast_id}).sort("chunk_index", 1)
+            csv_audience = []
+            async for aud_doc in aud_cursor:
+                csv_audience.extend(aud_doc.get("recipients", []))
 
         # ── Count total customers ────────────────────────────────────────
         if csv_audience:
@@ -277,21 +307,21 @@ async def _async_send_broadcast(
                     "status": "failed",
                 }
 
-            # 3. Daily Portfolio Unique Cap Check (Default to 250 Tier 0)
-            if not rate_limiter.check_daily_unique_recipient(wa_phone_id, phone, daily_cap=250):
+            # 3. Dynamic MPS Throttle Check
+            while not rate_limiter.consume_throughput(wa_phone_id, limit_mps=effective_mps):
+                await asyncio.sleep(0.05)
+
+            # 4. Daily Portfolio Unique Cap Check
+            if not rate_limiter.check_daily_unique_recipient(wa_phone_id, phone, daily_cap=effective_daily_cap):
                 return {
                     "success": False,
                     "customer": customer,
                     "error": "daily_unique_ceiling_exceeded",
                     "error_code": 429,
-                    "error_reason": "Daily portfolio unique recipient limit reached",
+                    "error_reason": f"Daily portfolio unique recipient limit reached ({effective_daily_cap} cap)",
                     "is_retryable": True,
                     "status": "failed",
                 }
-
-            # 4. MPS Throttle Check
-            while not rate_limiter.consume_throughput(wa_phone_id, limit_mps=70):
-                await asyncio.sleep(0.1)
 
             # Build per-recipient template payload if row contains custom params or dynamic button params
             raw_row = customer.get("raw_row", {})

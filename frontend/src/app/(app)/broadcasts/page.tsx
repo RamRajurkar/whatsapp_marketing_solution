@@ -11,7 +11,8 @@ import {
   Megaphone, FileText, Clock, Send, CheckCircle2, XCircle,
   AlertTriangle, Trash2, Plus, Edit2, Loader2, Calendar, ChevronLeft, ChevronRight, X, Image as ImageIcon, Upload,
   Pause, Play, RefreshCw, Download, Search, Filter, CheckCheck, AlertCircle, Eye, Check,
-  DollarSign, Zap, Repeat, ArrowRight, ArrowLeft, Users, Smartphone, ExternalLink, PhoneCall
+  DollarSign, Zap, Repeat, ArrowRight, ArrowLeft, Users, Smartphone, ExternalLink, PhoneCall,
+  CalendarDays, List, Grid
 } from 'lucide-react';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
@@ -38,17 +39,77 @@ const STATUS_MAP = {
   frequency_capped: { label: 'Freq Capped', class: 'badge-scheduled', icon: AlertTriangle, color: '#f97316' },
 };
 
-function BroadcastCalendar({ broadcasts, onDayClick }: { broadcasts: any[]; onDayClick: (date: Date) => void }) {
+const GOOGLE_CHIP_STYLES: Record<string, { bg: string; text: string; bar: string; label: string }> = {
+  sending: { bg: '#e8f0fe', text: '#1a73e8', bar: '#1a73e8', label: 'Active' },
+  scheduled: { bg: '#fef7e0', text: '#b06000', bar: '#f29900', label: 'Scheduled' },
+  sent: { bg: '#e6f4ea', text: '#137333', bar: '#1e8e3e', label: 'Completed' },
+  failed: { bg: '#fce8e6', text: '#c5221f', bar: '#d93025', label: 'Failed' },
+  partial: { bg: '#fef7e0', text: '#b06000', bar: '#f29900', label: 'Partial' },
+  draft: { bg: '#f1f3f4', text: '#5f6368', bar: '#80868b', label: 'Draft' },
+  paused: { bg: '#fef7e0', text: '#b06000', bar: '#f29900', label: 'Paused' },
+  frequency_capped: { bg: '#fff7ed', text: '#c2410c', bar: '#ea580c', label: 'Freq Capped' },
+};
+
+function BroadcastCalendar({
+  broadcasts,
+  onDayClick,
+  onNewCampaignOnDate,
+}: {
+  broadcasts: any[];
+  onDayClick: (bId: string) => void;
+  onNewCampaignOnDate?: (dateStr?: string) => void;
+}) {
   const [currentMonth, setCurrentMonth] = useState(new Date());
+  const [viewMode, setViewMode] = useState<'month' | 'week' | 'agenda'>('month');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [drawerDate, setDrawerDate] = useState<Date | null>(null);
+  const [hoveredCampaign, setHoveredCampaign] = useState<any | null>(null);
+  const [popoverPos, setPopoverPos] = useState<{ x: number; y: number } | null>(null);
 
   const monthStart = startOfMonth(currentMonth);
   const monthEnd = endOfMonth(currentMonth);
   const daysInMonth = eachDayOfInterval({ start: monthStart, end: monthEnd });
-  const startPadding = getDay(monthStart); // 0=Sun
+  const startPadding = getDay(monthStart);
 
+  // Filtered broadcasts
+  const filteredBroadcasts = useMemo(() => {
+    return (broadcasts || []).filter((b: any) => {
+      if (statusFilter !== 'all' && b.status !== statusFilter) return false;
+      if (searchQuery) {
+        const q = searchQuery.toLowerCase();
+        const name = (b.name || '').toLowerCase();
+        const tmpl = (b.templateName || '').toLowerCase();
+        if (!name.includes(q) && !tmpl.includes(q)) return false;
+      }
+      return true;
+    });
+  }, [broadcasts, statusFilter, searchQuery]);
+
+  // Aggregate monthly stats
+  const monthlyMetrics = useMemo(() => {
+    let scheduled = 0;
+    let sending = 0;
+    let completed = 0;
+    let totalAudience = 0;
+
+    (broadcasts || []).forEach((b: any) => {
+      const bDate = new Date(b.scheduledAt || b.createdAt);
+      if (isSameMonth(bDate, currentMonth)) {
+        if (b.status === 'scheduled') scheduled++;
+        else if (b.status === 'sending') sending++;
+        else if (b.status === 'sent') completed++;
+        totalAudience += (b.stats?.total || b.csvAudience?.length || 0);
+      }
+    });
+
+    return { scheduled, sending, completed, totalAudience };
+  }, [broadcasts, currentMonth]);
+
+  // Broadcasts grouped by YYYY-MM-DD
   const broadcastsByDate = useMemo(() => {
     const map: Record<string, any[]> = {};
-    broadcasts?.forEach((b: any) => {
+    filteredBroadcasts.forEach((b: any) => {
       const dateKey = b.scheduledAt
         ? format(new Date(b.scheduledAt), 'yyyy-MM-dd')
         : format(new Date(b.createdAt), 'yyyy-MM-dd');
@@ -56,103 +117,627 @@ function BroadcastCalendar({ broadcasts, onDayClick }: { broadcasts: any[]; onDa
       map[dateKey].push(b);
     });
     return map;
-  }, [broadcasts]);
+  }, [filteredBroadcasts]);
+
+  // Sorted list for Agenda View
+  const agendaList = useMemo(() => {
+    return [...filteredBroadcasts].sort((a, b) => {
+      const dA = new Date(a.scheduledAt || a.createdAt).getTime();
+      const dB = new Date(b.scheduledAt || b.createdAt).getTime();
+      return dB - dA;
+    });
+  }, [filteredBroadcasts]);
+
+  const drawerCampaigns = useMemo(() => {
+    if (!drawerDate) return [];
+    const dateKey = format(drawerDate, 'yyyy-MM-dd');
+    return broadcastsByDate[dateKey] || [];
+  }, [drawerDate, broadcastsByDate]);
+
+  // Grid padding & days array math for Google Matrix
+  const gridCells = useMemo(() => {
+    const cells: { date: Date | null; isPadding: boolean }[] = [];
+    for (let i = 0; i < startPadding; i++) {
+      cells.push({ date: null, isPadding: true });
+    }
+    daysInMonth.forEach(d => cells.push({ date: d, isPadding: false }));
+    while (cells.length % 7 !== 0) {
+      cells.push({ date: null, isPadding: true });
+    }
+    return cells;
+  }, [startPadding, daysInMonth]);
 
   return (
-    <div style={{ background: 'white', borderRadius: '16px', border: '1px solid #e5e7eb', padding: '20px', marginBottom: '24px' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <Calendar size={20} style={{ color: '#1B5E37' }} />
-          <h3 style={{ margin: 0, fontSize: '16px', fontWeight: '700', color: '#1a1a2e' }}>Broadcast Calendar</h3>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <button
-            onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}
-            style={{ background: '#f3f4f6', border: 'none', borderRadius: '8px', padding: '6px', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
-          >
-            <ChevronLeft size={18} color="#374151" />
-          </button>
-          <span style={{ fontSize: '15px', fontWeight: '700', color: '#1a1a2e', minWidth: '140px', textAlign: 'center' }}>
-            {format(currentMonth, 'MMMM yyyy')}
-          </span>
-          <button
-            onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}
-            style={{ background: '#f3f4f6', border: 'none', borderRadius: '8px', padding: '6px', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
-          >
-            <ChevronRight size={18} color="#374151" />
-          </button>
-        </div>
-      </div>
+    <div style={{
+      background: '#ffffff',
+      borderRadius: '16px',
+      border: '1px solid #dadce0',
+      boxShadow: '0 1px 6px rgba(60, 64, 67, 0.1)',
+      padding: '20px',
+      marginBottom: '28px',
+      position: 'relative'
+    }}>
 
-      {/* Day headers */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '2px', marginBottom: '4px' }}>
-        {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
-          <div key={day} style={{ textAlign: 'center', fontSize: '11px', fontWeight: '600', color: '#9ca3af', padding: '6px 0' }}>
-            {day}
-          </div>
-        ))}
-      </div>
+      {/* ── Top Header Toolbar (Google Calendar Styling) ── */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', marginBottom: '18px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+          
+          {/* Left: Floating Action Create + Today + Nav + Month Title */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            {onNewCampaignOnDate && (
+              <button
+                onClick={() => onNewCampaignOnDate()}
+                style={{
+                  background: '#ffffff', color: '#3c4043', border: '1px solid #dadce0',
+                  borderRadius: '24px', padding: '8px 20px', fontSize: '13px', fontWeight: '700',
+                  cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px',
+                  boxShadow: '0 1px 3px rgba(60,64,67,0.3)', transition: 'all 0.15s ease'
+                }}
+                onMouseEnter={e => {
+                  e.currentTarget.style.boxShadow = '0 4px 8px rgba(60,64,67,0.25)';
+                  e.currentTarget.style.background = '#f8fafc';
+                }}
+                onMouseLeave={e => {
+                  e.currentTarget.style.boxShadow = '0 1px 3px rgba(60,64,67,0.3)';
+                  e.currentTarget.style.background = '#ffffff';
+                }}
+              >
+                <Plus size={18} color="#1a73e8" />
+                <span>Create</span>
+              </button>
+            )}
 
-      {/* Calendar grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '2px' }}>
-        {/* Padding for start of month */}
-        {Array(startPadding).fill(null).map((_, i) => (
-          <div key={`pad-${i}`} style={{ minHeight: '60px' }} />
-        ))}
-
-        {daysInMonth.map(day => {
-          const dateKey = format(day, 'yyyy-MM-dd');
-          const dayBroadcasts = broadcastsByDate[dateKey] || [];
-          const isToday = isSameDay(day, new Date());
-
-          return (
-            <div
-              key={dateKey}
-              onClick={() => dayBroadcasts.length > 0 && onDayClick(day)}
+            <button
+              onClick={() => setCurrentMonth(new Date())}
               style={{
-                minHeight: '60px',
-                padding: '4px',
-                borderRadius: '8px',
-                border: isToday ? '2px solid #1B5E37' : '1px solid #f3f4f6',
-                background: isToday ? '#f0fdf4' : dayBroadcasts.length > 0 ? '#fafafa' : 'transparent',
-                cursor: dayBroadcasts.length > 0 ? 'pointer' : 'default',
-                transition: 'all 0.15s',
+                background: '#ffffff', border: '1px solid #dadce0', borderRadius: '6px', padding: '6px 14px',
+                fontSize: '13px', fontWeight: '600', color: '#3c4043', cursor: 'pointer', transition: 'all 0.15s'
+              }}
+              onMouseEnter={e => e.currentTarget.style.background = '#f1f3f4'}
+              onMouseLeave={e => e.currentTarget.style.background = '#ffffff'}
+            >
+              Today
+            </button>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
+              <button
+                onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}
+                style={{ background: 'none', border: 'none', borderRadius: '50%', padding: '6px', cursor: 'pointer', color: '#5f6368', display: 'flex', alignItems: 'center' }}
+                onMouseEnter={e => e.currentTarget.style.background = '#f1f3f4'}
+                onMouseLeave={e => e.currentTarget.style.background = 'none'}
+              >
+                <ChevronLeft size={20} />
+              </button>
+              <button
+                onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}
+                style={{ background: 'none', border: 'none', borderRadius: '50%', padding: '6px', cursor: 'pointer', color: '#5f6368', display: 'flex', alignItems: 'center' }}
+                onMouseEnter={e => e.currentTarget.style.background = '#f1f3f4'}
+                onMouseLeave={e => e.currentTarget.style.background = 'none'}
+              >
+                <ChevronRight size={20} />
+              </button>
+            </div>
+
+            <h2 style={{ margin: 0, fontSize: '20px', fontWeight: '600', color: '#3c4043', fontFamily: 'sans-serif' }}>
+              {format(currentMonth, 'MMMM yyyy')}
+            </h2>
+          </div>
+
+          {/* Center: View Switcher Segmented Control */}
+          <div style={{ display: 'flex', background: '#f1f3f4', padding: '2px', borderRadius: '8px', border: '1px solid #dadce0' }}>
+            <button
+              type="button"
+              onClick={() => setViewMode('month')}
+              style={{
+                padding: '6px 16px', borderRadius: '6px', fontSize: '12px', fontWeight: '600', border: 'none', cursor: 'pointer',
+                background: viewMode === 'month' ? '#ffffff' : 'transparent',
+                color: viewMode === 'month' ? '#1a73e8' : '#5f6368',
+                boxShadow: viewMode === 'month' ? '0 1px 2px rgba(60,64,67,0.3)' : 'none',
+                display: 'flex', alignItems: 'center', gap: '6px', transition: 'all 0.15s'
               }}
             >
-              <div style={{
-                fontSize: '12px',
-                fontWeight: isToday ? '700' : '500',
-                color: isToday ? '#1B5E37' : '#374151',
-                marginBottom: '2px',
-              }}>
-                {format(day, 'd')}
-              </div>
-              {dayBroadcasts.slice(0, 2).map((b: any) => {
-                const sc = STATUS_MAP[b.status as keyof typeof STATUS_MAP] || STATUS_MAP.draft;
-                return (
-                  <div key={b._id} style={{
-                    fontSize: '9px',
-                    fontWeight: '600',
-                    color: 'white',
-                    background: sc.color,
-                    borderRadius: '4px',
-                    padding: '1px 4px',
-                    marginBottom: '2px',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap',
-                  }}>
-                    {b.name}
-                  </div>
-                );
-              })}
-              {dayBroadcasts.length > 2 && (
-                <div style={{ fontSize: '9px', color: '#6b7280', fontWeight: '600' }}>+{dayBroadcasts.length - 2} more</div>
-              )}
+              <Grid size={13} /> Month
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode('week')}
+              style={{
+                padding: '6px 16px', borderRadius: '6px', fontSize: '12px', fontWeight: '600', border: 'none', cursor: 'pointer',
+                background: viewMode === 'week' ? '#ffffff' : 'transparent',
+                color: viewMode === 'week' ? '#1a73e8' : '#5f6368',
+                boxShadow: viewMode === 'week' ? '0 1px 2px rgba(60,64,67,0.3)' : 'none',
+                display: 'flex', alignItems: 'center', gap: '6px', transition: 'all 0.15s'
+              }}
+            >
+              <CalendarDays size={13} /> Week
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode('agenda')}
+              style={{
+                padding: '6px 16px', borderRadius: '6px', fontSize: '12px', fontWeight: '600', border: 'none', cursor: 'pointer',
+                background: viewMode === 'agenda' ? '#ffffff' : 'transparent',
+                color: viewMode === 'agenda' ? '#1a73e8' : '#5f6368',
+                boxShadow: viewMode === 'agenda' ? '0 1px 2px rgba(60,64,67,0.3)' : 'none',
+                display: 'flex', alignItems: 'center', gap: '6px', transition: 'all 0.15s'
+              }}
+            >
+              <List size={13} /> Agenda
+            </button>
+          </div>
+        </div>
+
+        {/* Filter Bar & KPI Summary Strip */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', paddingTop: '10px', borderTop: '1px solid #f1f3f4' }}>
+          
+          {/* Status Filter & Search */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <div style={{ position: 'relative' }}>
+              <Filter size={13} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: '#80868b' }} />
+              <select
+                value={statusFilter}
+                onChange={e => setStatusFilter(e.target.value)}
+                style={{
+                  paddingLeft: '28px', paddingRight: '24px', paddingTop: '5px', paddingBottom: '5px',
+                  borderRadius: '6px', border: '1px solid #dadce0', background: '#ffffff', fontSize: '12px', fontWeight: '500', color: '#3c4043', cursor: 'pointer'
+                }}
+              >
+                <option value="all">All Statuses</option>
+                <option value="scheduled">🟡 Scheduled</option>
+                <option value="sending">🔵 Active Sending</option>
+                <option value="sent">🟢 Completed</option>
+                <option value="draft">⚪ Draft</option>
+                <option value="failed">🔴 Failed / Partial</option>
+              </select>
             </div>
-          );
-        })}
+
+            <div style={{ position: 'relative' }}>
+              <Search size={13} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: '#80868b' }} />
+              <input
+                type="text"
+                placeholder="Search campaigns..."
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                style={{
+                  paddingLeft: '28px', paddingRight: '10px', paddingTop: '5px', paddingBottom: '5px',
+                  borderRadius: '6px', border: '1px solid #dadce0', background: '#ffffff', fontSize: '12px', width: '170px'
+                }}
+              />
+            </div>
+          </div>
+
+          {/* KPI Summary Strip */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '12px', fontWeight: '600' }}>
+            <span style={{ background: '#fef7e0', color: '#b06000', padding: '3px 10px', borderRadius: '12px', border: '1px solid #f29900', display: 'flex', alignItems: 'center', gap: '5px' }}>
+              <Clock size={12} /> {monthlyMetrics.scheduled} Scheduled
+            </span>
+            <span style={{ background: '#e8f0fe', color: '#1a73e8', padding: '3px 10px', borderRadius: '12px', border: '1px solid #aecbfa', display: 'flex', alignItems: 'center', gap: '5px' }}>
+              <Loader2 size={12} className="animate-spin" /> {monthlyMetrics.sending} Active
+            </span>
+            <span style={{ background: '#e6f4ea', color: '#137333', padding: '3px 10px', borderRadius: '12px', border: '1px solid #a8dab5', display: 'flex', alignItems: 'center', gap: '5px' }}>
+              <CheckCircle2 size={12} /> {monthlyMetrics.completed} Completed
+            </span>
+            <span style={{ background: '#f1f3f4', color: '#5f6368', padding: '3px 10px', borderRadius: '12px', border: '1px solid #dadce0', display: 'flex', alignItems: 'center', gap: '5px' }}>
+              <Users size={12} /> {monthlyMetrics.totalAudience.toLocaleString()} Target
+            </span>
+          </div>
+        </div>
       </div>
+
+      {/* ── VIEW 1: GOOGLE CALENDAR UNIFIED MATRIX MONTH GRID ── */}
+      {viewMode === 'month' && (
+        <div style={{
+          border: '1px solid #dadce0',
+          borderRadius: '12px',
+          overflow: 'hidden',
+          background: '#ffffff'
+        }}>
+          {/* Day Headers Row */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', background: '#ffffff', borderBottom: '1px solid #dadce0' }}>
+            {['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'].map((day, idx) => (
+              <div
+                key={day}
+                style={{
+                  textAlign: 'center', fontSize: '11px', fontWeight: '700', color: '#70757a',
+                  padding: '10px 0', borderRight: idx < 6 ? '1px solid #dadce0' : 'none', letterSpacing: '0.6px'
+                }}
+              >
+                {day}
+              </div>
+            ))}
+          </div>
+
+          {/* Grid Cells Container */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)' }}>
+            {gridCells.map((cell, idx) => {
+              if (cell.isPadding || !cell.date) {
+                const colIdx = idx % 7;
+                const rowIdx = Math.floor(idx / 7);
+                const totalRows = gridCells.length / 7;
+                return (
+                  <div
+                    key={`pad-${idx}`}
+                    style={{
+                      minHeight: '115px',
+                      background: '#f8fafc',
+                      borderRight: colIdx < 6 ? '1px solid #dadce0' : 'none',
+                      borderBottom: rowIdx < totalRows - 1 ? '1px solid #dadce0' : 'none',
+                      opacity: 0.5
+                    }}
+                  />
+                );
+              }
+
+              const day = cell.date;
+              const dateKey = format(day, 'yyyy-MM-dd');
+              const dayBroadcasts = broadcastsByDate[dateKey] || [];
+              const isToday = isSameDay(day, new Date());
+              const colIdx = idx % 7;
+              const rowIdx = Math.floor(idx / 7);
+              const totalRows = gridCells.length / 7;
+              const dayNum = format(day, 'd');
+              const isFirstOfMonth = dayNum === '1';
+
+              return (
+                <div
+                  key={dateKey}
+                  onClick={() => setDrawerDate(day)}
+                  style={{
+                    minHeight: '115px',
+                    padding: '6px 8px',
+                    background: isToday ? '#f8fafd' : '#ffffff',
+                    borderRight: colIdx < 6 ? '1px solid #dadce0' : 'none',
+                    borderBottom: rowIdx < totalRows - 1 ? '1px solid #dadce0' : 'none',
+                    cursor: 'pointer',
+                    transition: 'background 0.15s ease',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justify: 'space-between'
+                  }}
+                  onMouseEnter={e => e.currentTarget.style.background = isToday ? '#edf4fe' : '#f8fafc'}
+                  onMouseLeave={e => e.currentTarget.style.background = isToday ? '#f8fafd' : '#ffffff'}
+                >
+                  {/* Date Badge Top Bar */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                    {isToday ? (
+                      <span style={{
+                        background: '#1a73e8', color: '#ffffff', borderRadius: '50%',
+                        width: '24px', height: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        fontWeight: '700', fontSize: '12px'
+                      }}>
+                        {dayNum}
+                      </span>
+                    ) : isFirstOfMonth ? (
+                      <span style={{ fontWeight: '700', fontSize: '12px', color: '#3c4043' }}>
+                        {format(day, 'MMM d')}
+                      </span>
+                    ) : (
+                      <span style={{ fontWeight: '600', fontSize: '12px', color: '#3c4043', marginLeft: '4px' }}>
+                        {dayNum}
+                      </span>
+                    )}
+
+                    {dayBroadcasts.length > 0 && (
+                      <span style={{ fontSize: '10px', fontWeight: '600', color: '#70757a', background: '#f1f3f4', padding: '1px 6px', borderRadius: '10px' }}>
+                        {dayBroadcasts.length}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Google Style Event Chips */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', flex: 1 }}>
+                    {dayBroadcasts.slice(0, 3).map((b: any) => {
+                      const chipStyle = GOOGLE_CHIP_STYLES[b.status as string] || GOOGLE_CHIP_STYLES.draft;
+                      const isSending = b.status === 'sending';
+                      const timeStr = b.scheduledAt ? format(new Date(b.scheduledAt), 'HH:mm') : '•';
+                      return (
+                        <div
+                          key={b._id}
+                          onClick={(e) => { e.stopPropagation(); onDayClick(b._id); }}
+                          onMouseEnter={(e) => {
+                            const rect = e.currentTarget.getBoundingClientRect();
+                            setHoveredCampaign(b);
+                            setPopoverPos({ x: rect.left, y: rect.bottom + 6 });
+                          }}
+                          onMouseLeave={() => setHoveredCampaign(null)}
+                          style={{
+                            background: chipStyle.bg,
+                            color: chipStyle.text,
+                            borderLeft: `4px solid ${chipStyle.bar}`,
+                            borderRadius: '4px',
+                            padding: '3px 6px',
+                            fontSize: '11px',
+                            fontWeight: '600',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '5px',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap',
+                            transition: 'all 0.15s ease',
+                            boxShadow: '0 1px 2px rgba(0,0,0,0.04)'
+                          }}
+                          onMouseOver={e => e.currentTarget.style.boxShadow = '0 2px 6px rgba(0,0,0,0.15)'}
+                          onMouseOut={e => e.currentTarget.style.boxShadow = '0 1px 2px rgba(0,0,0,0.04)'}
+                        >
+                          {isSending ? (
+                            <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#1a73e8', flexShrink: 0, animation: 'pulse 1.5s infinite' }} />
+                          ) : (
+                            <span style={{ fontSize: '10px', opacity: 0.85, flexShrink: 0 }}>{timeStr}</span>
+                          )}
+                          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
+                            {b.name}
+                          </span>
+                        </div>
+                      );
+                    })}
+
+                    {dayBroadcasts.length > 3 && (
+                      <div style={{ fontSize: '11px', fontWeight: '700', color: '#1a73e8', padding: '1px 4px', borderRadius: '4px' }}>
+                        + {dayBroadcasts.length - 3} more
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* ── VIEW 2: AGENDA SCHEDULE TIMELINE ── */}
+      {viewMode === 'agenda' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', border: '1px solid #dadce0', borderRadius: '12px', padding: '16px', background: '#ffffff' }}>
+          {agendaList.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '40px', color: '#70757a' }}>
+              <Megaphone size={32} style={{ marginBottom: '8px' }} />
+              <div>No campaigns found matching current filters.</div>
+            </div>
+          ) : (
+            agendaList.map((b: any) => {
+              const chipStyle = GOOGLE_CHIP_STYLES[b.status as string] || GOOGLE_CHIP_STYLES.draft;
+              const scheduledDate = new Date(b.scheduledAt || b.createdAt);
+              return (
+                <div
+                  key={b._id}
+                  onClick={() => onDayClick(b._id)}
+                  style={{
+                    background: '#ffffff', borderRadius: '8px', border: '1px solid #dadce0', borderLeft: `6px solid ${chipStyle.bar}`,
+                    padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '16px',
+                    cursor: 'pointer', transition: 'all 0.15s ease'
+                  }}
+                  onMouseEnter={e => {
+                    e.currentTarget.style.boxShadow = '0 2px 8px rgba(60,64,67,0.15)';
+                    e.currentTarget.style.background = '#f8fafc';
+                  }}
+                  onMouseLeave={e => {
+                    e.currentTarget.style.boxShadow = 'none';
+                    e.currentTarget.style.background = '#ffffff';
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                    <div style={{ textAlign: 'center', minWidth: '65px' }}>
+                      <div style={{ fontSize: '11px', fontWeight: '700', color: '#70757a', textTransform: 'uppercase' }}>
+                        {format(scheduledDate, 'EEE, MMM d')}
+                      </div>
+                      <div style={{ fontSize: '13px', fontWeight: '700', color: '#202124', marginTop: '2px' }}>
+                        {format(scheduledDate, 'HH:mm')}
+                      </div>
+                    </div>
+
+                    <div>
+                      <div style={{ fontSize: '14px', fontWeight: '700', color: '#202124', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <span>{b.name}</span>
+                        <span style={{ background: chipStyle.bg, color: chipStyle.text, padding: '2px 8px', borderRadius: '10px', fontSize: '11px', fontWeight: '700' }}>
+                          {chipStyle.label}
+                        </span>
+                      </div>
+                      <div style={{ fontSize: '12px', color: '#5f6368', marginTop: '4px', display: 'flex', gap: '16px' }}>
+                        <span>📝 Template: <code>{b.templateName}</code></span>
+                        <span>🎯 Audience: <strong>{(b.stats?.total || b.csvAudience?.length || 0).toLocaleString()}</strong> contacts</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <button
+                    className="btn-secondary"
+                    style={{ padding: '6px 14px', fontSize: '12px', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '6px' }}
+                    onClick={(e) => { e.stopPropagation(); onDayClick(b._id); }}
+                  >
+                    <Eye size={14} /> Details
+                  </button>
+                </div>
+              );
+            })
+          )}
+        </div>
+      )}
+
+      {/* ── VIEW 3: WEEKLY TIME SLOTS ── */}
+      {viewMode === 'week' && (
+        <div style={{ border: '1px solid #dadce0', borderRadius: '12px', overflow: 'hidden', background: '#ffffff' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', borderBottom: '1px solid #dadce0' }}>
+            {daysInMonth.slice(0, 7).map((day, idx) => {
+              const isToday = isSameDay(day, new Date());
+              return (
+                <div key={idx} style={{ textAlign: 'center', padding: '10px 0', borderRight: idx < 6 ? '1px solid #dadce0' : 'none' }}>
+                  <div style={{ fontSize: '11px', fontWeight: '700', color: '#70757a' }}>{format(day, 'EEE')}</div>
+                  <div style={{
+                    fontSize: '14px', fontWeight: '700', color: isToday ? '#ffffff' : '#202124',
+                    background: isToday ? '#1a73e8' : 'transparent', borderRadius: '50%',
+                    width: '26px', height: '26px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', marginTop: '2px'
+                  }}>
+                    {format(day, 'd')}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', minHeight: '300px' }}>
+            {daysInMonth.slice(0, 7).map((day, idx) => {
+              const dateKey = format(day, 'yyyy-MM-dd');
+              const dayBroadcasts = broadcastsByDate[dateKey] || [];
+              return (
+                <div key={idx} style={{ padding: '8px', borderRight: idx < 6 ? '1px solid #dadce0' : 'none', background: '#ffffff' }}>
+                  {dayBroadcasts.length === 0 ? (
+                    <div style={{ fontSize: '11px', color: '#9aa0a6', textAlign: 'center', marginTop: '40px' }}>No events</div>
+                  ) : (
+                    dayBroadcasts.map((b: any) => {
+                      const chipStyle = GOOGLE_CHIP_STYLES[b.status as string] || GOOGLE_CHIP_STYLES.draft;
+                      return (
+                        <div
+                          key={b._id}
+                          onClick={() => onDayClick(b._id)}
+                          style={{
+                            background: chipStyle.bg, color: chipStyle.text, borderLeft: `4px solid ${chipStyle.bar}`,
+                            borderRadius: '4px', padding: '6px 8px', fontSize: '11px', fontWeight: '600', marginBottom: '6px', cursor: 'pointer'
+                          }}
+                        >
+                          <div style={{ fontWeight: '700' }}>{b.name}</div>
+                          <div style={{ fontSize: '10px', opacity: 0.85, marginTop: '2px' }}>
+                            {b.scheduledAt ? format(new Date(b.scheduledAt), 'HH:mm') : 'Draft'}
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* ── Slide-Over Day Drawer ── */}
+      {drawerDate && (
+        <div
+          className="modal-overlay"
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(15, 23, 42, 0.4)',
+            backdropFilter: 'blur(4px)',
+            zIndex: 99999,
+            display: 'flex',
+            justifyContent: 'flex-end',
+            padding: 0
+          }}
+          onClick={() => setDrawerDate(null)}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{
+              width: '440px',
+              maxWidth: '90vw',
+              height: '100vh',
+              background: '#ffffff',
+              boxShadow: '-10px 0 30px rgba(0, 0, 0, 0.2)',
+              borderLeft: '1px solid #dadce0',
+              padding: '24px',
+              overflowY: 'auto',
+              display: 'flex',
+              flexDirection: 'column',
+              zIndex: 100000,
+              animation: 'slideInRight 0.25s ease-out'
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', borderBottom: '1px solid #dadce0', paddingBottom: '12px' }}>
+              <div>
+                <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '700', color: '#202124' }}>
+                  📅 {format(drawerDate, 'MMMM d, yyyy')}
+                </h3>
+                <span style={{ fontSize: '12px', color: '#5f6368' }}>{drawerCampaigns.length} campaigns scheduled for this date</span>
+              </div>
+              <button onClick={() => setDrawerDate(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#5f6368' }}>
+                <X size={20} />
+              </button>
+            </div>
+
+            {onNewCampaignOnDate && (
+              <button
+                onClick={() => { setDrawerDate(null); onNewCampaignOnDate(format(drawerDate, 'yyyy-MM-dd')); }}
+                style={{
+                  width: '100%', background: '#1a73e8', color: 'white', border: 'none', borderRadius: '8px',
+                  padding: '10px', fontSize: '13px', fontWeight: '700', cursor: 'pointer', marginBottom: '20px',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+                  boxShadow: '0 1px 3px rgba(60,64,67,0.3)'
+                }}
+              >
+                <Plus size={16} /> Schedule Campaign on {format(drawerDate, 'MMM d')}
+              </button>
+            )}
+
+            {drawerCampaigns.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '40px 20px', color: '#70757a' }}>
+                <Calendar size={36} style={{ marginBottom: '8px' }} />
+                <div>No campaigns scheduled on this day.</div>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                {drawerCampaigns.map((b: any) => {
+                  const chipStyle = GOOGLE_CHIP_STYLES[b.status as string] || GOOGLE_CHIP_STYLES.draft;
+                  return (
+                    <div key={b._id} style={{ background: chipStyle.bg, border: '1px solid #dadce0', borderLeft: `5px solid ${chipStyle.bar}`, borderRadius: '8px', padding: '14px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                        <div style={{ fontWeight: '700', fontSize: '14px', color: '#202124' }}>{b.name}</div>
+                        <span style={{ background: 'white', color: chipStyle.text, padding: '2px 8px', borderRadius: '10px', fontSize: '10px', fontWeight: '700' }}>
+                          {chipStyle.label}
+                        </span>
+                      </div>
+                      <div style={{ fontSize: '12px', color: '#5f6368' }}>
+                        Template: <code>{b.templateName}</code>
+                      </div>
+                      <div style={{ fontSize: '12px', color: '#5f6368' }}>
+                        Target Audience: <strong>{(b.stats?.total || b.csvAudience?.length || 0).toLocaleString()}</strong> contacts
+                      </div>
+                      <button
+                        className="btn-primary"
+                        style={{ padding: '6px 12px', fontSize: '12px', marginTop: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', background: chipStyle.bar }}
+                        onClick={() => { setDrawerDate(null); onDayClick(b._id); }}
+                      >
+                        <Eye size={13} /> View Delivery Diagnostics
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ── Interactive Google Hover Popover Card ── */}
+      {hoveredCampaign && popoverPos && (
+        <div style={{
+          position: 'fixed',
+          left: Math.min(popoverPos.x, window.innerWidth - 300),
+          top: Math.min(popoverPos.y, window.innerHeight - 200),
+          width: '280px',
+          background: '#ffffff',
+          borderRadius: '12px',
+          boxShadow: '0 8px 24px rgba(60,64,67,0.25)',
+          border: '1px solid #dadce0',
+          padding: '16px',
+          zIndex: 1500,
+          pointerEvents: 'none',
+          animation: 'fadeIn 0.15s ease-out'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+            <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: GOOGLE_CHIP_STYLES[hoveredCampaign.status as string]?.bar || '#1a73e8' }} />
+            <div style={{ fontSize: '14px', fontWeight: '700', color: '#202124', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
+              {hoveredCampaign.name}
+            </div>
+          </div>
+          <div style={{ fontSize: '12px', color: '#5f6368', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            <div>📅 Schedule: <strong>{hoveredCampaign.scheduledAt ? format(new Date(hoveredCampaign.scheduledAt), 'MMM d, yyyy @ HH:mm') : 'Immediate / Draft'}</strong></div>
+            <div>📝 Template: <code>{hoveredCampaign.templateName}</code></div>
+            <div>🎯 Reach: <strong>{(hoveredCampaign.stats?.total || hoveredCampaign.csvAudience?.length || 0).toLocaleString()} contacts</strong></div>
+            <div>📊 Status: <span style={{ textTransform: 'capitalize', fontWeight: '700', color: GOOGLE_CHIP_STYLES[hoveredCampaign.status as string]?.text }}>{hoveredCampaign.status}</span></div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -163,6 +748,8 @@ function BroadcastModal({ broadcast, onClose, onSave }: any) {
   const [csvFile, setCsvFile] = useState<File | null>(null);
   const [csvParseData, setCsvParseData] = useState<any>(null);
   const [csvParsing, setCsvParsing] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadBytesText, setUploadBytesText] = useState('');
 
   // Per-parameter mapping mode: 'csv' column OR 'static' manual value
   const [paramModes, setParamModes] = useState<Record<string, 'csv' | 'static'>>({});
@@ -294,11 +881,23 @@ function BroadcastModal({ broadcast, onClose, onSave }: any) {
     if (!file) return;
     setCsvFile(file);
     setCsvParsing(true);
+    setUploadProgress(0);
+    const totalMb = (file.size / (1024 * 1024)).toFixed(2);
+    setUploadBytesText(`0 MB of ${totalMb} MB`);
+
     try {
       const formData = new FormData();
       formData.append('file', file);
       const res = await api.post('/api/broadcasts/parse-csv', formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
+        onUploadProgress: (progressEvent) => {
+          if (progressEvent.total) {
+            const percent = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+            setUploadProgress(percent);
+            const loadedMb = (progressEvent.loaded / (1024 * 1024)).toFixed(2);
+            setUploadBytesText(`${loadedMb} MB of ${totalMb} MB`);
+          }
+        }
       });
       setCsvParseData(res.data);
 
@@ -550,7 +1149,33 @@ function BroadcastModal({ broadcast, onClose, onSave }: any) {
                   style={{ display: 'none' }}
                 />
 
-                {!csvParseData ? (
+                {csvParsing ? (
+                  <div style={{
+                    padding: '24px', background: 'white', borderRadius: '10px', border: '2px solid #3b82f6',
+                    textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px'
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#1d4ed8', fontWeight: '700', fontSize: '15px' }}>
+                      <Loader2 size={20} className="animate-spin" />
+                      <span>Uploading & Normalizing Contact List... ({uploadProgress}%)</span>
+                    </div>
+                    
+                    <div style={{ width: '100%', height: '10px', background: '#e2e8f0', borderRadius: '10px', overflow: 'hidden' }}>
+                      <div style={{
+                        width: `${uploadProgress}%`, height: '100%',
+                        background: 'linear-gradient(90deg, #3b82f6, #1d4ed8)',
+                        borderRadius: '10px', transition: 'width 0.2s ease-in-out'
+                      }} />
+                    </div>
+
+                    <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', fontSize: '12px', color: '#64748b', fontWeight: '500' }}>
+                      <span>File: {csvFile?.name}</span>
+                      <span>{uploadBytesText || `${uploadProgress}%`}</span>
+                    </div>
+                    <span style={{ fontSize: '11px', color: '#059669', fontWeight: '600' }}>
+                      ⚡ Normalizing E.164 phone numbers & mapping columns in real time...
+                    </span>
+                  </div>
+                ) : !csvParseData ? (
                   <label
                     htmlFor="csv-file-input"
                     style={{
@@ -601,20 +1226,20 @@ function BroadcastModal({ broadcast, onClose, onSave }: any) {
                   </div>
                 )}
 
-                {/* Full Scrollable & Inline Editable Contacts Table */}
+                {/* Scrollable & Fast Preview Table for High Volume Contacts */}
                 {csvParseData?.parsed_recipients && (
                   <div style={{ marginTop: '16px', background: 'white', borderRadius: '10px', padding: '12px', border: '1px solid #e2e8f0' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
                       <div>
                         <span style={{ fontSize: '13px', fontWeight: '700', color: '#0f172a' }}>
-                          📋 Verified Contact List ({csvParseData.parsed_recipients.length} Total Contacts)
+                          📋 Verified Contact List ({csvParseData.parsed_recipients.length.toLocaleString()} Total Contacts Loaded)
                         </span>
                         <span style={{ fontSize: '11px', color: '#64748b', display: 'block' }}>
-                          ✏️ You can edit names or numbers directly inline before starting the campaign
+                          Showing preview of first 50 contacts (editing enabled for preview rows)
                         </span>
                       </div>
                       <span style={{ fontSize: '11px', background: '#dcfce7', color: '#166534', padding: '3px 10px', borderRadius: '12px', fontWeight: '700' }}>
-                        {csvParseData.parsed_recipients.length} Valid WhatsApp Contacts
+                        {csvParseData.parsed_recipients.length.toLocaleString()} Valid WhatsApp Contacts
                       </span>
                     </div>
 
@@ -630,7 +1255,7 @@ function BroadcastModal({ broadcast, onClose, onSave }: any) {
                           </tr>
                         </thead>
                         <tbody>
-                          {csvParseData.parsed_recipients.map((row: any, i: number) => (
+                          {csvParseData.parsed_recipients.slice(0, 50).map((row: any, i: number) => (
                             <tr key={i} style={{ borderBottom: '1px solid #f1f5f9' }}>
                               <td style={{ padding: '6px 10px' }}>
                                 <input
@@ -1242,7 +1867,11 @@ export default function BroadcastsPage() {
       <div style={{ padding: '0 32px' }}>
         {/* Broadcast Calendar */}
         {!isLoading && broadcasts?.length > 0 && (
-          <BroadcastCalendar broadcasts={broadcasts} onDayClick={handleDayClick} />
+          <BroadcastCalendar
+            broadcasts={broadcasts}
+            onDayClick={(bId: string) => router.push(`/broadcasts/${bId}`)}
+            onNewCampaignOnDate={(dateStr?: string) => setModal('new')}
+          />
         )}
 
         {/* Info banner */}

@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '@/lib/api';
 import toast from 'react-hot-toast';
-import { Radio, UtensilsCrossed, Loader2, Save, Link, Plug, Lock, Palette, UploadCloud, Image as ImageIcon, Volume2 } from 'lucide-react';
+import { Radio, UtensilsCrossed, Loader2, Save, Link, Plug, Lock, Palette, UploadCloud, Image as ImageIcon, Volume2, Zap } from 'lucide-react';
 import { useBranding } from '@/lib/hooks/useBranding';
 
 export default function SettingsPage() {
@@ -45,7 +45,6 @@ export default function SettingsPage() {
     }
   };
 
-  // Separate states for branding and API settings to avoid mixing them
   const [brandingForm, setBrandingForm] = useState<any>({});
   
   const logoInputRef = useRef<HTMLInputElement>(null);
@@ -116,7 +115,6 @@ export default function SettingsPage() {
       toast.error(`Failed to upload ${isLogo ? 'logo' : 'background'}`);
     } finally {
       isLogo ? setUploadingLogo(false) : setUploadingBg(false);
-      // Reset input
       if (e.target) e.target.value = '';
     }
   };
@@ -188,6 +186,35 @@ export default function SettingsPage() {
               >
                 {testingWebhook ? <><Loader2 size={15} /> Sending Test...</> : '🧪 Send Test Webhook Payload'}
               </button>
+            </div>
+          </div>
+        </div>
+
+        {/* WhatsApp Sending Rate & Account Tier Controls */}
+        <div className="glass-card" style={{ padding: '28px', marginBottom: '20px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '24px' }}>
+            <div style={{ width: '40px', height: '40px', borderRadius: '12px', background: 'linear-gradient(135deg, #0284C7, #0369A1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Zap size={20} color="white" /></div>
+            <div><h2 style={{ margin: 0, fontSize: '17px', fontWeight: '700', color: '#1a1a2e' }}>WhatsApp Rate Limits & Sending Speed</h2><p style={{ margin: 0, fontSize: '13px', color: '#6b7280' }}>Configure Messages Per Second (MPS) and Meta Tier caps for new & warming phone numbers</p></div>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+            <div>
+              <label style={{ fontSize: '13px', fontWeight: '500', color: '#374151', display: 'block', marginBottom: '6px' }}>Max Messages Per Second (MPS)</label>
+              <select className="input-field" value={form.maxMpsLimit || 25} onChange={e => setForm({ ...form, maxMpsLimit: parseInt(e.target.value) })}>
+                <option value={10}>🐢 10 MPS (Slow Warmup Mode)</option>
+                <option value={25}>⚡ 25 MPS (Standard Mode)</option>
+                <option value={50}>🚀 50 MPS (Medium Speed)</option>
+                <option value={80}>🏎️ 80 MPS (Fast)</option>
+                <option value={250}>🔥 250 MPS (High Speed)</option>
+              </select>
+            </div>
+            <div>
+              <label style={{ fontSize: '13px', fontWeight: '500', color: '#374151', display: 'block', marginBottom: '6px' }}>Daily Recipient Tier Limit</label>
+              <select className="input-field" value={form.dailyTierLimit || 250} onChange={e => setForm({ ...form, dailyTierLimit: parseInt(e.target.value) })}>
+                <option value={250}>250 Contacts / 24h (Tier 0)</option>
+                <option value={1000}>1,000 Contacts / 24h (Tier 1)</option>
+                <option value={10000}>10,000 Contacts / 24h (Tier 2)</option>
+                <option value={100000}>100,000 Contacts / 24h (Tier 3)</option>
+              </select>
             </div>
           </div>
         </div>

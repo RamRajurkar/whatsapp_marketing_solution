@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
+from fastapi.responses import StreamingResponse
 from typing import Optional, List, Dict, Any
 from pydantic import BaseModel
 from app.routes.auth import get_current_user
@@ -59,6 +60,7 @@ class BroadcastCreate(BaseModel):
     bodyParams: Optional[List[str]] = None
     buttonParams: Optional[List[str]] = None
     carouselCards: Optional[List[dict]] = None
+    speedMps: Optional[int] = None
 
 
 @router.post("/parse-csv")
@@ -160,6 +162,25 @@ async def get_broadcasts(current_user: dict = Depends(get_current_user)):
     return broadcasts
 
 
+async def _save_csv_audience_chunks(broadcast_id: str, csv_audience: list):
+    """Save large CSV audience array in chunked MongoDB documents to prevent BSON > 16MB errors."""
+    if not csv_audience:
+        return
+    await db.db.broadcast_audiences.delete_many({"broadcastId": broadcast_id})
+    CHUNK_SIZE = 2000
+    chunk_docs = []
+    for i in range(0, len(csv_audience), CHUNK_SIZE):
+        chunk = csv_audience[i:i + CHUNK_SIZE]
+        chunk_docs.append({
+            "broadcastId": broadcast_id,
+            "chunk_index": i // CHUNK_SIZE,
+            "recipients": chunk,
+            "createdAt": _now()
+        })
+    if chunk_docs:
+        await db.db.broadcast_audiences.insert_many(chunk_docs)
+
+
 @router.post("")
 @router.post("/")
 async def create_broadcast(data: BroadcastCreate, current_user: dict = Depends(get_current_user)):
@@ -171,6 +192,11 @@ async def create_broadcast(data: BroadcastCreate, current_user: dict = Depends(g
     doc["stats"] = {"total": 0, "sent": 0, "failed": 0}
     inject_tenant_id(doc, current_user)
 
+    # Pop csvAudience to prevent BSON > 16MB error on db.broadcasts insert
+    csv_aud = doc.pop("csvAudience", None)
+    if csv_aud:
+        doc["totalCsvRecipients"] = len(csv_aud)
+
     scheduled_at = doc.get("scheduledAt")
     eta_utc = _get_scheduled_eta(scheduled_at)
 
@@ -180,6 +206,10 @@ async def create_broadcast(data: BroadcastCreate, current_user: dict = Depends(g
     result = await db.db.broadcasts.insert_one(doc)
     broadcast_id = str(result.inserted_id)
     doc["_id"] = broadcast_id
+
+    # Store CSV audience in chunked MongoDB collection
+    if csv_aud:
+        await _save_csv_audience_chunks(broadcast_id, csv_aud)
 
     if eta_utc and eta_utc > now:
         wa_phone_id = current_user.get("waPhoneNumberId") or settings.WA_PHONE_NUMBER_ID
@@ -201,7 +231,7 @@ async def create_broadcast(data: BroadcastCreate, current_user: dict = Depends(g
                     "carousel_cards": doc.get("carouselCards"),
                     "audience_tags": doc.get("audienceTags"),
                     "tenant_id": tenant_id,
-                    "csv_audience": doc.get("csvAudience"),
+                    "speed_mps": doc.get("speedMps"),
                 },
                 eta=eta_utc
             )
@@ -260,6 +290,11 @@ async def update_broadcast(broadcast_id: str, data: BroadcastCreate, current_use
     update_data = data.model_dump(exclude_unset=True)
     now = _now()
     update_data["updatedAt"] = now
+
+    csv_aud = update_data.pop("csvAudience", None)
+    if csv_aud:
+        update_data["totalCsvRecipients"] = len(csv_aud)
+        await _save_csv_audience_chunks(broadcast_id, csv_aud)
     
     scheduled_at = update_data.get("scheduledAt")
     eta_utc = _get_scheduled_eta(scheduled_at)
@@ -290,7 +325,7 @@ async def update_broadcast(broadcast_id: str, data: BroadcastCreate, current_use
                     "carousel_cards": update_data.get("carouselCards", broadcast.get("carouselCards")),
                     "audience_tags": update_data.get("audienceTags", broadcast.get("audienceTags")),
                     "tenant_id": tenant_id,
-                    "csv_audience": update_data.get("csvAudience", broadcast.get("csvAudience")),
+                    "speed_mps": update_data.get("speedMps", broadcast.get("speedMps")),
                 },
                 eta=eta_utc
             )
@@ -343,8 +378,19 @@ async def send_broadcast(
     # Count target customers
     audience_tags  = broadcast.get("audienceTags", [])
     csv_audience = broadcast.get("csvAudience")
-    if csv_audience:
-        total_count = len(csv_audience)
+    
+    if broadcast.get("audienceType") == "csv":
+        csv_count = broadcast.get("totalCsvRecipients", 0)
+        if not csv_count and csv_audience:
+            csv_count = len(csv_audience)
+        if not csv_count:
+            res = await db.db.broadcast_audiences.aggregate([
+                {"$match": {"broadcastId": broadcast_id}},
+                {"$project": {"count": {"$size": "$recipients"}}},
+                {"$group": {"_id": None, "total": {"$sum": "$count"}}}
+            ]).to_list(1)
+            csv_count = res[0]["total"] if res else 0
+        total_count = csv_count
     else:
         customer_query = {"tags": {"$in": audience_tags}} if audience_tags else {}
         if tenant_filter:
@@ -585,7 +631,8 @@ async def get_broadcast_details(broadcast_id: str, current_user: dict = Depends(
     delivered_unread = counts.get("delivered", 0)
     read = counts.get("read", 0)
     total_dispatched = sent_pending + delivered_unread + read
-    total = sum(counts.values()) or broadcast.get("stats", {}).get("total", 0)
+    total_processed = sum(counts.values())
+    target_total = broadcast.get("stats", {}).get("total", 0) or total_processed
 
     total_delivered = delivered_unread + read
     delivery_rate = round((total_delivered / total_dispatched * 100), 1) if total_dispatched > 0 else 0
@@ -594,7 +641,8 @@ async def get_broadcast_details(broadcast_id: str, current_user: dict = Depends(
     return {
         "broadcast": broadcast,
         "analytics": {
-            "total": total,
+            "total": target_total,
+            "totalProcessed": total_processed,
             "totalDispatched": total_dispatched,
             "sent": sent_pending,
             "delivered": delivered_unread,
@@ -817,4 +865,67 @@ async def resume_recipient_retry(broadcast_id: str, recipient_id: str, current_u
         raise HTTPException(status_code=404, detail="Recipient not found")
 
     return {"message": "Recipient resumed for retries", "isPaused": False}
+
+
+@router.get("/{broadcast_id}/export-recipients-csv")
+async def export_broadcast_recipients_csv(
+    broadcast_id: str,
+    status: Optional[str] = None,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Stream full CSV export of ALL recipients for a broadcast campaign without page limits.
+    """
+    try:
+        obj_id = ObjectId(broadcast_id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid broadcast ID")
+
+    query: dict = {"broadcastId": broadcast_id}
+    if status and status != "all":
+        if status == "failed_permanent":
+            query["status"] = "failed"
+            query["isRetryable"] = False
+        elif status == "failed_temporary":
+            query["status"] = "failed"
+            query["isRetryable"] = True
+        elif status == "frequency_capped":
+            query["status"] = "frequency_capped"
+        else:
+            query["status"] = status
+
+    async def generate_csv():
+        output = io.StringIO()
+        writer = csv.writer(output)
+        writer.writerow(["Customer Name", "Phone Number", "Status", "Error Code", "Error Reason", "Retryable", "Paused", "Last Attempt"])
+        yield output.getvalue()
+        output.seek(0)
+        output.truncate(0)
+
+        cursor = db.db.broadcast_recipients.find(query).sort("updatedAt", -1)
+        async for r in cursor:
+            name = r.get("customerName") or r.get("customerPhone") or ""
+            phone = r.get("customerPhone", "")
+            st = r.get("status", "")
+            err_code = str(r.get("errorCode") or "")
+            err_reason = str(r.get("errorReason") or "")
+            retryable = "Yes" if r.get("isRetryable") else "No"
+            paused = "Yes" if r.get("isPaused") else "No"
+            attempt_at = r.get("lastAttemptAt")
+            if hasattr(attempt_at, "strftime"):
+                attempt_str = attempt_at.strftime("%Y-%m-%d %H:%M:%S")
+            else:
+                attempt_str = str(attempt_at or "")
+
+            writer.writerow([name, phone, st, err_code, err_reason, retryable, paused, attempt_str])
+            yield output.getvalue()
+            output.seek(0)
+            output.truncate(0)
+
+    filename = f"campaign_{broadcast_id}_all_recipients.csv"
+    return StreamingResponse(
+        generate_csv(),
+        media_type="text/csv",
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )
 

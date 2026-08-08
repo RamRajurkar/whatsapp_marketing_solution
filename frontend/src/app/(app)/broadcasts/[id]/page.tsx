@@ -150,7 +150,7 @@ function formatMetaErrorForUser(code?: number | string, rawReason?: string): Fri
   // 10. Fallback formatting clean Meta text
   const cleanReason = rawReason ? rawReason.replace(/^\[#\d+\]\s*/, '').replace(/^\(#\d+\)\s*/, '') : 'Message delivery failed';
   return {
-    title: `⚠️ ${cleanReason.slice(0, 45)}${cleanReason.length > 45 ? '...' : ''}`,
+    title: `⚠️ ${cleanReason}`,
     explanation: cleanReason,
     solution: '💡 Fix: Check recipient phone number or review template parameter setup.',
     badgeColor: '#c2410c',
@@ -170,6 +170,7 @@ export default function CampaignDetailPage({ params }: { params: Promise<{ id: s
   const [page, setPage] = useState(1);
   const [retryMode, setRetryMode] = useState('temporary_only');
   const [showRetryConfirm, setShowRetryConfirm] = useState(false);
+  const [expandedErrors, setExpandedErrors] = useState<Record<string, boolean>>({});
 
   // Fetch broadcast details & aggregate analytics
   const { data: detailsData, isLoading: detailsLoading } = useQuery({
@@ -244,29 +245,24 @@ export default function CampaignDetailPage({ params }: { params: Promise<{ id: s
   const isPaused = broadcast?.isPaused || broadcast?.status === 'paused';
 
   const exportCSV = () => {
-    if (!recipientsData?.recipients?.length) {
-      toast.error('No recipients to export');
-      return;
-    }
-    const headers = ['Customer Name', 'Phone Number', 'Status', 'Error Code', 'Error Reason', 'Retryable', 'Paused', 'Last Attempt'];
-    const rows = recipientsData.recipients.map((r: any) => [
-      `"${r.customerName || ''}"`,
-      `"${r.customerPhone || ''}"`,
-      `"${r.status || ''}"`,
-      `"${r.errorCode || ''}"`,
-      `"${(r.errorReason || '').replace(/"/g, '""')}"`,
-      `"${r.isRetryable ? 'Yes' : 'No'}"`,
-      `"${r.isPaused ? 'Yes' : 'No'}"`,
-      `"${r.lastAttemptAt ? format(new Date(r.lastAttemptAt), 'yyyy-MM-dd HH:mm:ss') : ''}"`,
-    ]);
-    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement('a');
-    link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `campaign_${broadcastId}_recipients.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    toast.loading('Generating full recipient CSV export...', { id: 'csv-export' });
+    api.get(`/api/broadcasts/${broadcastId}/export-recipients-csv`, {
+      params: { status: statusFilter },
+      responseType: 'blob',
+    }).then(response => {
+      const blob = new Blob([response.data], { type: 'text/csv;charset=utf-8;' });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `campaign_${broadcastId}_all_recipients.csv`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+      toast.success('Downloaded full recipient CSV file!', { id: 'csv-export' });
+    }).catch(err => {
+      toast.error('Failed to export recipients CSV', { id: 'csv-export' });
+    });
   };
 
   return (
@@ -362,16 +358,18 @@ export default function CampaignDetailPage({ params }: { params: Promise<{ id: s
                 <span style={{ fontSize: '12px', color: '#64748b', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Total Targeted</span>
                 <Users size={18} color="#64748b" />
               </div>
-              <div style={{ fontSize: '28px', fontWeight: '800', color: '#0f172a' }}>{analytics.total || 0}</div>
-              <div style={{ fontSize: '12px', color: '#64748b', marginTop: '4px' }}>Recipients in campaign</div>
+              <div style={{ fontSize: '28px', fontWeight: '800', color: '#0f172a' }}>{(analytics.total || 0).toLocaleString()}</div>
+              <div style={{ fontSize: '11px', color: '#16a34a', fontWeight: '600', marginTop: '4px' }}>
+                {analytics.totalProcessed ? `${analytics.totalProcessed.toLocaleString()} processed so far` : 'Recipients in campaign'}
+              </div>
             </div>
 
             <div style={{ background: 'white', borderRadius: '16px', padding: '20px', border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                <span style={{ fontSize: '12px', color: '#475569', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Sent (Pending Delivery)</span>
+                <span style={{ fontSize: '12px', color: '#475569', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Sent (Pending)</span>
                 <Send size={18} color="#64748b" />
               </div>
-              <div style={{ fontSize: '28px', fontWeight: '800', color: '#334155' }}>{analytics.sent || 0}</div>
+              <div style={{ fontSize: '28px', fontWeight: '800', color: '#334155' }}>{(analytics.sent || 0).toLocaleString()}</div>
               <div style={{ fontSize: '12px', color: '#64748b', fontWeight: '500', marginTop: '4px' }}>Dispatched, pending delivery</div>
             </div>
 
@@ -380,7 +378,7 @@ export default function CampaignDetailPage({ params }: { params: Promise<{ id: s
                 <span style={{ fontSize: '12px', color: '#166534', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Delivered (Unread)</span>
                 <Check size={18} color="#16a34a" />
               </div>
-              <div style={{ fontSize: '28px', fontWeight: '800', color: '#15803d' }}>{analytics.delivered || 0}</div>
+              <div style={{ fontSize: '28px', fontWeight: '800', color: '#15803d' }}>{(analytics.delivered || 0).toLocaleString()}</div>
               <div style={{ fontSize: '12px', color: '#16a34a', fontWeight: '600', marginTop: '4px' }}>Delivered to phone</div>
             </div>
 
@@ -389,8 +387,17 @@ export default function CampaignDetailPage({ params }: { params: Promise<{ id: s
                 <span style={{ fontSize: '12px', color: '#1e40af', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Read Receipts</span>
                 <CheckCheck size={18} color="#2563eb" />
               </div>
-              <div style={{ fontSize: '28px', fontWeight: '800', color: '#1d4ed8' }}>{analytics.read || 0}</div>
+              <div style={{ fontSize: '28px', fontWeight: '800', color: '#1d4ed8' }}>{(analytics.read || 0).toLocaleString()}</div>
               <div style={{ fontSize: '12px', color: '#2563eb', fontWeight: '600', marginTop: '4px' }}>Read by customer</div>
+            </div>
+
+            <div style={{ background: 'white', borderRadius: '16px', padding: '20px', border: '1px solid #fde68a', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                <span style={{ fontSize: '12px', color: '#b45309', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Temp Failures (#429)</span>
+                <AlertTriangle size={18} color="#d97706" />
+              </div>
+              <div style={{ fontSize: '28px', fontWeight: '800', color: '#d97706' }}>{(analytics.failedTemporary || 0).toLocaleString()}</div>
+              <div style={{ fontSize: '11px', color: '#b45309', marginTop: '4px' }}>Daily portfolio cap / rate limit</div>
             </div>
 
             <div style={{ background: 'white', borderRadius: '16px', padding: '20px', border: '1px solid #ffedd5', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
@@ -398,7 +405,7 @@ export default function CampaignDetailPage({ params }: { params: Promise<{ id: s
                 <span style={{ fontSize: '12px', color: '#c2410c', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Meta 24h Cap (#131049)</span>
                 <AlertCircle size={18} color="#ea580c" />
               </div>
-              <div style={{ fontSize: '28px', fontWeight: '800', color: '#ea580c' }}>{analytics.frequencyCapped || 0}</div>
+              <div style={{ fontSize: '28px', fontWeight: '800', color: '#ea580c' }}>{(analytics.frequencyCapped || 0).toLocaleString()}</div>
               <div style={{ fontSize: '11px', color: '#c2410c', marginTop: '4px' }}>Auto-reschedules after 24h</div>
             </div>
 
@@ -407,29 +414,59 @@ export default function CampaignDetailPage({ params }: { params: Promise<{ id: s
                 <span style={{ fontSize: '12px', color: '#991b1b', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Permanent Failures</span>
                 <XCircle size={18} color="#dc2626" />
               </div>
-              <div style={{ fontSize: '28px', fontWeight: '800', color: '#dc2626' }}>{analytics.failedPermanent || 0}</div>
+              <div style={{ fontSize: '28px', fontWeight: '800', color: '#dc2626' }}>{(analytics.failedPermanent || 0).toLocaleString()}</div>
               <div style={{ fontSize: '11px', color: '#991b1b', marginTop: '4px' }}>Invalid number or opt-out</div>
             </div>
           </div>
 
-          {/* Delivery Funnel Progress Visualizer */}
-          {analytics.totalDispatched > 0 && (
+          {/* Complete Campaign Progress & Delivery Funnel Visualizer */}
+          {analytics.total > 0 && (
             <div style={{ background: 'white', borderRadius: '16px', border: '1px solid #e5e7eb', padding: '20px', marginBottom: '24px' }}>
-              <div style={{ fontSize: '14px', fontWeight: '700', color: '#1e293b', marginBottom: '12px' }}>
-                Delivery Funnel Breakdown ({analytics.totalDispatched} Total Dispatched)
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                <div style={{ fontSize: '14px', fontWeight: '700', color: '#1e293b' }}>
+                  📊 Overall Campaign Execution & Funnel Progress ({(analytics.totalProcessed || 0).toLocaleString()} of {(analytics.total || 0).toLocaleString()} Processed)
+                </div>
+                <div style={{ fontSize: '13px', fontWeight: '800', color: '#16a34a', background: '#dcfce7', padding: '3px 10px', borderRadius: '12px' }}>
+                  {(((analytics.totalProcessed || 0) / (analytics.total || 1)) * 100).toFixed(1)}% Completed
+                </div>
               </div>
-              <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
-                <div style={{ flex: 1 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', fontWeight: '600', marginBottom: '6px' }}>
-                    <span style={{ color: '#475569' }}>Sent Pending ({analytics.sent})</span>
-                    <span style={{ color: '#15803d' }}>Delivered Unread ({analytics.delivered})</span>
-                    <span style={{ color: '#1d4ed8' }}>Read ({analytics.read})</span>
-                  </div>
-                  <div style={{ width: '100%', height: '12px', background: '#f3f4f6', borderRadius: '6px', overflow: 'hidden', display: 'flex' }}>
-                    <div style={{ width: `${(analytics.sent / (analytics.totalDispatched || 1)) * 100}%`, background: '#94a3b8', height: '100%' }} title="Sent Pending" />
-                    <div style={{ width: `${(analytics.delivered / (analytics.totalDispatched || 1)) * 100}%`, background: '#22c55e', height: '100%' }} title="Delivered Unread" />
-                    <div style={{ width: `${(analytics.read / (analytics.totalDispatched || 1)) * 100}%`, background: '#3b82f6', height: '100%' }} title="Read" />
-                  </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {/* Multi-segment Progress Bar */}
+                <div style={{ width: '100%', height: '14px', background: '#f1f5f9', borderRadius: '7px', overflow: 'hidden', display: 'flex' }}>
+                  <div style={{ width: `${(analytics.read / (analytics.total || 1)) * 100}%`, background: '#3b82f6', height: '100%' }} title={`Read: ${analytics.read}`} />
+                  <div style={{ width: `${(analytics.delivered / (analytics.total || 1)) * 100}%`, background: '#22c55e', height: '100%' }} title={`Delivered: ${analytics.delivered}`} />
+                  <div style={{ width: `${(analytics.sent / (analytics.total || 1)) * 100}%`, background: '#94a3b8', height: '100%' }} title={`Sent Pending: ${analytics.sent}`} />
+                  <div style={{ width: `${(analytics.failedTemporary / (analytics.total || 1)) * 100}%`, background: '#f59e0b', height: '100%' }} title={`Temp Failures / Tier Limit: ${analytics.failedTemporary}`} />
+                  <div style={{ width: `${(analytics.failedPermanent / (analytics.total || 1)) * 100}%`, background: '#ef4444', height: '100%' }} title={`Permanent Failures: ${analytics.failedPermanent}`} />
+                </div>
+
+                {/* Segment Legend */}
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '16px', fontSize: '11px', fontWeight: '600', color: '#475569', marginTop: '4px' }}>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <span style={{ width: '8px', height: '8px', background: '#3b82f6', borderRadius: '50%' }} />
+                    Read ({analytics.read})
+                  </span>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <span style={{ width: '8px', height: '8px', background: '#22c55e', borderRadius: '50%' }} />
+                    Delivered ({analytics.delivered})
+                  </span>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <span style={{ width: '8px', height: '8px', background: '#94a3b8', borderRadius: '50%' }} />
+                    Sent Pending ({analytics.sent})
+                  </span>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <span style={{ width: '8px', height: '8px', background: '#f59e0b', borderRadius: '50%' }} />
+                    Temp Tier Limit #429 ({(analytics.failedTemporary || 0).toLocaleString()})
+                  </span>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <span style={{ width: '8px', height: '8px', background: '#ef4444', borderRadius: '50%' }} />
+                    Permanent Failed ({(analytics.failedPermanent || 0).toLocaleString()})
+                  </span>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#94a3b8' }}>
+                    <span style={{ width: '8px', height: '8px', background: '#e2e8f0', borderRadius: '50%' }} />
+                    Remaining Queued ({Math.max(0, (analytics.total || 0) - (analytics.totalProcessed || 0)).toLocaleString()})
+                  </span>
                 </div>
               </div>
             </div>
@@ -538,33 +575,69 @@ export default function CampaignDetailPage({ params }: { params: Promise<{ id: s
                         <td style={{ padding: '12px 16px' }}>
                           {r.errorReason ? (() => {
                             const errInfo = formatMetaErrorForUser(r.errorCode, r.errorReason);
+                            const isExpanded = !!expandedErrors[r._id];
                             return (
-                              <div style={{
-                                fontSize: '12px',
-                                color: errInfo.badgeColor,
-                                background: errInfo.badgeBg,
-                                border: `1px solid ${errInfo.badgeBorder}`,
-                                padding: '8px 12px',
-                                borderRadius: '8px',
-                                maxWidth: '440px',
-                                display: 'flex',
-                                flexDirection: 'column',
-                                gap: '3px',
-                              }}>
-                                <div style={{ fontWeight: '700', fontSize: '12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                                  <span>{errInfo.title}</span>
-                                  {r.errorCode ? (
-                                    <span style={{ fontSize: '10px', opacity: 0.8, background: 'rgba(0,0,0,0.06)', padding: '1px 6px', borderRadius: '4px' }}>
-                                      Code #{r.errorCode}
-                                    </span>
-                                  ) : null}
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxWidth: isExpanded ? '540px' : '440px', transition: 'all 0.2s' }}>
+                                {/* Direct Raw Meta Error & Code Bar */}
+                                <div style={{
+                                  display: 'flex', alignItems: isExpanded ? 'flex-start' : 'center', justifyContent: 'space-between', gap: '8px',
+                                  background: '#f8fafc', padding: '6px 10px', borderRadius: '6px', border: '1px solid #cbd5e1'
+                                }}>
+                                  <div style={{
+                                    fontSize: '11px', fontFamily: 'monospace', color: '#1e293b', fontWeight: '600',
+                                    whiteSpace: isExpanded ? 'normal' : 'nowrap',
+                                    wordBreak: isExpanded ? 'break-word' : 'normal',
+                                    overflow: isExpanded ? 'visible' : 'hidden',
+                                    textOverflow: isExpanded ? 'clip' : 'ellipsis',
+                                  }}>
+                                    {r.errorCode ? (
+                                      <span style={{ background: '#fee2e2', color: '#dc2626', fontWeight: '700', padding: '1px 6px', borderRadius: '4px', marginRight: '6px', display: 'inline-block' }}>
+                                        Code #{r.errorCode}
+                                      </span>
+                                    ) : null}
+                                    <span>{r.errorReason}</span>
+                                  </div>
+
+                                  {/* Describe / Explain Button */}
+                                  <button
+                                    type="button"
+                                    onClick={() => setExpandedErrors(prev => ({ ...prev, [r._id]: !prev[r._id] }))}
+                                    style={{
+                                      flexShrink: 0, padding: '3px 8px', fontSize: '11px', fontWeight: '700',
+                                      background: isExpanded ? '#dbeafe' : '#f1f5f9',
+                                      color: isExpanded ? '#1d4ed8' : '#334155',
+                                      border: isExpanded ? '1px solid #93c5fd' : '1px solid #cbd5e1',
+                                      borderRadius: '4px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px'
+                                    }}
+                                  >
+                                    {isExpanded ? '▲ Hide' : '💡 Describe / Explain'}
+                                  </button>
                                 </div>
-                                <div style={{ fontSize: '11px', lineHeight: '1.35', opacity: 0.95 }}>
-                                  {errInfo.explanation}
-                                </div>
-                                <div style={{ fontSize: '11px', fontWeight: '600', color: '#047857', marginTop: '2px' }}>
-                                  {errInfo.solution}
-                                </div>
+
+                                {/* Collapsible Translated Explanation & Solution Card */}
+                                {isExpanded && (
+                                  <div style={{
+                                    fontSize: '12px',
+                                    color: errInfo.badgeColor,
+                                    background: errInfo.badgeBg,
+                                    border: `1px solid ${errInfo.badgeBorder}`,
+                                    padding: '10px 14px',
+                                    borderRadius: '8px',
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    gap: '6px',
+                                  }}>
+                                    <div style={{ fontWeight: '700', fontSize: '13px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', wordBreak: 'break-word' }}>
+                                      <span>{errInfo.title}</span>
+                                    </div>
+                                    <div style={{ fontSize: '11.5px', lineHeight: '1.4', opacity: 0.95, wordBreak: 'break-word' }}>
+                                      {errInfo.explanation}
+                                    </div>
+                                    <div style={{ fontSize: '11.5px', fontWeight: '600', color: '#047857', marginTop: '2px', wordBreak: 'break-word' }}>
+                                      {errInfo.solution}
+                                    </div>
+                                  </div>
+                                )}
                               </div>
                             );
                           })() : (
@@ -611,7 +684,7 @@ export default function CampaignDetailPage({ params }: { params: Promise<{ id: s
 
           {/* Smart Retry Modal Dialog */}
           {showRetryConfirm && (
-            <div className="modal-backdrop" style={{ zIndex: 1200 }}>
+            <div className="modal-overlay" style={{ zIndex: 99999 }}>
               <div className="modal-content glass-card" style={{ maxWidth: '520px', padding: '24px' }}>
                 <h3 style={{ margin: '0 0 12px', fontSize: '18px', fontWeight: '700', color: '#0f172a' }}>
                   Retry Campaign Failures

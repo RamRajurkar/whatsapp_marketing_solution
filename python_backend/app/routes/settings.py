@@ -24,6 +24,8 @@ class SettingsUpdate(BaseModel):
     waAccessToken: Optional[str] = None
     waVerifyToken: Optional[str] = None
     leadsWebhookUrl: Optional[str] = None
+    maxMpsLimit: Optional[int] = 25
+    dailyTierLimit: Optional[int] = 250
     password: Optional[str] = None
 
 class TestWebhookRequest(BaseModel):
@@ -74,7 +76,9 @@ async def get_settings(current_user: dict = Depends(get_current_user)):
         "waAccessToken": current_user.get("waAccessToken") or settings.WA_ACCESS_TOKEN or "",
         "waVerifyToken": current_user.get("waVerifyToken") or settings.WA_VERIFY_TOKEN or "",
         "leadsWebhookUrl": current_user.get("leadsWebhookUrl") or os.getenv("OUTBOUND_LEADS_WEBHOOK_URL", ""),
-        "email": current_user.get("email", "")
+        "email": current_user.get("email", ""),
+        "maxMpsLimit": current_user.get("maxMpsLimit", 25),
+        "dailyTierLimit": current_user.get("dailyTierLimit", 250),
     }
 
 @router.post("/test-lead-webhook")
