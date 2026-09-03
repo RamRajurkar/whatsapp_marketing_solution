@@ -2,15 +2,16 @@ import os
 import json
 from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 from typing import Dict, Any, Optional
 
 from app.routes.auth import get_current_user
 from app.database import db
 from app.config import settings
-from app.utils.tenant import get_tenant_filter, inject_tenant_id
+from app.repositories.base import TenantScopedRepository
+from app.utils.channel_guard import require_channel
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(require_channel("whatsapp"))])
 
 CONFIG_DIR = "uploads/configs"
 CONFIG_FILE = os.path.join(CONFIG_DIR, "active_chatbot_flow.json")
@@ -79,13 +80,15 @@ DEFAULT_FLOW = {
     }
 }
 
+def _get_flow_repo(current_user: dict):
+    return TenantScopedRepository(db.db.bot_flows, current_user.get("tenantId"))
+
 @router.get("")
 @router.get("/")
 async def get_chatbot_flow(current_user: dict = Depends(get_current_user)):
-    """Fetch the active chatbot state-machine flow JSON."""
-    tenant_filter = get_tenant_filter(current_user)
-    
-    flow = await db.db.bot_flows.find_one(tenant_filter)
+    """Fetch the active chatbot state-machine flow JSON for the calling tenant."""
+    flow_repo = _get_flow_repo(current_user)
+    flow = await flow_repo.find_one({})
     
     if not flow:
         # Self-hosted mode: try reading local file if MongoDB is empty
@@ -94,25 +97,23 @@ async def get_chatbot_flow(current_user: dict = Depends(get_current_user)):
                 with open(CONFIG_FILE, "r", encoding="utf-8") as f:
                     flow_content = json.load(f)
                     
-                # Sync back to DB for consistency
                 flow_content["updatedAt"] = datetime.now(timezone.utc)
-                await db.db.bot_flows.update_one(
+                await flow_repo.update_one(
                     {"flowId": flow_content.get("flowId", "default")},
                     {"$set": flow_content},
                     upsert=True
                 )
-                flow = await db.db.bot_flows.find_one(tenant_filter)
+                flow = await flow_repo.find_one({})
             except Exception as e:
                 print(f"[Flow Router] Error syncing local file: {e}")
                 
     if not flow:
         # Default initialization if nothing is found
         init_flow = DEFAULT_FLOW.copy()
-        inject_tenant_id(init_flow, current_user)
         init_flow["createdAt"] = datetime.now(timezone.utc)
         init_flow["updatedAt"] = datetime.now(timezone.utc)
         
-        await db.db.bot_flows.insert_one(init_flow)
+        await flow_repo.insert_one(init_flow)
         flow = init_flow
         
         # Self-hosted mode: write default JSON to disk
@@ -136,16 +137,14 @@ async def update_chatbot_flow(
     data: FlowPayload,
     current_user: dict = Depends(get_current_user)
 ):
-    """Save the updated chatbot flow to MongoDB, and sync to file if self-hosted."""
-    tenant_filter = get_tenant_filter(current_user)
-    
+    """Save the updated chatbot flow for the calling tenant."""
+    flow_repo = _get_flow_repo(current_user)
     flow_doc = data.model_dump()
     flow_doc["updatedAt"] = datetime.now(timezone.utc)
-    inject_tenant_id(flow_doc, current_user)
     
     # Overwrite flow config
-    await db.db.bot_flows.update_one(
-        tenant_filter if tenant_filter else {"flowId": data.flowId},
+    await flow_repo.update_one(
+        {"flowId": data.flowId},
         {"$set": flow_doc},
         upsert=True
     )

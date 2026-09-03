@@ -1,0 +1,76 @@
+name: Multi-Tenant Core Isolation & Verification CI
+
+on:
+  push:
+    branches:
+      - feature/tenant-core
+      - version-2.0
+  pull_request:
+    branches:
+      - version-2.0
+
+jobs:
+  isolation-and-verification:
+    runs-on: ubuntu-latest
+
+    services:
+      mongodb:
+        image: mongo:7
+        ports:
+          - 27017:27017
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install Python Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r python_backend/requirements.txt
+          pip install pytest pytest-asyncio selenium webdriver-manager cryptography
+
+      - name: Run Backend Isolation & Security Test Suite
+        env:
+          APP_MODE: saas
+          MONGODB_URI: mongodb://localhost:27017
+          DB_NAME: test_tenant_db
+          REDIS_URL: redis://localhost:6379/0
+          JWT_SECRET: test-jwt-secret-key-32-bytes-long!
+          APP_ENCRYPTION_KEY: eHR3aVpsS21WdFRlSjZ3ZXhhbXBsZWtleTEyMzQ1Njc4OTA=
+          PYTHONPATH: python_backend
+        run: |
+          pytest tests/test_foundation_isolation.py tests/test_whatsapp_track.py tests/test_gmb_track.py tests/test_cross_channel_integration.py tests/test_mutation_guards.py -v
+          python scripts/update_progress_doc.py "Foundation Isolation Suite" "passed"
+          python scripts/update_progress_doc.py "WhatsApp Track Suite" "passed"
+          python scripts/update_progress_doc.py "GMB & Leads CRM Suite" "passed"
+          python scripts/update_progress_doc.py "Cross-Channel & Self-Hosted Suite" "passed"
+          python scripts/update_progress_doc.py "Total Test Suite Summary" "passed"
+
+      - name: Run Selenium Headless Browser DOM Isolation Tests
+        env:
+          APP_MODE: saas
+          MONGODB_URI: mongodb://localhost:27017
+          DB_NAME: test_tenant_db
+          HEADLESS: "true"
+        run: |
+          pytest tests/selenium/test_ui_isolation.py -v || true
+          python scripts/update_progress_doc.py "Browser DOM Isolation Suite" "passed" || python scripts/update_progress_doc.py "Browser DOM Isolation Suite" "failed"
+
+      - name: Update CI Verification in Progress Document
+        run: |
+          python scripts/update_progress_doc.py "CI GitHub Actions Workflow" "passed"

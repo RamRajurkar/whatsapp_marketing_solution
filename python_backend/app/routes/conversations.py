@@ -12,12 +12,21 @@ from app.socket import sio
 import os
 import mimetypes
 from app.utils.image_utils import compress_image_bytes
+from app.repositories.base import TenantScopedRepository
+from app.utils.channel_guard import require_channel
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(require_channel("whatsapp"))])
 
 
 def _now():
     return datetime.now(timezone.utc)
+
+def _get_repos(current_user: dict):
+    tenant_id = current_user.get("tenantId")
+    return (
+        TenantScopedRepository(db.db.conversations, tenant_id),
+        TenantScopedRepository(db.db.messages, tenant_id),
+    )
 
 
 class SendMessageRequest(BaseModel):
@@ -43,6 +52,7 @@ async def get_conversations(
     limit: int = Query(100, le=200),
     current_user: dict = Depends(get_current_user),
 ):
+    conv_repo, _ = _get_repos(current_user)
     query = {}
     if search:
         query = {
@@ -52,8 +62,7 @@ async def get_conversations(
             ]
         }
 
-    cursor        = db.db.conversations.find(query).sort("lastMessageTime", -1).limit(limit)
-    conversations = await cursor.to_list(length=limit)
+    conversations = await conv_repo.find(query, sort=[("lastMessageTime", -1)], limit=limit)
 
     for conv in conversations:
         conv["_id"] = str(conv["_id"])
@@ -73,28 +82,28 @@ async def get_messages(
     Messages are returned in ascending timestamp order (oldest first).
     Use `page` and `page_size` for cursor-style pagination.
     """
+    conv_repo, msg_repo = _get_repos(current_user)
     try:
         # Reset unread count when opening conversation
-        await db.db.conversations.update_one(
+        await conv_repo.update_one(
             {"_id": ObjectId(conversation_id)},
             {"$set": {"unreadCount": 0}},
         )
     except Exception:
         pass
 
-    skip   = (page - 1) * page_size
-    cursor = (
-        db.db.messages.find({"conversationId": conversation_id})
-        .sort("timestamp", -1)
-        .skip(skip)
-        .limit(page_size)
+    skip = (page - 1) * page_size
+    messages = await msg_repo.find(
+        {"conversationId": conversation_id},
+        sort=[("timestamp", -1)],
+        skip=skip,
+        limit=page_size
     )
-    messages = await cursor.to_list(length=page_size)
     
     # Reverse to return in chronological order (oldest first in the array) for the UI
     messages.reverse()
     
-    total    = await db.db.messages.count_documents({"conversationId": conversation_id})
+    total = await msg_repo.count_documents({"conversationId": conversation_id})
 
     for msg in messages:
         msg["_id"] = str(msg["_id"])
@@ -114,21 +123,24 @@ async def send_text(
     req: SendMessageRequest,
     current_user: dict = Depends(get_current_user),
 ):
+    conv_repo, msg_repo = _get_repos(current_user)
     wa_phone_id = current_user.get("waPhoneNumberId") or settings.WA_PHONE_NUMBER_ID
     wa_token    = current_user.get("waAccessToken")    or settings.WA_ACCESS_TOKEN
 
     if not wa_phone_id or not wa_token:
         raise HTTPException(status_code=400, detail="WhatsApp credentials not configured in settings")
 
-    conversation = await db.db.conversations.find_one({"_id": ObjectId(conversation_id)})
+    conversation = await conv_repo.find_one({"_id": ObjectId(conversation_id)})
     if not conversation:
         raise HTTPException(status_code=404, detail="Conversation not found")
 
     # 24-hour customer service window check (Meta Policy Enforcement)
-    last_inbound = await db.db.messages.find_one(
+    inbound_msgs = await msg_repo.find(
         {"conversationId": conversation_id, "direction": "inbound"},
-        sort=[("timestamp", -1)]
+        sort=[("timestamp", -1)],
+        limit=1
     )
+    last_inbound = inbound_msgs[0] if inbound_msgs else None
     if not last_inbound:
         raise HTTPException(
             status_code=400,
@@ -178,10 +190,10 @@ async def send_text(
         "timestamp":         now,
         "createdAt":         now,
     }
-    result               = await db.db.messages.insert_one(message_doc)
+    result               = await msg_repo.insert_one(message_doc)
     message_doc["_id"]   = str(result.inserted_id)
 
-    await db.db.conversations.update_one(
+    await conv_repo.update_one(
         {"_id": ObjectId(conversation_id)},
         {"$set": {"lastMessage": req.text, "lastMessageTime": now, "updatedAt": now}},
     )
@@ -199,19 +211,20 @@ async def delete_conversation(
     current_user: dict = Depends(get_current_user),
 ):
     """Delete a conversation and all its messages."""
+    conv_repo, msg_repo = _get_repos(current_user)
     try:
         obj_id = ObjectId(conversation_id)
     except Exception:
         raise HTTPException(status_code=400, detail="Invalid conversation ID")
 
-    conv = await db.db.conversations.find_one({"_id": obj_id})
+    conv = await conv_repo.find_one({"_id": obj_id})
     if not conv:
         raise HTTPException(status_code=404, detail="Conversation not found")
 
     # Delete all messages in this conversation
-    await db.db.messages.delete_many({"conversationId": conversation_id})
+    await msg_repo.delete_many({"conversationId": conversation_id})
     # Delete the conversation itself
-    await db.db.conversations.delete_one({"_id": obj_id})
+    await conv_repo.delete_one({"_id": obj_id})
 
     await sio.emit("conversation:deleted", {"conversationId": conversation_id})
 
@@ -232,21 +245,24 @@ async def upload_and_send_media(
     current_user: dict = Depends(get_current_user),
 ):
     """Upload a file and send it as a media message in a conversation."""
+    conv_repo, msg_repo = _get_repos(current_user)
     wa_phone_id = current_user.get("waPhoneNumberId") or settings.WA_PHONE_NUMBER_ID
     wa_token    = current_user.get("waAccessToken")    or settings.WA_ACCESS_TOKEN
 
     if not wa_phone_id or not wa_token:
         raise HTTPException(status_code=400, detail="WhatsApp credentials not configured")
 
-    conversation = await db.db.conversations.find_one({"_id": ObjectId(conversation_id)})
+    conversation = await conv_repo.find_one({"_id": ObjectId(conversation_id)})
     if not conversation:
         raise HTTPException(status_code=404, detail="Conversation not found")
 
     # 24-hour customer service window check (Meta Policy Enforcement)
-    last_inbound = await db.db.messages.find_one(
+    inbound_msgs = await msg_repo.find(
         {"conversationId": conversation_id, "direction": "inbound"},
-        sort=[("timestamp", -1)]
+        sort=[("timestamp", -1)],
+        limit=1
     )
+    last_inbound = inbound_msgs[0] if inbound_msgs else None
     if not last_inbound:
         raise HTTPException(
             status_code=400,
@@ -329,10 +345,10 @@ async def upload_and_send_media(
         "timestamp":         now,
         "createdAt":         now,
     }
-    result = await db.db.messages.insert_one(message_doc)
+    result = await msg_repo.insert_one(message_doc)
     message_doc["_id"] = str(result.inserted_id)
 
-    await db.db.conversations.update_one(
+    await conv_repo.update_one(
         {"_id": ObjectId(conversation_id)},
         {"$set": {"lastMessage": display_text, "lastMessageTime": now, "updatedAt": now}},
     )
@@ -351,13 +367,14 @@ async def send_catalog_asset(
     current_user: dict = Depends(get_current_user),
 ):
     """Send an uploaded catalog/price list asset directly into a WhatsApp conversation."""
+    conv_repo, msg_repo = _get_repos(current_user)
     wa_phone_id = current_user.get("waPhoneNumberId") or settings.WA_PHONE_NUMBER_ID
     wa_token    = current_user.get("waAccessToken") or settings.WA_ACCESS_TOKEN
 
     if not wa_phone_id or not wa_token:
         raise HTTPException(status_code=400, detail="WhatsApp credentials not configured.")
 
-    conversation = await db.db.conversations.find_one({"_id": ObjectId(conversation_id)})
+    conversation = await conv_repo.find_one({"_id": ObjectId(conversation_id)})
     if not conversation:
         raise HTTPException(status_code=404, detail="Conversation not found")
 
@@ -427,10 +444,10 @@ async def send_catalog_asset(
         "timestamp":         now,
         "createdAt":         now,
     }
-    result = await db.db.messages.insert_one(message_doc)
+    result = await msg_repo.insert_one(message_doc)
     message_doc["_id"] = str(result.inserted_id)
 
-    await db.db.conversations.update_one(
+    await conv_repo.update_one(
         {"_id": ObjectId(conversation_id)},
         {"$set": {"lastMessage": display_text, "lastMessageTime": now, "updatedAt": now}},
     )
@@ -449,13 +466,14 @@ async def send_template_in_conversation(
     current_user: dict = Depends(get_current_user),
 ):
     """Send a template message within an existing conversation."""
+    conv_repo, msg_repo = _get_repos(current_user)
     wa_phone_id = current_user.get("waPhoneNumberId") or settings.WA_PHONE_NUMBER_ID
     wa_token    = current_user.get("waAccessToken")    or settings.WA_ACCESS_TOKEN
 
     if not wa_phone_id or not wa_token:
         raise HTTPException(status_code=400, detail="WhatsApp credentials not configured in settings")
 
-    conversation = await db.db.conversations.find_one({"_id": ObjectId(conversation_id)})
+    conversation = await conv_repo.find_one({"_id": ObjectId(conversation_id)})
     if not conversation:
         raise HTTPException(status_code=404, detail="Conversation not found")
 
@@ -546,10 +564,10 @@ async def send_template_in_conversation(
         "timestamp":         now,
         "createdAt":         now,
     }
-    result             = await db.db.messages.insert_one(message_doc)
+    result             = await msg_repo.insert_one(message_doc)
     message_doc["_id"] = str(result.inserted_id)
 
-    await db.db.conversations.update_one(
+    await conv_repo.update_one(
         {"_id": ObjectId(conversation_id)},
         {"$set": {"lastMessage": display_text, "lastMessageTime": now, "updatedAt": now}},
     )
@@ -571,17 +589,18 @@ async def retry_message(
     current_user: dict = Depends(get_current_user),
 ):
     """Retry sending a failed message."""
+    conv_repo, msg_repo = _get_repos(current_user)
     wa_phone_id = current_user.get("waPhoneNumberId") or settings.WA_PHONE_NUMBER_ID
     wa_token    = current_user.get("waAccessToken") or settings.WA_ACCESS_TOKEN
 
     if not wa_phone_id or not wa_token:
         raise HTTPException(status_code=400, detail="WhatsApp credentials not configured.")
 
-    conversation = await db.db.conversations.find_one({"_id": ObjectId(conversation_id)})
+    conversation = await conv_repo.find_one({"_id": ObjectId(conversation_id)})
     if not conversation:
         raise HTTPException(status_code=404, detail="Conversation not found")
 
-    message = await db.db.messages.find_one({"_id": ObjectId(message_id), "conversationId": conversation_id})
+    message = await msg_repo.find_one({"_id": ObjectId(message_id), "conversationId": conversation_id})
     if not message:
         raise HTTPException(status_code=404, detail="Message not found")
 
@@ -605,7 +624,7 @@ async def retry_message(
         resp = await client.post(url, json=payload, headers=headers)
         if resp.status_code not in (200, 201):
             detail_err = resp.json().get("error", {}).get("message", resp.text)
-            await db.db.messages.update_one(
+            await msg_repo.update_one(
                 {"_id": ObjectId(message_id)},
                 {"$set": {"status": "failed", "errorReason": detail_err, "updatedAt": _now()}}
             )
@@ -613,11 +632,11 @@ async def retry_message(
         
         new_wa_id = resp.json().get("messages", [{}])[0].get("id", "unknown")
         now = _now()
-        await db.db.messages.update_one(
+        await msg_repo.update_one(
             {"_id": ObjectId(message_id)},
             {"$set": {"whatsappMessageId": new_wa_id, "status": "sent", "errorReason": None, "updatedAt": now}}
         )
-        updated_doc = await db.db.messages.find_one({"_id": ObjectId(message_id)})
+        updated_doc = await msg_repo.find_one({"_id": ObjectId(message_id)})
         updated_doc["_id"] = str(updated_doc["_id"])
         emit_doc = {**updated_doc, "timestamp": updated_doc["timestamp"].isoformat(), "createdAt": updated_doc["createdAt"].isoformat()}
         await sio.emit("message:status", emit_doc, room=conversation_id)

@@ -144,7 +144,7 @@ from app.socket import sio
 
 socket_app = socketio.ASGIApp(sio, app)
 
-from app.routes import auth, settings as settings_route, customers, segments, webhook, conversations, broadcasts, messaging, reports, media, bot, quick_replies, menu, reservations, faq, feedback, bot_flow
+from app.routes import auth, settings as settings_route, customers, segments, webhook, conversations, broadcasts, messaging, reports, media, bot, quick_replies, menu, reservations, faq, feedback, bot_flow, gmb, leads, superadmin, agency
 
 app.include_router(auth.router,          prefix="/api/auth",          tags=["auth"])
 app.include_router(settings_route.router, prefix="/api/settings",      tags=["settings"])
@@ -163,6 +163,10 @@ app.include_router(menu.router,          prefix="/api/menu",          tags=["men
 app.include_router(reservations.router,  prefix="/api/reservations",  tags=["reservations"])
 app.include_router(faq.router,           prefix="/api/faq",           tags=["faq"])
 app.include_router(feedback.router,      prefix="/api/feedback",      tags=["feedback"])
+app.include_router(gmb.router,           prefix="/api/gmb",           tags=["gmb"])
+app.include_router(leads.router,         prefix="/api/leads",         tags=["leads"])
+app.include_router(superadmin.router,    prefix="/api/superadmin",    tags=["superadmin"])
+app.include_router(agency.router,        prefix="/api/agency",        tags=["agency"])
 
 @app.get("/")
 async def root():

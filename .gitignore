@@ -29,4 +29,7 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
+# Secrets and Credentials
+secrets/
+*.secret
 .env
