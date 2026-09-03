@@ -221,12 +221,26 @@ async def _async_send_broadcast(
             if components:
                 template_payload["components"] = components
 
-        # Resolve csv_audience from database.broadcast_audiences chunk storage if not passed directly
+        # Resolve csv_audience from database.broadcast_audiences or customer_segments if not passed directly
         if not csv_audience and bc_doc and bc_doc.get("audienceType") == "csv":
             aud_cursor = database.broadcast_audiences.find({"broadcastId": broadcast_id}).sort("chunk_index", 1)
             csv_audience = []
             async for aud_doc in aud_cursor:
                 csv_audience.extend(aud_doc.get("recipients", []))
+
+        elif not csv_audience and bc_doc and bc_doc.get("audienceType") == "segment":
+            segment_id = bc_doc.get("segmentId")
+            if segment_id:
+                try:
+                    seg_doc = await database.customer_segments.find_one({"_id": ObjectId(segment_id)})
+                except Exception:
+                    seg_doc = await database.customer_segments.find_one({"_id": segment_id})
+                if seg_doc:
+                    members = seg_doc.get("members", [])
+                    csv_audience = [
+                        {"phone": m.get("phone"), "name": m.get("name", m.get("phone")), "params": []}
+                        for m in members if m.get("phone")
+                    ]
 
         # ── Count total customers ────────────────────────────────────────
         if csv_audience:

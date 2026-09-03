@@ -144,11 +144,12 @@ from app.socket import sio
 
 socket_app = socketio.ASGIApp(sio, app)
 
-from app.routes import auth, settings as settings_route, customers, webhook, conversations, broadcasts, messaging, reports, media, bot, quick_replies, menu, reservations, faq, feedback, bot_flow
+from app.routes import auth, settings as settings_route, customers, segments, webhook, conversations, broadcasts, messaging, reports, media, bot, quick_replies, menu, reservations, faq, feedback, bot_flow
 
 app.include_router(auth.router,          prefix="/api/auth",          tags=["auth"])
 app.include_router(settings_route.router, prefix="/api/settings",      tags=["settings"])
 app.include_router(customers.router,     prefix="/api/customers",     tags=["customers"])
+app.include_router(segments.router,      prefix="/api/segments",      tags=["segments"])
 app.include_router(webhook.router,       prefix="/api/webhook",       tags=["webhook"])
 app.include_router(conversations.router, prefix="/api/conversations", tags=["conversations"])
 app.include_router(broadcasts.router,    prefix="/api/broadcasts",    tags=["broadcasts"])

@@ -26,15 +26,17 @@ import {
   Loader2,
   Image,
   Star,
+  Layers,
 } from 'lucide-react';
 
 const menuItems = [
-  { href: '/dashboard',     icon: LayoutDashboard, label: 'Dashboard' },
-  { href: '/inbox',         icon: MessageSquare,   label: 'Inbox' },
-  { href: '/chatbot',       icon: MessageCircle,   label: 'Chatbot' },
-  { href: '/faq',           icon: HelpCircle,      label: 'Smart FAQ', hidden: true },
-  { href: '/customers',     icon: Users,           label: 'Customers' },
-  { href: '/reservations',  icon: CalendarDays,    label: 'Leads & Enquiries' },
+  { href: '/dashboard',          icon: LayoutDashboard, label: 'Dashboard' },
+  { href: '/inbox',              icon: MessageSquare,   label: 'Inbox' },
+  { href: '/chatbot',            icon: MessageCircle,   label: 'Chatbot' },
+  { href: '/faq',                icon: HelpCircle,      label: 'Smart FAQ', hidden: true },
+  { href: '/customers',          icon: Users,           label: 'Customers' },
+  { href: '/customers/segments', icon: Layers,          label: 'Customer Segments' },
+  { href: '/reservations',       icon: CalendarDays,    label: 'Leads & Enquiries' },
   { href: '/feedback',      icon: Star,            label: 'Feedback', hidden: true },
   { href: '/quick-replies', icon: Zap,             label: 'Quick Replies' },
   { href: '/menu',          icon: BookOpen,        label: 'Catalogs & Price Lists' },

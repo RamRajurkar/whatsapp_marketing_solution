@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '@/lib/api';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { getSocket } from '@/lib/socket';
 import toast from 'react-hot-toast';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, isSameMonth, addMonths, subMonths, getDay } from 'date-fns';
@@ -744,7 +744,9 @@ function BroadcastCalendar({
 
 function BroadcastModal({ broadcast, onClose, onSave }: any) {
   const [step, setStep] = useState<1 | 2>(1);
-  const [audienceType, setAudienceType] = useState<'tags' | 'csv'>(broadcast?.audienceType || 'tags');
+  const [audienceType, setAudienceType] = useState<'tags' | 'csv' | 'segment'>(broadcast?.audienceType || 'tags');
+  const [selectedSegmentId, setSelectedSegmentId] = useState<string>(broadcast?.segmentId || '');
+  const [selectedSegmentName, setSelectedSegmentName] = useState<string>(broadcast?.segmentName || '');
   const [csvFile, setCsvFile] = useState<File | null>(null);
   const [csvParseData, setCsvParseData] = useState<any>(null);
   const [csvParsing, setCsvParsing] = useState(false);
@@ -770,6 +772,11 @@ function BroadcastModal({ broadcast, onClose, onSave }: any) {
   });
 
   const TAGS = ['Regular Customer', 'VIP Customer', 'Vegetarian', 'Birthday Customer', 'Catering Inquiry'];
+
+  const { data: segmentsList } = useQuery({
+    queryKey: ['customer-segments'],
+    queryFn: () => api.get('/api/segments').then(r => r.data.segments || []),
+  });
 
   const { data: templatesData, isLoading: templatesLoading } = useQuery({
     queryKey: ['templates'],
@@ -1017,6 +1024,8 @@ function BroadcastModal({ broadcast, onClose, onSave }: any) {
       ...form,
       headerMediaUrl: finalHeaderMediaUrl,
       audienceType,
+      segmentId: audienceType === 'segment' ? selectedSegmentId : undefined,
+      segmentName: audienceType === 'segment' ? selectedSegmentName : undefined,
       csvAudience: finalCsvAudience,
       bodyParams: finalBodyParams,
       buttonParams: finalButtonParams,
@@ -1064,6 +1073,10 @@ function BroadcastModal({ broadcast, onClose, onSave }: any) {
                   toast.error('Please upload a CSV file first');
                   return;
                 }
+                if (audienceType === 'segment' && !selectedSegmentId) {
+                  toast.error('Please select a Customer Segment');
+                  return;
+                }
                 setStep(2);
               }}
               style={{
@@ -1096,7 +1109,7 @@ function BroadcastModal({ broadcast, onClose, onSave }: any) {
                   type="button"
                   onClick={() => setAudienceType('tags')}
                   style={{
-                    flex: 1, padding: '10px 14px', borderRadius: '8px', border: 'none', fontSize: '13px', fontWeight: '600', cursor: 'pointer',
+                    flex: 1, padding: '10px 10px', borderRadius: '8px', border: 'none', fontSize: '12px', fontWeight: '600', cursor: 'pointer',
                     background: audienceType === 'tags' ? 'white' : 'transparent',
                     color: audienceType === 'tags' ? '#0f172a' : '#64748b',
                     boxShadow: audienceType === 'tags' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
@@ -1106,9 +1119,21 @@ function BroadcastModal({ broadcast, onClose, onSave }: any) {
                 </button>
                 <button
                   type="button"
+                  onClick={() => setAudienceType('segment')}
+                  style={{
+                    flex: 1, padding: '10px 10px', borderRadius: '8px', border: 'none', fontSize: '12px', fontWeight: '600', cursor: 'pointer',
+                    background: audienceType === 'segment' ? 'white' : 'transparent',
+                    color: audienceType === 'segment' ? '#0f172a' : '#64748b',
+                    boxShadow: audienceType === 'segment' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+                  }}
+                >
+                  🎯 Customer Segment
+                </button>
+                <button
+                  type="button"
                   onClick={() => setAudienceType('csv')}
                   style={{
-                    flex: 1, padding: '10px 14px', borderRadius: '8px', border: 'none', fontSize: '13px', fontWeight: '600', cursor: 'pointer',
+                    flex: 1, padding: '10px 10px', borderRadius: '8px', border: 'none', fontSize: '12px', fontWeight: '600', cursor: 'pointer',
                     background: audienceType === 'csv' ? 'white' : 'transparent',
                     color: audienceType === 'csv' ? '#0f172a' : '#64748b',
                     boxShadow: audienceType === 'csv' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
@@ -1118,6 +1143,37 @@ function BroadcastModal({ broadcast, onClose, onSave }: any) {
                 </button>
               </div>
             </div>
+
+            {audienceType === 'segment' && (
+              <div style={{ background: '#f8fafc', padding: '14px', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
+                <label style={{ fontSize: '12px', fontWeight: '700', color: '#334155', display: 'block', marginBottom: '6px' }}>
+                  Select Customer Segment Target
+                </label>
+                <select
+                  value={selectedSegmentId}
+                  onChange={e => {
+                    const segId = e.target.value;
+                    setSelectedSegmentId(segId);
+                    const found = (segmentsList || []).find((s: any) => s._id === segId);
+                    if (found) setSelectedSegmentName(found.name);
+                  }}
+                  style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '13px', background: '#ffffff' }}
+                >
+                  <option value="">-- Choose a Segment --</option>
+                  {(segmentsList || []).map((seg: any) => (
+                    <option key={seg._id} value={seg._id}>
+                      {seg.name} ({seg.totalCount || 0} contacts) — {seg.source === 'csv_upload' ? 'CSV Upload' : 'CRM Selection'}
+                    </option>
+                  ))}
+                </select>
+
+                {selectedSegmentId && (
+                  <div style={{ marginTop: '10px', fontSize: '12px', color: '#15803d', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <CheckCircle2 size={15} /> Targeted Segment: <strong>{selectedSegmentName}</strong> pre-loaded as audience target.
+                  </div>
+                )}
+              </div>
+            )}
 
             {audienceType === 'tags' && (
               <div>
@@ -1794,9 +1850,24 @@ function BroadcastModal({ broadcast, onClose, onSave }: any) {
 
 export default function BroadcastsPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const queryClient = useQueryClient();
   const [modal, setModal] = useState<any>(null);
   const [progressMap, setProgressMap] = useState<Record<string, any>>({});
+
+  const segmentIdParam = searchParams?.get('segmentId');
+  const segmentNameParam = searchParams?.get('segmentName');
+
+  useEffect(() => {
+    if (segmentIdParam) {
+      setModal({
+        audienceType: 'segment',
+        segmentId: segmentIdParam,
+        segmentName: segmentNameParam || '',
+        name: `Campaign - ${segmentNameParam || 'Segment'}`
+      });
+    }
+  }, [segmentIdParam, segmentNameParam]);
 
   const { data: broadcasts, isLoading } = useQuery({
     queryKey: ['broadcasts'],

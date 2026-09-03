@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '@/lib/api';
 import toast from 'react-hot-toast';
@@ -8,7 +9,7 @@ import { format } from 'date-fns';
 import { formatIndianPhone } from '@/lib/phone';
 import {
   Users, Search, Plus, Pencil, Trash2, UserPlus, Send,
-  MessageSquare, FileText, Loader2, X,
+  MessageSquare, FileText, Loader2, X, Layers,
 } from 'lucide-react';
 
 const TAG_COLORS: Record<string, string> = {
@@ -514,6 +515,27 @@ export default function CustomersPage() {
             <Plus size={16} />
             Add Customer
           </button>
+        </div>
+
+        {/* Tab Switcher Bar */}
+        <div style={{ display: 'flex', gap: '8px', marginTop: '20px', borderBottom: '1px solid #e2e8f0', paddingBottom: '2px' }}>
+          <span
+            style={{
+              padding: '8px 16px', fontSize: '13px', fontWeight: '700',
+              color: '#1B5E37', borderBottom: '2px solid #1B5E37', display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer'
+            }}
+          >
+            <Users size={15} /> All Customers CRM
+          </span>
+          <Link
+            href="/customers/segments"
+            style={{
+              padding: '8px 16px', fontSize: '13px', fontWeight: '600', textDecoration: 'none',
+              color: '#64748b', borderBottom: '2px solid transparent', display: 'flex', alignItems: 'center', gap: '6px'
+            }}
+          >
+            <Layers size={15} /> Targeted Audience Segments
+          </Link>
         </div>
       </div>
 

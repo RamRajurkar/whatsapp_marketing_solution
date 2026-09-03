@@ -47,7 +47,9 @@ class BroadcastCreate(BaseModel):
     templateName: str
     templateLanguage: str = "en"
     audienceTags: Optional[List[str]] = []
-    audienceType: Optional[str] = "tags"  # "tags" | "csv"
+    audienceType: Optional[str] = "tags"  # "tags" | "csv" | "segment"
+    segmentId: Optional[str] = None
+    segmentName: Optional[str] = None
     csvAudience: Optional[List[Dict[str, Any]]] = None
     scheduledAt: Optional[str] = None
     recurringSchedule: Optional[str] = "none"  # "none" | "daily" | "weekly" | "monthly"
