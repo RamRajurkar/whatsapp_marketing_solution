@@ -138,10 +138,101 @@ async def update_settings(settings_data: SettingsUpdate, current_user: dict = De
         {"$set": update_data}
     )
     
-    if result.modified_count == 0:
-        return {"message": "No changes made"}
-        
+    # In SaaS mode, if WhatsApp credentials were submitted, auto-vault into wa_connections
+    if getattr(settings, "APP_MODE", "self_hosted") == "saas" and update_data.get("waPhoneNumberId") and update_data.get("waAccessToken"):
+        from app.models.channels.whatsapp import WhatsAppConnection
+        tenant_id = str(current_user.get("tenantId") or current_user.get("_id"))
+        conn = WhatsAppConnection.create_encrypted(
+            tenant_id=tenant_id,
+            phone_number_id=update_data["waPhoneNumberId"],
+            waba_id=update_data.get("waBusinessAccountId", ""),
+            access_token=update_data["waAccessToken"],
+            app_secret=update_data.get("waAppSecret"),
+            verify_token=update_data.get("waVerifyToken") or settings.WA_VERIFY_TOKEN
+        )
+        conn_dict = conn.model_dump(by_alias=True, exclude=["id"])
+        await db.db.wa_connections.update_one(
+            {"tenantId": tenant_id},
+            {"$set": conn_dict},
+            upsert=True
+        )
+
     return {"message": "Settings updated successfully"}
+
+class WhatsAppConnectRequest(BaseModel):
+    phoneNumberId: str
+    wabaId: str
+    accessToken: str
+    appSecret: Optional[str] = None
+    verifyToken: Optional[str] = None
+    displayPhoneNumber: Optional[str] = None
+
+@router.post("/whatsapp/connect")
+async def connect_whatsapp_channel(req: WhatsAppConnectRequest, current_user: dict = Depends(get_current_user)):
+    """
+    SaaS Tenant Onboarding Endpoint for WhatsApp.
+    Encrypts Meta Cloud API credentials with AES-256-GCM and vaults into wa_connections.
+    """
+    from app.models.channels.whatsapp import WhatsAppConnection
+    tenant_id = str(current_user.get("tenantId") or current_user.get("_id"))
+    
+    conn = WhatsAppConnection.create_encrypted(
+        tenant_id=tenant_id,
+        phone_number_id=req.phoneNumberId,
+        waba_id=req.wabaId,
+        access_token=req.accessToken,
+        app_secret=req.appSecret,
+        verify_token=req.verifyToken or settings.WA_VERIFY_TOKEN,
+        display_phone_number=req.displayPhoneNumber
+    )
+    conn_dict = conn.model_dump(by_alias=True, exclude=["id"])
+    
+    await db.db.wa_connections.update_one(
+        {"tenantId": tenant_id},
+        {"$set": conn_dict},
+        upsert=True
+    )
+    
+    # Also update user record pointer
+    try:
+        obj_id = ObjectId(current_user["_id"])
+    except Exception:
+        obj_id = current_user["_id"]
+        
+    await db.db.users.update_one(
+        {"_id": obj_id},
+        {"$set": {
+            "waPhoneNumberId": req.phoneNumberId,
+            "waBusinessAccountId": req.wabaId
+        }}
+    )
+    
+    return {
+        "status": "connected",
+        "tenantId": tenant_id,
+        "phoneNumberId": req.phoneNumberId,
+        "wabaId": req.wabaId,
+        "vaulted": True,
+        "message": "WhatsApp credentials securely encrypted and vaulted for tenant."
+    }
+
+@router.get("/whatsapp/status")
+async def get_whatsapp_channel_status(current_user: dict = Depends(get_current_user)):
+    """Check WhatsApp channel connection status for tenant."""
+    tenant_id = str(current_user.get("tenantId") or current_user.get("_id"))
+    conn = await db.db.wa_connections.find_one({"tenantId": tenant_id})
+    if not conn:
+        return {"connected": False, "tenantId": tenant_id}
+    
+    return {
+        "connected": True,
+        "tenantId": tenant_id,
+        "phoneNumberId": conn.get("phoneNumberId"),
+        "wabaId": conn.get("wabaId"),
+        "displayPhoneNumber": conn.get("displayPhoneNumber"),
+        "status": conn.get("status", "connected"),
+        "qualityRating": conn.get("qualityRating", "GREEN")
+    }
 
 @router.post("/test-connection")
 async def test_connection(current_user: dict = Depends(get_current_user)):
