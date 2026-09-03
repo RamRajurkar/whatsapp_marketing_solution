@@ -38,12 +38,15 @@ const menuItems = [
   { href: '/customers/segments', icon: Layers,          label: 'Customer Segments' },
   { href: '/reservations',       icon: CalendarDays,    label: 'Leads & Enquiries' },
   { href: '/feedback',      icon: Star,            label: 'Feedback', hidden: true },
+  { href: '/reviews',       icon: Star,            label: 'Google Reviews' },
   { href: '/quick-replies', icon: Zap,             label: 'Quick Replies' },
   { href: '/menu',          icon: BookOpen,        label: 'Catalogs & Price Lists' },
   { href: '/templates',     icon: MessageCircle,   label: 'Templates' },
   { href: '/broadcasts',    icon: Megaphone,       label: 'Broadcasts' },
   { href: '/media',         icon: Image,           label: 'Media' },
   { href: '/reports',       icon: BarChart3,       label: 'Reports' },
+  { href: '/agency',        icon: Users,           label: 'Agency Workspace' },
+  { href: '/superadmin',    icon: Settings,        label: 'Superadmin' },
 ];
 
 const generalItems = [

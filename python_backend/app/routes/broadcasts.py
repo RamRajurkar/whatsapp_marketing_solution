@@ -17,11 +17,10 @@ import pytz
 from app.celery_app import celery_app
 from app.utils.phone import normalize_indian_phone
 from app.utils.image_utils import compress_image_bytes
-from app.tasks.broadcast_task import send_broadcast as send_broadcast_task
-from app.http_client import get_http_client
-from app.utils.tenant import get_tenant_filter, inject_tenant_id
+from app.repositories.base import TenantScopedRepository
+from app.utils.channel_guard import require_channel
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(require_channel("whatsapp"))])
 
 
 def _now():
@@ -151,24 +150,30 @@ async def parse_broadcast_csv(file: UploadFile = File(...), current_user: dict =
     }
 
 
+def _get_bcast_repos(current_user: dict):
+    tenant_id = current_user.get("tenantId")
+    return (
+        TenantScopedRepository(db.db.broadcasts, tenant_id),
+        TenantScopedRepository(db.db.broadcast_audiences, tenant_id),
+    )
+
+
 @router.get("")
 @router.get("/")
 async def get_broadcasts(current_user: dict = Depends(get_current_user)):
-    """Get all broadcast campaigns."""
-    tenant_filter = get_tenant_filter(current_user)
-    
-    cursor = db.db.broadcasts.find(tenant_filter).sort("createdAt", -1)
-    broadcasts = await cursor.to_list(length=100)
+    """Get all broadcast campaigns for the calling tenant."""
+    bcast_repo, _ = _get_bcast_repos(current_user)
+    broadcasts = await bcast_repo.find({}, sort=[("createdAt", -1)], limit=100)
     for b in broadcasts:
         b["_id"] = str(b["_id"])
     return broadcasts
 
 
-async def _save_csv_audience_chunks(broadcast_id: str, csv_audience: list):
+async def _save_csv_audience_chunks(broadcast_id: str, csv_audience: list, aud_repo: TenantScopedRepository):
     """Save large CSV audience array in chunked MongoDB documents to prevent BSON > 16MB errors."""
     if not csv_audience:
         return
-    await db.db.broadcast_audiences.delete_many({"broadcastId": broadcast_id})
+    await aud_repo.delete_many({"broadcastId": broadcast_id})
     CHUNK_SIZE = 2000
     chunk_docs = []
     for i in range(0, len(csv_audience), CHUNK_SIZE):
@@ -180,19 +185,19 @@ async def _save_csv_audience_chunks(broadcast_id: str, csv_audience: list):
             "createdAt": _now()
         })
     if chunk_docs:
-        await db.db.broadcast_audiences.insert_many(chunk_docs)
+        await aud_repo.insert_many(chunk_docs)
 
 
 @router.post("")
 @router.post("/")
 async def create_broadcast(data: BroadcastCreate, current_user: dict = Depends(get_current_user)):
     """Create a new broadcast campaign."""
+    bcast_repo, aud_repo = _get_bcast_repos(current_user)
     doc = data.model_dump()
     now = _now()
     doc["createdAt"] = now
     doc["updatedAt"] = now
     doc["stats"] = {"total": 0, "sent": 0, "failed": 0}
-    inject_tenant_id(doc, current_user)
 
     # Pop csvAudience to prevent BSON > 16MB error on db.broadcasts insert
     csv_aud = doc.pop("csvAudience", None)
@@ -205,20 +210,21 @@ async def create_broadcast(data: BroadcastCreate, current_user: dict = Depends(g
     if eta_utc and eta_utc > now:
         doc["status"] = "scheduled"
 
-    result = await db.db.broadcasts.insert_one(doc)
+    result = await bcast_repo.insert_one(doc)
     broadcast_id = str(result.inserted_id)
     doc["_id"] = broadcast_id
 
     # Store CSV audience in chunked MongoDB collection
     if csv_aud:
-        await _save_csv_audience_chunks(broadcast_id, csv_aud)
+        await _save_csv_audience_chunks(broadcast_id, csv_aud, aud_repo)
 
     if eta_utc and eta_utc > now:
         wa_phone_id = current_user.get("waPhoneNumberId") or settings.WA_PHONE_NUMBER_ID
         wa_token    = current_user.get("waAccessToken")    or settings.WA_ACCESS_TOKEN
-        tenant_id   = str(current_user["_id"]) if settings.APP_MODE == "saas" else None
+        tenant_id   = current_user.get("tenantId")
 
         if wa_phone_id and wa_token:
+            from app.tasks.broadcast_task import send_broadcast as send_broadcast_task
             task = send_broadcast_task.apply_async(
                 kwargs={
                     "broadcast_id": broadcast_id,
@@ -237,7 +243,7 @@ async def create_broadcast(data: BroadcastCreate, current_user: dict = Depends(g
                 },
                 eta=eta_utc
             )
-            await db.db.broadcasts.update_one({"_id": ObjectId(broadcast_id)}, {"$set": {"celeryTaskId": task.id}})
+            await bcast_repo.update_one({"_id": ObjectId(broadcast_id)}, {"$set": {"celeryTaskId": task.id}})
             doc["celeryTaskId"] = task.id
 
     return doc
@@ -246,24 +252,20 @@ async def create_broadcast(data: BroadcastCreate, current_user: dict = Depends(g
 @router.delete("/{broadcast_id}")
 async def delete_broadcast(broadcast_id: str, current_user: dict = Depends(get_current_user)):
     """Delete a broadcast campaign."""
+    bcast_repo, aud_repo = _get_bcast_repos(current_user)
     try:
         obj_id = ObjectId(broadcast_id)
     except Exception:
         raise HTTPException(status_code=400, detail="Invalid broadcast ID")
 
-    tenant_filter = get_tenant_filter(current_user)
-    delete_query = {"_id": obj_id}
-    if tenant_filter:
-        delete_query = {"$and": [delete_query, tenant_filter]}
-
-    broadcast = await db.db.broadcasts.find_one(delete_query)
+    broadcast = await bcast_repo.find_one({"_id": obj_id})
     if broadcast and broadcast.get("celeryTaskId"):
         try:
             celery_app.control.revoke(broadcast["celeryTaskId"], terminate=True)
         except Exception:
             pass
 
-    result = await db.db.broadcasts.delete_one(delete_query)
+    result = await bcast_repo.delete_one({"_id": obj_id})
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Broadcast not found")
     return {"message": "Broadcast deleted"}
@@ -272,17 +274,13 @@ async def delete_broadcast(broadcast_id: str, current_user: dict = Depends(get_c
 @router.put("/{broadcast_id}")
 async def update_broadcast(broadcast_id: str, data: BroadcastCreate, current_user: dict = Depends(get_current_user)):
     """Update an existing broadcast campaign."""
+    bcast_repo, aud_repo = _get_bcast_repos(current_user)
     try:
         obj_id = ObjectId(broadcast_id)
     except Exception:
         raise HTTPException(status_code=400, detail="Invalid broadcast ID")
 
-    tenant_filter = get_tenant_filter(current_user)
-    broadcast_query = {"_id": obj_id}
-    if tenant_filter:
-        broadcast_query = {"$and": [broadcast_query, tenant_filter]}
-
-    broadcast = await db.db.broadcasts.find_one(broadcast_query)
+    broadcast = await bcast_repo.find_one({"_id": obj_id})
     if not broadcast:
         raise HTTPException(status_code=404, detail="Broadcast not found")
         
@@ -296,7 +294,7 @@ async def update_broadcast(broadcast_id: str, data: BroadcastCreate, current_use
     csv_aud = update_data.pop("csvAudience", None)
     if csv_aud:
         update_data["totalCsvRecipients"] = len(csv_aud)
-        await _save_csv_audience_chunks(broadcast_id, csv_aud)
+        await _save_csv_audience_chunks(broadcast_id, csv_aud, aud_repo)
     
     scheduled_at = update_data.get("scheduledAt")
     eta_utc = _get_scheduled_eta(scheduled_at)
@@ -310,9 +308,10 @@ async def update_broadcast(broadcast_id: str, data: BroadcastCreate, current_use
 
         wa_phone_id = current_user.get("waPhoneNumberId") or settings.WA_PHONE_NUMBER_ID
         wa_token    = current_user.get("waAccessToken")    or settings.WA_ACCESS_TOKEN
-        tenant_id   = str(current_user["_id"]) if settings.APP_MODE == "saas" else None
+        tenant_id   = current_user.get("tenantId")
 
         if wa_phone_id and wa_token:
+            from app.tasks.broadcast_task import send_broadcast as send_broadcast_task
             task = send_broadcast_task.apply_async(
                 kwargs={
                     "broadcast_id": broadcast_id,
@@ -333,9 +332,9 @@ async def update_broadcast(broadcast_id: str, data: BroadcastCreate, current_use
             )
             update_data["celeryTaskId"] = task.id
 
-    await db.db.broadcasts.update_one(broadcast_query, {"$set": update_data})
+    await bcast_repo.update_one({"_id": obj_id}, {"$set": update_data})
     
-    updated = await db.db.broadcasts.find_one(broadcast_query)
+    updated = await bcast_repo.find_one({"_id": obj_id})
     updated["_id"] = str(updated["_id"])
     return updated
 
@@ -348,17 +347,13 @@ async def send_broadcast(
     """
     Queue a broadcast campaign to Celery for background processing.
     """
+    bcast_repo, aud_repo = _get_bcast_repos(current_user)
     try:
         obj_id = ObjectId(broadcast_id)
     except Exception:
         raise HTTPException(status_code=400, detail="Invalid broadcast ID")
 
-    tenant_filter = get_tenant_filter(current_user)
-    broadcast_query = {"_id": obj_id}
-    if tenant_filter:
-        broadcast_query = {"$and": [broadcast_query, tenant_filter]}
-
-    broadcast = await db.db.broadcasts.find_one(broadcast_query)
+    broadcast = await bcast_repo.find_one({"_id": obj_id})
     if not broadcast:
         raise HTTPException(status_code=404, detail="Broadcast not found")
 
@@ -386,23 +381,22 @@ async def send_broadcast(
         if not csv_count and csv_audience:
             csv_count = len(csv_audience)
         if not csv_count:
-            res = await db.db.broadcast_audiences.aggregate([
+            res = await aud_repo.aggregate([
                 {"$match": {"broadcastId": broadcast_id}},
                 {"$project": {"count": {"$size": "$recipients"}}},
                 {"$group": {"_id": None, "total": {"$sum": "$count"}}}
-            ]).to_list(1)
+            ])
             csv_count = res[0]["total"] if res else 0
         total_count = csv_count
     else:
+        cust_repo = TenantScopedRepository(db.db.customers, current_user.get("tenantId"))
         customer_query = {"tags": {"$in": audience_tags}} if audience_tags else {}
-        if tenant_filter:
-            customer_query = {"$and": [customer_query, tenant_filter]}
-        total_count = await db.db.customers.count_documents(customer_query)
+        total_count = await cust_repo.count_documents(customer_query)
 
     if total_count == 0:
         raise HTTPException(
             status_code=400,
-            detail="No customers found for the selected audience",
+            detail="No customers found matching the selected audience criteria",
         )
 
     header_media_url = broadcast.get("headerMediaUrl")
@@ -437,8 +431,8 @@ async def send_broadcast(
                 if u_resp.status_code in (200, 201):
                     header_media_id = u_resp.json().get("id")
                     header_media_url = None
-                    await db.db.broadcasts.update_one(
-                        broadcast_query,
+                    await bcast_repo.update_one(
+                        {"_id": obj_id},
                         {"$set": {
                             "headerMediaId": header_media_id,
                             "headerMediaUrl": None
@@ -460,7 +454,7 @@ async def send_broadcast(
     scheduled_at = broadcast.get("scheduledAt")
     eta_utc = _get_scheduled_eta(scheduled_at)
     now = _now()
-    tenant_id = str(current_user["_id"]) if settings.APP_MODE == "saas" else None
+    tenant_id = current_user.get("tenantId")
 
     if eta_utc and eta_utc > now:
         if broadcast.get("celeryTaskId"):
@@ -488,8 +482,8 @@ async def send_broadcast(
             eta=eta_utc
         )
 
-        await db.db.broadcasts.update_one(
-            broadcast_query,
+        await bcast_repo.update_one(
+            {"_id": obj_id},
             {"$set": {
                 "status": "scheduled",
                 "stats.total": total_count,
@@ -507,8 +501,8 @@ async def send_broadcast(
 
     else:
         # Immediate send
-        await db.db.broadcasts.update_one(
-            broadcast_query,
+        await bcast_repo.update_one(
+            {"_id": obj_id},
             {"$set": {
                 "status": "sending",
                 "stats.total": total_count,
@@ -534,28 +528,32 @@ async def send_broadcast(
             csv_audience=csv_audience,
         )
 
+        await bcast_repo.update_one(
+            {"_id": obj_id},
+            {"$set": {"celeryTaskId": task.id}},
+        )
+
         return {
-            "message": f"Broadcast queued. Sending to {total_count} customers.",
-            "total": total_count,
+            "broadcastId": broadcast_id,
             "status": "sending",
+            "totalRecipients": total_count,
             "taskId": task.id,
         }
 
 
-@router.get("/{broadcast_id}/progress")
-async def get_broadcast_progress(broadcast_id: str, current_user: dict = Depends(get_current_user)):
-    """Get real-time progress of a broadcast (polling fallback)."""
+@router.get("/{broadcast_id}/status")
+async def get_broadcast_status(
+    broadcast_id: str,
+    current_user: dict = Depends(get_current_user),
+):
+    """Poll broadcast progress."""
+    bcast_repo, _ = _get_bcast_repos(current_user)
     try:
         obj_id = ObjectId(broadcast_id)
     except Exception:
         raise HTTPException(status_code=400, detail="Invalid broadcast ID")
 
-    tenant_filter = get_tenant_filter(current_user)
-    broadcast_query = {"_id": obj_id}
-    if tenant_filter:
-        broadcast_query = {"$and": [broadcast_query, tenant_filter]}
-
-    broadcast = await db.db.broadcasts.find_one(broadcast_query)
+    broadcast = await bcast_repo.find_one({"_id": obj_id})
     if not broadcast:
         raise HTTPException(status_code=404, detail="Broadcast not found")
 
@@ -581,17 +579,13 @@ class RetryRequest(BaseModel):
 @router.get("/{broadcast_id}/details")
 async def get_broadcast_details(broadcast_id: str, current_user: dict = Depends(get_current_user)):
     """Get complete analytics summary for a broadcast campaign."""
+    bcast_repo, _ = _get_bcast_repos(current_user)
     try:
         obj_id = ObjectId(broadcast_id)
     except Exception:
         raise HTTPException(status_code=400, detail="Invalid broadcast ID")
 
-    tenant_filter = get_tenant_filter(current_user)
-    broadcast_query = {"_id": obj_id}
-    if tenant_filter:
-        broadcast_query = {"$and": [broadcast_query, tenant_filter]}
-
-    broadcast = await db.db.broadcasts.find_one(broadcast_query)
+    broadcast = await bcast_repo.find_one({"_id": obj_id})
     if not broadcast:
         raise HTTPException(status_code=404, detail="Broadcast not found")
 
@@ -733,17 +727,13 @@ async def retry_broadcast_failed_recipients(
     current_user: dict = Depends(get_current_user)
 ):
     """Resend campaign messages to failed or frequency-capped recipients."""
+    bcast_repo, _ = _get_bcast_repos(current_user)
     try:
         obj_id = ObjectId(broadcast_id)
     except Exception:
         raise HTTPException(status_code=400, detail="Invalid broadcast ID")
 
-    tenant_filter = get_tenant_filter(current_user)
-    broadcast_query = {"_id": obj_id}
-    if tenant_filter:
-        broadcast_query = {"$and": [broadcast_query, tenant_filter]}
-
-    broadcast = await db.db.broadcasts.find_one(broadcast_query)
+    broadcast = await bcast_repo.find_one({"_id": obj_id})
     if not broadcast:
         raise HTTPException(status_code=404, detail="Broadcast not found")
 
@@ -772,7 +762,7 @@ async def retry_broadcast_failed_recipients(
 
     wa_phone_id = current_user.get("waPhoneNumberId") or settings.WA_PHONE_NUMBER_ID
     wa_token = current_user.get("waAccessToken") or settings.WA_ACCESS_TOKEN
-    tenant_id = str(current_user["_id"]) if settings.APP_MODE == "saas" else None
+    tenant_id = current_user.get("tenantId")
 
     # Trigger Celery retry task
     task = send_broadcast_task.delay(
@@ -800,12 +790,13 @@ async def retry_broadcast_failed_recipients(
 @router.post("/{broadcast_id}/pause")
 async def pause_broadcast(broadcast_id: str, current_user: dict = Depends(get_current_user)):
     """Pause automatic retries and ongoing dispatches for a campaign."""
+    bcast_repo, _ = _get_bcast_repos(current_user)
     try:
         obj_id = ObjectId(broadcast_id)
     except Exception:
         raise HTTPException(status_code=400, detail="Invalid broadcast ID")
 
-    result = await db.db.broadcasts.update_one(
+    result = await bcast_repo.update_one(
         {"_id": obj_id},
         {"$set": {"isPaused": True, "status": "paused", "updatedAt": _now()}}
     )
@@ -818,12 +809,13 @@ async def pause_broadcast(broadcast_id: str, current_user: dict = Depends(get_cu
 @router.post("/{broadcast_id}/resume")
 async def resume_broadcast(broadcast_id: str, current_user: dict = Depends(get_current_user)):
     """Resume automatic retries and dispatches for a paused campaign."""
+    bcast_repo, _ = _get_bcast_repos(current_user)
     try:
         obj_id = ObjectId(broadcast_id)
     except Exception:
         raise HTTPException(status_code=400, detail="Invalid broadcast ID")
 
-    result = await db.db.broadcasts.update_one(
+    result = await bcast_repo.update_one(
         {"_id": obj_id},
         {"$set": {"isPaused": False, "status": "running", "updatedAt": _now()}}
     )

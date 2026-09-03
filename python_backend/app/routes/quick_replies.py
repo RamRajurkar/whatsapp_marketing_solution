@@ -5,44 +5,41 @@ from app.routes.auth import get_current_user
 from app.database import db
 from bson import ObjectId
 from datetime import datetime, timezone
-from app.utils.tenant import get_tenant_filter, inject_tenant_id
+from app.repositories.base import TenantScopedRepository
+from app.utils.channel_guard import require_channel
 
-router = APIRouter()
-
+router = APIRouter(dependencies=[Depends(require_channel("whatsapp"))])
 
 def _now():
     return datetime.now(timezone.utc)
 
+def _get_qr_repo(current_user: dict):
+    return TenantScopedRepository(db.db.quick_replies, current_user.get("tenantId"))
 
 class QuickReplyCreate(BaseModel):
     title: str
     body: str
     category: str = "General"
 
-
 class QuickReplyUpdate(BaseModel):
     title: Optional[str] = None
     body: Optional[str] = None
     category: Optional[str] = None
 
-
 @router.get("")
 @router.get("/")
 async def list_quick_replies(current_user: dict = Depends(get_current_user)):
-    """Retrieve all quick replies, sorted by most recently created."""
-    tenant_filter = get_tenant_filter(current_user)
-    
-    cursor = db.db.quick_replies.find(tenant_filter).sort("createdAt", -1)
-    replies = []
-    async for doc in cursor:
+    """Retrieve all quick replies for the calling tenant."""
+    qr_repo = _get_qr_repo(current_user)
+    replies = await qr_repo.find({}, sort=[("createdAt", -1)])
+    for doc in replies:
         doc["_id"] = str(doc["_id"])
-        replies.append(doc)
     return replies
-
 
 @router.post("/")
 async def create_quick_reply(data: QuickReplyCreate, current_user: dict = Depends(get_current_user)):
     """Create a new quick reply."""
+    qr_repo = _get_qr_repo(current_user)
     doc = {
         "title": data.title,
         "body": data.body,
@@ -51,51 +48,48 @@ async def create_quick_reply(data: QuickReplyCreate, current_user: dict = Depend
         "createdAt": _now(),
         "updatedAt": _now(),
     }
-    inject_tenant_id(doc, current_user)
-    
-    result = await db.db.quick_replies.insert_one(doc)
+    result = await qr_repo.insert_one(doc)
     doc["_id"] = str(result.inserted_id)
     return doc
-
 
 @router.patch("/{reply_id}")
 async def update_quick_reply(reply_id: str, data: QuickReplyUpdate, current_user: dict = Depends(get_current_user)):
     """Update an existing quick reply."""
-    tenant_filter = get_tenant_filter(current_user)
-    query = {"_id": ObjectId(reply_id)}
-    if tenant_filter:
-        query = {"$and": [query, tenant_filter]}
+    qr_repo = _get_qr_repo(current_user)
+    try:
+        obj_id = ObjectId(reply_id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid quick reply ID format")
 
-    existing = await db.db.quick_replies.find_one(query)
+    existing = await qr_repo.find_one({"_id": obj_id})
     if not existing:
         raise HTTPException(status_code=404, detail="Quick reply not found")
 
     update_fields = {k: v for k, v in data.model_dump().items() if v is not None}
     update_fields["updatedAt"] = _now()
 
-    await db.db.quick_replies.update_one(
-        query,
+    await qr_repo.update_one(
+        {"_id": obj_id},
         {"$set": update_fields}
     )
 
-    updated = await db.db.quick_replies.find_one(query)
+    updated = await qr_repo.find_one({"_id": obj_id})
     updated["_id"] = str(updated["_id"])
     return updated
-
 
 @router.delete("/{reply_id}")
 async def delete_quick_reply(reply_id: str, current_user: dict = Depends(get_current_user)):
     """Delete a quick reply."""
-    tenant_filter = get_tenant_filter(current_user)
-    query = {"_id": ObjectId(reply_id)}
-    if tenant_filter:
-        query = {"$and": [query, tenant_filter]}
+    qr_repo = _get_qr_repo(current_user)
+    try:
+        obj_id = ObjectId(reply_id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid quick reply ID format")
 
-    result = await db.db.quick_replies.delete_one(query)
+    result = await qr_repo.delete_one({"_id": obj_id})
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Quick reply not found")
     return {"message": "Quick reply deleted successfully"}
-
 
 TEXTILE_REPLIES_SEED = [
     {
@@ -150,13 +144,31 @@ TEXTILE_REPLIES_SEED = [
     }
 ]
 
+GENERIC_REPLIES_SEED = [
+    {
+        "title": "👋 Welcome & Introduction",
+        "category": "General",
+        "body": "Hello! Welcome to our WhatsApp service desk. How may we assist you today?"
+    },
+    {
+        "title": "🕒 Business Working Hours",
+        "category": "General",
+        "body": "Our business hours are Monday through Saturday, 9:00 AM to 7:00 PM. Messages received outside these hours will be answered promptly the next business day."
+    },
+    {
+        "title": "📦 Order Status Inquiry",
+        "category": "Orders",
+        "body": "Thank you for inquiring about your order. Could you please share your Order ID or registered phone number so our team can provide the latest dispatch update?"
+    }
+]
+
 @router.post("/seed-textile")
 async def seed_textile_quick_replies(current_user: dict = Depends(get_current_user)):
-    """Clear old quick replies and seed fresh Textile Industry templates."""
-    tenant_filter = get_tenant_filter(current_user)
+    """Clear old quick replies and seed fresh Textile Industry templates for the calling tenant."""
+    qr_repo = _get_qr_repo(current_user)
     
-    # 1. Clear old replies
-    await db.db.quick_replies.delete_many(tenant_filter if tenant_filter else {})
+    # 1. Clear old replies for this tenant
+    await qr_repo.delete_many({})
     
     # 2. Insert textile templates
     inserted_docs = []
@@ -169,23 +181,43 @@ async def seed_textile_quick_replies(current_user: dict = Depends(get_current_us
             "createdAt": _now(),
             "updatedAt": _now()
         }
-        inject_tenant_id(doc, current_user)
-        res = await db.db.quick_replies.insert_one(doc)
+        res = await qr_repo.insert_one(doc)
         doc["_id"] = str(res.inserted_id)
         inserted_docs.append(doc)
         
     return {"message": "Textile templates seeded successfully", "count": len(inserted_docs)}
 
+@router.post("/seed-generic")
+async def seed_generic_quick_replies(current_user: dict = Depends(get_current_user)):
+    """Seed fresh generic starter templates for the calling tenant."""
+    qr_repo = _get_qr_repo(current_user)
+    await qr_repo.delete_many({})
+    inserted_docs = []
+    for item in GENERIC_REPLIES_SEED:
+        doc = {
+            "title": item["title"],
+            "body": item["body"],
+            "category": item["category"],
+            "usageCount": 0,
+            "createdAt": _now(),
+            "updatedAt": _now()
+        }
+        res = await qr_repo.insert_one(doc)
+        doc["_id"] = str(res.inserted_id)
+        inserted_docs.append(doc)
+    return {"message": "Generic templates seeded successfully", "count": len(inserted_docs)}
+
 @router.post("/{reply_id}/use")
 async def increment_usage(reply_id: str, current_user: dict = Depends(get_current_user)):
     """Increment the usage counter for a quick reply (called when inserted in inbox)."""
-    tenant_filter = get_tenant_filter(current_user)
-    query = {"_id": ObjectId(reply_id)}
-    if tenant_filter:
-        query = {"$and": [query, tenant_filter]}
+    qr_repo = _get_qr_repo(current_user)
+    try:
+        obj_id = ObjectId(reply_id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid quick reply ID format")
 
-    result = await db.db.quick_replies.update_one(
-        query,
+    result = await qr_repo.update_one(
+        {"_id": obj_id},
         {"$inc": {"usageCount": 1}}
     )
     if result.matched_count == 0:
