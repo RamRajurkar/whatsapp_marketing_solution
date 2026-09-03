@@ -62,12 +62,27 @@ async def _get_wa_credentials(tenant_id: Optional[str]) -> Tuple[str, str, str]:
     business_name = "Our Business"
     
     if tenant_id and getattr(settings, "APP_MODE", "self_hosted") == "saas":
-        # SaaS mode: Look up tenant details from MongoDB
-        user = await db.db.users.find_one({"_id": ObjectId(tenant_id)})
-        if user:
-            wa_token = user.get("waAccessToken") or wa_token
-            wa_phone_id = user.get("waPhoneNumberId") or wa_phone_id
-            business_name = user.get("restaurantName") or user.get("businessName") or business_name
+        # 1. First look in wa_connections for vaulted encrypted credentials
+        from app.utils.crypto_vault import crypto_vault
+        conn = await db.db.wa_connections.find_one({"tenantId": tenant_id})
+        if conn and conn.get("accessTokenEncrypted"):
+            try:
+                wa_token = crypto_vault.decrypt_secret(conn["accessTokenEncrypted"])
+                wa_phone_id = conn.get("phoneNumberId") or wa_phone_id
+            except Exception as e:
+                print(f"[Bot Executor] Error decrypting tenant access token: {e}")
+
+        # 2. Lookup tenant business name
+        try:
+            tenant = await db.db.tenants.find_one({"_id": ObjectId(tenant_id)})
+            if tenant:
+                business_name = tenant.get("name") or business_name
+        except Exception:
+            pass
+        if business_name == "Our Business":
+            user = await db.db.users.find_one({"tenantId": tenant_id})
+            if user:
+                business_name = user.get("restaurantName") or user.get("businessName") or business_name
     else:
         # Self hosted mode: fetch business name from the first user profile
         user = await db.db.users.find_one({})
@@ -175,8 +190,12 @@ async def _save_bot_message(
     
     # Emits
     emit_doc = {**doc, "timestamp": now.isoformat(), "createdAt": now.isoformat()}
-    await sio.emit("message:new", emit_doc, room=conv_id)
-    await sio.emit("conversation:updated", {"conversationId": conv_id})
+    try:
+        import asyncio
+        asyncio.create_task(sio.emit("message:new", emit_doc, room=conv_id))
+        asyncio.create_task(sio.emit("conversation:updated", {"conversationId": conv_id}))
+    except Exception:
+        pass
 
 async def _execute_node_action(
     action_type: str, 
@@ -340,14 +359,16 @@ async def execute_chatbot_flow(
         return None
 
     # 1. Fetch chatbot flow schema
-    flow_query = {}
+    flow = None
     if tenant_id and getattr(settings, "APP_MODE", "self_hosted") == "saas":
-        flow_query["tenantId"] = tenant_id
+        flow = await db.db.bot_flows.find_one({"tenantId": tenant_id})
         
-    flow = await db.db.bot_flows.find_one(flow_query)
-    
-    # Fallback to local config file if db record is missing in self-hosted mode
-    if not flow and getattr(settings, "APP_MODE", "self_hosted") != "saas":
+    # If no tenant-specific flow exists, fall back to global active flow or database template
+    if not flow:
+        flow = await db.db.bot_flows.find_one({"isActive": True}) or await db.db.bot_flows.find_one({})
+
+    # Fallback to local config file if db record is missing
+    if not flow:
         config_path = "uploads/configs/active_chatbot_flow.json"
         if os.path.exists(config_path):
             try:

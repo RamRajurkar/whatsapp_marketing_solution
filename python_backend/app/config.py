@@ -19,6 +19,10 @@ class Settings(BaseSettings):
     WA_APP_ID: Optional[str] = None
     WA_API_VERSION: str = "v21.0"
 
+    # Google Business Profile / GCP OAuth
+    GOOGLE_CLIENT_ID: Optional[str] = None
+    GOOGLE_CLIENT_SECRET: Optional[str] = None
+
     # Cloudinary
     CLOUDINARY_CLOUD_NAME: Optional[str] = None
     CLOUDINARY_API_KEY: Optional[str] = None

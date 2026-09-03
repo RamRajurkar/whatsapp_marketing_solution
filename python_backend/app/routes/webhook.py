@@ -215,8 +215,11 @@ async def _process_webhook_body(body: dict) -> dict:
                         "timestamp": timestamp.isoformat(),
                         "createdAt": message_doc["createdAt"].isoformat(),
                     }
-                    await sio.emit("message:new", emit_doc, room=conv_id)
-                    await sio.emit("conversation:updated", {"conversationId": conv_id})
+                    try:
+                        asyncio.create_task(sio.emit("message:new", emit_doc, room=conv_id))
+                        asyncio.create_task(sio.emit("conversation:updated", {"conversationId": conv_id}))
+                    except Exception:
+                        pass
 
                     results["messages_processed"] += 1
 
