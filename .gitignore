@@ -20,6 +20,7 @@ frontend/next-env.d.ts
 
 # MongoDB Local (if any leftover or custom)
 mongodb_local/
+mongodb_original_backup/
 
 # General
 .DS_Store

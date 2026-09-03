@@ -774,7 +774,10 @@ async def _emit_progress(sio_mgr, database, obj_id, broadcast_id, sent, failed, 
         "status": status,
         "percentage": round((sent + failed + freq_capped) / total * 100, 1) if total > 0 else 0,
     }
-    await sio_mgr.emit("broadcast:progress", progress_data, room="broadcasts")
+    try:
+        await sio_mgr.emit("broadcast:progress", progress_data, room="broadcasts")
+    except Exception:
+        pass
 
 
 @celery_app.task(

@@ -58,11 +58,26 @@ async def lifespan(app: FastAPI):
         # Enforce unique index for outbound billing deduplication
         await db.db.billing_events.create_index("metaMessageId", unique=True)
         
-        # Mode-based customer and conversation unique constraints
+        # Mode-based customer and conversation unique constraints & compound indexes
         if settings.APP_MODE == "saas":
+            # Compound unique indexes
             await db.db.customers.create_index([("tenantId", 1), ("phone", 1)], unique=True)
             await db.db.conversations.create_index([("tenantId", 1), ("customerPhone", 1)], unique=True)
-            print("[STARTUP] SaaS Mode compound unique indexes created.")
+            
+            # Query optimization compound indexes (tenantId leading prefix for optimal B-Tree seek)
+            await db.db.customers.create_index([("tenantId", 1), ("tags", 1)])
+            await db.db.customers.create_index([("tenantId", 1), ("createdAt", -1)])
+            await db.db.conversations.create_index([("tenantId", 1), ("lastMessageTime", -1)])
+            await db.db.messages.create_index([("tenantId", 1), ("conversationId", 1), ("createdAt", -1)])
+            await db.db.messages.create_index([("tenantId", 1), ("broadcastId", 1)])
+            await db.db.broadcasts.create_index([("tenantId", 1), ("status", 1), ("createdAt", -1)])
+            await db.db.gbp_reviews.create_index([("tenantId", 1), ("starRating", 1)])
+            await db.db.gbp_reviews.create_index([("tenantId", 1), ("createdAt", -1)])
+            await db.db.leads.create_index([("tenantId", 1), ("status", 1)])
+            await db.db.leads.create_index([("tenantId", 1), ("createdAt", -1)])
+            await db.db.quick_replies.create_index([("tenantId", 1), ("category", 1)])
+            await db.db.billing_events.create_index([("tenantId", 1), ("createdAt", -1)])
+            print("[STARTUP] SaaS Mode leading tenantId compound indexes created.")
         else:
             try:
                 await db.db.customers.create_index("phone", unique=True)
