@@ -179,6 +179,7 @@ app.include_router(reservations.router,  prefix="/api/reservations",  tags=["res
 app.include_router(faq.router,           prefix="/api/faq",           tags=["faq"])
 app.include_router(feedback.router,      prefix="/api/feedback",      tags=["feedback"])
 app.include_router(gmb.router,           prefix="/api/gmb",           tags=["gmb"])
+app.include_router(gmb.public_router,    prefix="/api/gmb",           tags=["gmb_public"])
 app.include_router(leads.router,         prefix="/api/leads",         tags=["leads"])
 app.include_router(superadmin.router,    prefix="/api/superadmin",    tags=["superadmin"])
 app.include_router(agency.router,        prefix="/api/agency",        tags=["agency"])
