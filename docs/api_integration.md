@@ -1,6 +1,6 @@
-# 🔌 RestoChat API Integration Documentation
+# 🔌 Black Angler API Integration Documentation
 
-This document describes the complete API surface of the **RestoChat WhatsApp Marketing Solution**.
+This document describes the complete API surface of the **Black Angler WhatsApp Marketing Solution**.
 
 ---
 
@@ -131,7 +131,7 @@ Content-Type: application/json
 *   **Response (`200 OK`)**:
     ```json
     {
-      "appName": "RestoChat",
+      "appName": "Black Angler",
       "tagline": "WhatsApp Marketing Solution",
       "logoPath": "http://localhost:5000/uploads/branding/logo.png",
       "loginBgPath": "http://localhost:5000/uploads/branding/loginBg.png",

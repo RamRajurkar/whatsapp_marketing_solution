@@ -1,12 +1,12 @@
 # ⚡ Caching, Concurrency, & Rate Limiting
 
-This document outlines the performance optimizations, rate-limiting rules, concurrent task settings, caching logic, and offline message queue mechanisms built into **RestoChat**.
+This document outlines the performance optimizations, rate-limiting rules, concurrent task settings, caching logic, and offline message queue mechanisms built into **Black Angler**.
 
 ---
 
 ## 🔒 API Rate Limiting
 
-To protect authentication endpoints from brute-force login attempts and prevent server resources from being overwhelmed, RestoChat uses **SlowAPI** (a Python port of the limits library) initialized in `python_backend/app/limiter.py`.
+To protect authentication endpoints from brute-force login attempts and prevent server resources from being overwhelmed, Black Angler uses **SlowAPI** (a Python port of the limits library) initialized in `python_backend/app/limiter.py`.
 
 *   **Endpoint Configuration**:
     *   `POST /api/auth/login`: Rate-limited to **10 requests per minute** per client IP.
@@ -18,7 +18,7 @@ To protect authentication endpoints from brute-force login attempts and prevent 
 
 ## 🗄️ Redis Integration & Caching Layer
 
-Redis serves three roles in the RestoChat infrastructure, helping handle task queues and pub/sub events.
+Redis serves three roles in the Black Angler infrastructure, helping handle task queues and pub/sub events.
 
 ### 1. Celery Task Queue Broker & Result Backend
 Redis acts as the transportation broker (`redis://redis:6379/0`) between the FastAPI backend and the Celery background worker. 
@@ -62,7 +62,7 @@ The Celery worker settings in `celery_app.py` are optimized to run on standard c
 
 ## 📥 Cloudflare Worker + Supabase Offline Webhook Queue
 
-Since RestoChat is deployed on a local PC, the server goes offline when the computer is shut down (e.g. overnight or during power cuts). 
+Since Black Angler is deployed on a local PC, the server goes offline when the computer is shut down (e.g. overnight or during power cuts). 
 
 To prevent WhatsApp webhook messages (like customer replies or delivery receipts) from being lost, the system uses a Cloudflare Worker proxy and a Supabase queue.
 

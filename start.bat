@@ -1,6 +1,6 @@
 @echo off
-title RestoChat — Start
-echo Starting RestoChat...
+title Black Angler — Start
+echo Starting Black Angler...
 
 :: ── Check if Docker Desktop is running ───────────────────────────────────────
 docker info >nul 2>&1
@@ -46,7 +46,7 @@ echo [Cleanup] Clearing active customer sessions...
 docker exec wa_mongodb mongosh whatsapp_saas --eval "db.customer_sessions.deleteMany({})"
 
 echo.
-echo RestoChat is running at http://localhost:3000
+echo Black Angler is running at http://localhost:3000
 echo.
 start http://localhost:3000
 

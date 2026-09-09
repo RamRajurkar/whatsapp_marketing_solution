@@ -131,7 +131,7 @@ async def register(request: Request, user_data: UserCreate):
     # Create tenant record in SaaS mode
     tenant_id_str = None
     if is_saas:
-        enabled_ch = user_data.enabledChannels or ["whatsapp"]
+        enabled_ch = user_data.enabledChannels or ["whatsapp", "gbp"]
         tenant_doc = {
             "name": tenant_name,
             "slug": tenant_slug,

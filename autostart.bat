@@ -1,5 +1,5 @@
 @echo off
-title RestoChat — AutoStart
+title Black Angler — AutoStart
 :: This script is called by Windows Task Scheduler on every login.
 :: It intelligently waits for Docker Desktop to be ready before launching.
 
@@ -28,8 +28,8 @@ timeout /t 5 /nobreak >nul
 goto wait_docker
 
 :docker_ready
-echo Docker is ready. Starting RestoChat...
-cd /d "C:\RestoChat"
+echo Docker is ready. Starting Black Angler...
+cd /d "%~dp0"
 docker-compose up -d
 
 exit /b 0

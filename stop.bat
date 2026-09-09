@@ -1,8 +1,8 @@
 @echo off
-title RestoChat — Stop
-echo Stopping RestoChat...
-cd /d "C:\RestoChat"
+title Black Angler — Stop
+echo Stopping Black Angler...
+cd /d "%~dp0"
 docker-compose down
 echo.
-echo RestoChat has been stopped.
+echo Black Angler has been stopped.
 pause

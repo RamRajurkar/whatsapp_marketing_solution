@@ -1,7 +1,7 @@
 # 📋 WhatsApp Automation Platform — Comprehensive Architecture & Tenancy Audit Report
 
 > **Date:** September 2026  
-> **Target System:** WhatsApp Marketing & Automation Platform (`RestoChat` / `BlackAngler Wholesale`)  
+> **Target System:** WhatsApp Marketing & Automation Platform (`Black Angler` / `BlackAngler Wholesale`)  
 > **Document Status:** Production Architectural Audit & Tenancy Assessment
 
 ---
@@ -96,9 +96,9 @@ graph TD
 ### 2.3 Deployment Automation & Distribution
 * **Pendrive / Local Installer Script:** [`setup.bat`](file:///d:/New%20Whatsapp%20Platform/whatsapp_marketing_solution/setup.bat)
   * Installs Docker Desktop if absent.
-  * Copies code to `C:\RestoChat\`.
+  * Copies code to `C:\Black Angler\`.
   * Prompts for client credentials (`RESTAURANT_NAME`, `WA_PHONE_ID`, `WA_BUSINESS_ID`, `WA_TOKEN`, `WA_VERIFY`).
-  * Generates `C:\RestoChat\python_backend\.env`.
+  * Generates `C:\Black Angler\python_backend\.env`.
   * Registers Windows Task Scheduler task [`autostart.bat`](file:///d:/New%20Whatsapp%20Platform/whatsapp_marketing_solution/autostart.bat) to launch `docker-compose up -d` upon Windows login.
 * **CI/CD Pipelines:** None present (no `.github/workflows`, `.gitlab-ci.yml`, or automated build agents exist in the codebase).
 

@@ -1,7 +1,7 @@
 {
-  "name": "RestoChat",
-  "short_name": "RestoChat",
-  "description": "Restaurant WhatsApp Manager",
+  "name": "Black Angler",
+  "short_name": "Black Angler",
+  "description": "Black Angler — Omnichannel Marketing & WhatsApp Business Platform",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",

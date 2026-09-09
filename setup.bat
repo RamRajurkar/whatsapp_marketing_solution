@@ -1,11 +1,11 @@
 @echo off
 setlocal enabledelayedexpansion
-title RestoChat — First Time Setup
+title Black Angler — First Time Setup
 color 0A
 
 echo.
 echo  ============================================
-echo    RestoChat — WhatsApp Marketing Solution
+echo    Black Angler — WhatsApp & Omnichannel Platform
 echo    First Time Setup
 echo  ============================================
 echo.
@@ -59,19 +59,19 @@ if %errorlevel% neq 0 (
 )
 echo  [OK] Docker is running.
 
-:: ── Copy app to C:\RestoChat ─────────────────────────────────────────────────
+:: ── Copy app to C:\BlackAngler ─────────────────────────────────────────────────
 echo.
-echo  [2/6] Installing RestoChat to C:\RestoChat...
-if not exist "C:\RestoChat" mkdir "C:\RestoChat"
-xcopy /E /I /Y /Q "app\*" "C:\RestoChat\" >nul
+echo  [2/6] Installing Black Angler to C:\BlackAngler...
+if not exist "C:\BlackAngler" mkdir "C:\BlackAngler"
+xcopy /E /I /Y /Q "app\*" "C:\BlackAngler\" >nul
 echo  [OK] Files copied.
 
 :: ── Collect client info ──────────────────────────────────────────────────────
 echo.
-echo  [3/6] Restaurant Configuration
+echo  [3/6] Business Configuration
 echo  ─────────────────────────────────────────────
 echo.
-set /p RESTAURANT_NAME="  Restaurant Name (e.g. Spice Garden): "
+set /p BUSINESS_NAME="  Business Name (e.g. Black Angler): "
 set /p WA_PHONE_ID="  WhatsApp Phone Number ID: "
 set /p WA_BUSINESS_ID="  WhatsApp Business Account ID: "
 set /p WA_TOKEN="  WhatsApp Access Token: "
@@ -87,7 +87,7 @@ echo.
 echo  [4/6] Writing configuration...
 (
     echo MONGODB_URI=mongodb://mongodb:27017
-    echo DB_NAME=resto_chat
+    echo DB_NAME=whatsapp_saas
     echo JWT_SECRET=!JWT_SECRET!
     echo WA_PHONE_NUMBER_ID=!WA_PHONE_ID!
     echo WA_BUSINESS_ACCOUNT_ID=!WA_BUSINESS_ID!
@@ -97,20 +97,20 @@ echo  [4/6] Writing configuration...
     echo CLOUDINARY_CLOUD_NAME=
     echo CLOUDINARY_API_KEY=
     echo CLOUDINARY_API_SECRET=
-) > "C:\RestoChat\python_backend\.env"
+) > "C:\BlackAngler\python_backend\.env"
 echo  [OK] Config saved.
 
 :: ── Register auto-start task ─────────────────────────────────────────────────
 echo.
 echo  [5/6] Setting up auto-start on boot...
-schtasks /delete /tn "RestoChat AutoStart" /f >nul 2>&1
-schtasks /create /tn "RestoChat AutoStart" /tr "C:\RestoChat\autostart.bat" /sc onlogon /ru "%USERNAME%" /rl highest /f >nul
-echo  [OK] RestoChat will start automatically when Windows logs in.
+schtasks /delete /tn "BlackAngler AutoStart" /f >nul 2>&1
+schtasks /create /tn "BlackAngler AutoStart" /tr "C:\BlackAngler\autostart.bat" /sc onlogon /ru "%USERNAME%" /rl highest /f >nul
+echo  [OK] Black Angler will start automatically when Windows logs in.
 
 :: ── Start the app ────────────────────────────────────────────────────────────
 echo.
-echo  [6/6] Starting RestoChat...
-cd /d "C:\RestoChat"
+echo  [6/6] Starting Black Angler...
+cd /d "C:\BlackAngler"
 docker-compose up -d --build
 
 echo.
@@ -118,7 +118,7 @@ echo  ============================================
 echo    Setup Complete!
 echo  ============================================
 echo.
-echo  RestoChat is now running at:
+echo  Black Angler is now running at:
 echo    http://localhost:3000
 echo.
 echo  Next steps:

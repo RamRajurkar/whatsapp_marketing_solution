@@ -5,13 +5,13 @@ import { Providers } from './providers';
 import type { Viewport } from 'next';
 
 export const metadata: Metadata = {
-  title: 'BlackAngler WA — WhatsApp Wholesale & Marketing Platform',
-  description: 'Manage your WhatsApp wholesale communications with ease. Real-time inbox, catalogs, broadcasts, and automation.',
+  title: 'Black Angler — Omnichannel Marketing & WhatsApp Business Platform',
+  description: 'Manage your WhatsApp and Omnichannel marketing with ease. Real-time inbox, catalogs, broadcasts, reviews, and automation.',
   manifest: '/manifest.json',
   appleWebApp: {
     capable: true,
     statusBarStyle: 'default',
-    title: 'BlackAngler WA',
+    title: 'Black Angler',
   },
 };
 

@@ -1,6 +1,6 @@
-# 💬 RestoChat — Restaurant WhatsApp Marketing Solution
+# 💬 Black Angler — WhatsApp & Omnichannel Marketing Solution
 
-A full-stack, self-hosted SaaS application for restaurants and cafes to manage WhatsApp communications via the official **Meta WhatsApp Cloud API**. Deploy on a client's PC using Docker — no cloud server required.
+A full-stack WhatsApp and Omnichannel marketing platform via the official **Meta WhatsApp Cloud API** and Google Business Profile. Deploy on cloud or locally using Docker.
 
 ---
 
@@ -167,7 +167,7 @@ Before you paste the folder on the client's PC, you **must** ensure the followin
 ### Pendrive Contents
 Your pendrive should look exactly like this before plugging it into the client's PC:
 ```
-📁 RestoChat-Setup/
+📁 BlackAngler-Setup/
 ├── 📁 app/                     ← Full cloned repo
 ├── 📁 installers/
 │   └── DockerDesktopInstaller.exe  ← YOU MUST DOWNLOAD THIS MANUALLY AND PLACE IT HERE
@@ -178,12 +178,12 @@ Your pendrive should look exactly like this before plugging it into the client's
 ```
 
 ### Setup Steps
-1. Copy the `RestoChat-Setup` folder from your pendrive to the client PC's Desktop.
+1. Copy the `BlackAngler-Setup` folder from your pendrive to the client PC's Desktop.
 2. Right-click `setup.bat` → **Run as Administrator**
-3. Follow the prompts (restaurant name, WhatsApp credentials)
+3. Follow the prompts (business name, WhatsApp credentials)
 5. The script will:
    - Install Docker if missing
-   - Copy app to `C:\RestoChat`
+   - Copy app to `C:\BlackAngler`
    - Generate `.env` with a random JWT secret
    - Register auto-start in Windows Task Scheduler
    - Run `docker-compose up -d --build`

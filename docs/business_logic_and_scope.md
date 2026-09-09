@@ -1,12 +1,12 @@
-# 🎯 RestoChat Business Logic & Functional Scope
+# 🎯 Black Angler Business Logic & Functional Scope
 
-This document details the functional capabilities, business workflows, chatbot flows, campaign management logic, target audience, and platform scope of **RestoChat**.
+This document details the functional capabilities, business workflows, chatbot flows, campaign management logic, target audience, and platform scope of **Black Angler**.
 
 ---
 
 ## 📈 Platform Scope & Business Value
 
-RestoChat is designed to solve a major problem for local food and beverage (F&B) businesses: **reducing customer friction while saving recurring SaaS costs.**
+Black Angler is designed to solve a major problem for local food and beverage (F&B) businesses: **reducing customer friction while saving recurring SaaS costs.**
 
 *   **Self-Hosted Economy**: By running local Docker containers on the restaurant's billing computer (or low-power store PC), businesses avoid paying high monthly subscription fees associated with cloud-hosted platforms.
 *   **Official Meta WhatsApp Integration**: Uses the official WhatsApp Cloud API, guaranteeing stable messaging without the risk of phone number blocking associated with unofficial scraping/web automation tools.
@@ -24,7 +24,7 @@ RestoChat is designed to solve a major problem for local food and beverage (F&B)
 
 ## 🤖 Chatbot Flow & State Machine Engine
 
-RestoChat features a conversational chatbot engine that processes incoming customer messages. The bot can handle simple FAQs, interactive button selections, conversational reservations, and post-visit feedback loops.
+Black Angler features a conversational chatbot engine that processes incoming customer messages. The bot can handle simple FAQs, interactive button selections, conversational reservations, and post-visit feedback loops.
 
 ```mermaid
 stateDiagram-v2
@@ -138,9 +138,9 @@ sequenceDiagram
 ```
 
 ### 1. Pre-Flight Local Media Interception & Compression
-Meta's WhatsApp Cloud API requires template header media (like images or PDF menus) to be served via a public URL so Meta's servers can download them. However, since RestoChat runs on local PCs, its uploaded media URLs point to `localhost:5000` (which Meta cannot access).
+Meta's WhatsApp Cloud API requires template header media (like images or PDF menus) to be served via a public URL so Meta's servers can download them. However, since Black Angler runs on local PCs, its uploaded media URLs point to `localhost:5000` (which Meta cannot access).
 
-To solve this, RestoChat implements a media upload handler:
+To solve this, Black Angler implements a media upload handler:
 1.  Before queueing a campaign, the backend scans for local media references in the broadcast request.
 2.  If it detects a local file, it reads the file from local disk.
 3.  If the file is an image, the system compresses it to fit under WhatsApp's file size limit (5MB).

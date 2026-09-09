@@ -1,12 +1,12 @@
-# 🏗️ RestoChat Architecture & Tech Stack Documentation
+# 🏗️ Black Angler Architecture & Tech Stack Documentation
 
-This document provides a detailed overview of the system architecture, network topology, service components, and technology stack powering the **RestoChat WhatsApp Marketing Solution**.
+This document provides a detailed overview of the system architecture, network topology, service components, and technology stack powering the **Black Angler WhatsApp Marketing Solution**.
 
 ---
 
 ## 🗺️ High-Level System Architecture
 
-RestoChat is designed as a **self-hosted, single-tenant SaaS application** optimized to run locally on a client's PC (e.g., a Windows machine at a restaurant or shop) or resource-constrained devices (like a Raspberry Pi), removing the need for expensive, dedicated cloud servers. 
+Black Angler is designed as a **self-hosted, single-tenant SaaS application** optimized to run locally on a client's PC (e.g., a Windows machine at a restaurant or shop) or resource-constrained devices (like a Raspberry Pi), removing the need for expensive, dedicated cloud servers. 
 
 ```mermaid
 graph TD
@@ -165,7 +165,7 @@ The system is containerized using **Docker Compose** into seven modular, decoupl
             └──────────────────────────┬──────────────────────────┘
                                        │ (Decrypted local packet)
                                        ▼
-                              [ C:\RestoChat Host ]
+                              [ C:\Black Angler Host ]
                               ┌───────────────────┐
                               │ Nginx (:8080/:80) │
                               └────────┬──────────┘

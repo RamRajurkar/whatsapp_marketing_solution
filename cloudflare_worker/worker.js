@@ -1,5 +1,5 @@
 /**
- * RestoChat — Cloudflare Worker Webhook Proxy
+ * Black Angler — Cloudflare Worker Webhook Proxy
  * ============================================
  * Always-online middleman that receives Meta WhatsApp webhooks and stores
  * the raw payload in Supabase when the origin server (your PC) is offline.
@@ -32,7 +32,7 @@ export default {
 
     // ── Health check ───────────────────────────────────────────────────────
     if (url.pathname === "/" || url.pathname === "/health") {
-      return new Response(JSON.stringify({ status: "ok", service: "RestoChat Webhook Proxy" }), {
+      return new Response(JSON.stringify({ status: "ok", service: "Black Angler Webhook Proxy" }), {
         status: 200,
         headers: { "Content-Type": "application/json" },
       });

@@ -1,17 +1,17 @@
-# 🚀 RestoChat Deployment & Operations Guide
+# 🚀 Black Angler Deployment & Operations Guide
 
-This document describes the offline-first pendrive installation process, Docker service configurations, Windows task scheduling startup, and setup steps required to deploy **RestoChat** at client sites.
+This document describes the offline-first pendrive installation process, Docker service configurations, Windows task scheduling startup, and setup steps required to deploy **Black Angler** at client sites.
 
 ---
 
 ## 💾 Pendrive-Based Client Site Deployment
 
-To deploy RestoChat on a client's local PC without cloning from Git or configuring development tools manually, the project includes automated setup files designed to run from a USB pendrive.
+To deploy Black Angler on a client's local PC without cloning from Git or configuring development tools manually, the project includes automated setup files designed to run from a USB pendrive.
 
 ### 📁 USB Pendrive Directory Structure
 Your installation pendrive must be structured as follows:
 ```
-📁 RestoChat-Setup/
+📁 Black Angler-Setup/
 ├── 📁 app/                         ← Cloned repository files
 ├── 📁 installers/
 │   └── DockerDesktopInstaller.exe  ← Manual download from docker.com/products/docker-desktop
@@ -26,10 +26,10 @@ Your installation pendrive must be structured as follows:
 ## 🛠️ Step-by-Step Installation Flow
 
 ### Step 1: File Copying & Environment Extraction
-1. Copy the `RestoChat-Setup` directory from the USB drive to the target client PC (preferably to the `Desktop` or `C:\` partition).
+1. Copy the `Black Angler-Setup` directory from the USB drive to the target client PC (preferably to the `Desktop` or `C:\` partition).
 2. Right-click `setup.bat` and select **Run as Administrator**.
 3. The script verifies administrative rights. If missing, it halts with an instructions warning.
-4. The script copies the core application folder to `C:\RestoChat`.
+4. The script copies the core application folder to `C:\Black Angler`.
 
 ### Step 2: Docker Automated Check & Installation
 1. The setup script checks if the Docker CLI is installed.
@@ -49,13 +49,13 @@ The script prompts the user for local business credentials:
 *   **WhatsApp App Secret** (Optional, used to verify incoming webhook signatures)
 
 The script automatically generates a cryptographically secure 128-character JWT secret and writes all configurations directly to the local backend configuration file:
-`C:\RestoChat\python_backend\.env`.
+`C:\Black Angler\python_backend\.env`.
 
 ### Step 4: Automating Startup on Windows Login
 To ensure the system boots automatically if the client's PC restarts:
 1. `setup.bat` registers `autostart.bat` inside the **Windows Task Scheduler** using the command line:
    ```cmd
-   schtasks /create /tn "RestoChat AutoStart" /tr "C:\RestoChat\autostart.bat" /sc onlogon /ru "%USERNAME%" /rl highest /f
+   schtasks /create /tn "Black Angler AutoStart" /tr "C:\Black Angler\autostart.bat" /sc onlogon /ru "%USERNAME%" /rl highest /f
    ```
 2. The task is configured to trigger on user login with elevated privileges (`highest`).
 
