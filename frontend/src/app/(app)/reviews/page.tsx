@@ -30,6 +30,28 @@ export default function GmbReviewsPage() {
     }
   });
 
+  // Fetch connected locations
+  const { data: locData } = useQuery({
+    queryKey: ['gmb_locations'],
+    queryFn: async () => {
+      const res = await api.get('/api/gmb/locations');
+      return res.data;
+    }
+  });
+
+  const isGoogleConnected = (locData?.locations?.length || 0) > 0;
+
+  const handleConnectGoogle = async () => {
+    try {
+      const res = await api.get('/api/gmb/oauth/url');
+      if (res.data?.authUrl) {
+        window.location.href = res.data.authUrl;
+      }
+    } catch (err: any) {
+      toast.error(err.response?.data?.detail || 'Failed to initiate Google connection');
+    }
+  };
+
   // Reply mutation
   const replyMutation = useMutation({
     mutationFn: async ({ reviewId, replyComment, generateWithAi }: any) => {
@@ -81,13 +103,28 @@ export default function GmbReviewsPage() {
               Manage real-time customer reviews across your connected GBP storefront locations.
             </p>
           </div>
-          <button
-            onClick={() => refetch()}
-            className="btn-secondary"
-            style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
-          >
-            <RefreshCw size={14} /> Refresh
-          </button>
+          <div style={{ display: 'flex', gap: '10px' }}>
+            {isGoogleConnected ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 14px', background: '#ecfdf5', color: '#059669', borderRadius: '8px', fontSize: '13px', fontWeight: '600' }}>
+                <CheckCircle2 size={16} /> Google Connected
+              </div>
+            ) : (
+              <button
+                onClick={handleConnectGoogle}
+                className="btn-primary"
+                style={{ display: 'flex', alignItems: 'center', gap: '6px', background: '#4285F4', borderColor: '#4285F4' }}
+              >
+                <Sparkles size={14} /> Connect Google Account
+              </button>
+            )}
+            <button
+              onClick={() => refetch()}
+              className="btn-secondary"
+              style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+            >
+              <RefreshCw size={14} /> Refresh
+            </button>
+          </div>
         </div>
       </div>
 
