@@ -130,7 +130,7 @@ async def lifespan(app: FastAPI):
     await close_http_client()
     await close_mongo_connection()
 
-app = FastAPI(title="RestoChat API", lifespan=lifespan, redirect_slashes=True)
+app = FastAPI(title="Black Angler API", lifespan=lifespan, redirect_slashes=True)
 
 # Attach rate limiter to app state
 app.state.limiter = limiter
@@ -186,7 +186,7 @@ app.include_router(agency.router,        prefix="/api/agency",        tags=["age
 
 @app.get("/")
 async def root():
-    return {"message": "Welcome to RestoChat Python API"}
+    return {"message": "Welcome to Black Angler API"}
 
 @app.get("/api/health")
 async def health_check():

@@ -398,7 +398,7 @@ export default function SplashPage() {
           )}
         </div>
 
-        <div className="version">RestoChat v1.0</div>
+        <div className="version">Black Angler v2.0</div>
       </div>
     </>
   );

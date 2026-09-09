@@ -5,7 +5,7 @@ import warnings
 class Settings(BaseSettings):
     APP_MODE: str = "self_hosted"
     MONGODB_URI: str = "mongodb://localhost:27017"
-    DB_NAME: str = "resto_chat"
+    DB_NAME: str = "whatsapp_saas_live"
     JWT_SECRET: str = "your-super-secret-jwt-key"
     PORT: int = 5000
 

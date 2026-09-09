@@ -196,7 +196,7 @@ export default function LoginPage() {
           </h2>
           <p className="login-subtext">
             {isRegisterMode 
-              ? 'Register your single-user credentials to start using RestoChat' 
+              ? 'Register your credentials to start using Black Angler' 
               : 'Sign in to your dashboard'}
           </p>
 
@@ -204,14 +204,14 @@ export default function LoginPage() {
             {/* Restaurant Name (Only for Registration) */}
             {isRegisterMode && (
               <div className="login-field">
-                <label htmlFor="reg-restaurant-name" className="login-label">Restaurant/Business Name*</label>
+                <label htmlFor="reg-restaurant-name" className="login-label">Business Name*</label>
                 <input
                   id="reg-restaurant-name"
                   type="text"
                   className="login-input"
                   value={restaurantName}
                   onChange={(e) => setRestaurantName(e.target.value)}
-                  placeholder="My Restaurant"
+                  placeholder="Your Business Name"
                   required
                 />
               </div>

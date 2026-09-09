@@ -15,8 +15,8 @@ export interface BrandingData {
 }
 
 export const defaultBranding: BrandingData = {
-  appName: 'RestoChat',
-  tagline: 'WhatsApp Marketing Solution',
+  appName: 'Black Angler',
+  tagline: 'Omnichannel Marketing & WhatsApp Business Platform',
   logoPath: null,
   loginBgPath: null,
   primaryColor: '#1B5E37',

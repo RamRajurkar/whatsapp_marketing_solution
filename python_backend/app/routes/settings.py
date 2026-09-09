@@ -42,8 +42,8 @@ class BrandingUpdate(BaseModel):
     trustStats: Optional[list] = None
 
 DEFAULT_BRANDING = {
-    "appName": "RestoChat",
-    "tagline": "WhatsApp Marketing Solution",
+    "appName": "Black Angler",
+    "tagline": "Omnichannel Marketing & WhatsApp Business Platform",
     "logoPath": None,
     "loginBgPath": None,
     "primaryColor": "#1B5E37",

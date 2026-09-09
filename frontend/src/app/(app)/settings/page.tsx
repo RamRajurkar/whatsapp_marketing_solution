@@ -323,8 +323,8 @@ export default function SettingsPage() {
           
           <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-              <div><label style={{ fontSize: '13px', fontWeight: '500', color: '#374151', display: 'block', marginBottom: '6px' }}>App Name</label><input className="input-field" value={brandingForm.appName || ''} onChange={e => setBrandingForm({ ...brandingForm, appName: e.target.value })} placeholder="RestoChat" /></div>
-              <div><label style={{ fontSize: '13px', fontWeight: '500', color: '#374151', display: 'block', marginBottom: '6px' }}>Tagline</label><input className="input-field" value={brandingForm.tagline || ''} onChange={e => setBrandingForm({ ...brandingForm, tagline: e.target.value })} placeholder="WhatsApp Marketing Solution" /></div>
+              <div><label style={{ fontSize: '13px', fontWeight: '500', color: '#374151', display: 'block', marginBottom: '6px' }}>App Name</label><input className="input-field" value={brandingForm.appName || ''} onChange={e => setBrandingForm({ ...brandingForm, appName: e.target.value })} placeholder="Black Angler" /></div>
+              <div><label style={{ fontSize: '13px', fontWeight: '500', color: '#374151', display: 'block', marginBottom: '6px' }}>Tagline</label><input className="input-field" value={brandingForm.tagline || ''} onChange={e => setBrandingForm({ ...brandingForm, tagline: e.target.value })} placeholder="Omnichannel Marketing & WhatsApp Business Platform" /></div>
             </div>
 
             {/* File Uploaders */}

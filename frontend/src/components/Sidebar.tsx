@@ -125,7 +125,7 @@ export function Sidebar() {
             </div>
             <div>
               <div style={{ color: '#1a1a2e', fontWeight: '800', fontSize: '17px', letterSpacing: '-0.3px' }}>
-                {BRANDING?.appName || 'RestoChat'}
+                {BRANDING?.appName || 'Black Angler'}
               </div>
             </div>
           </div>
