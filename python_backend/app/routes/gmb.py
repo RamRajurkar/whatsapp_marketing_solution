@@ -12,6 +12,7 @@ from bson import ObjectId
 from app.routes.auth import get_current_user
 from app.database import db
 from app.config import settings
+from app.http_client import get_http_client
 from app.repositories.base import TenantScopedRepository
 from app.utils.channel_guard import require_channel
 from app.models.channels.gmb import GBPConnection, GBPReview, GBPPost
