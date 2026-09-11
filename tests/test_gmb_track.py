@@ -201,3 +201,87 @@ async def test_leads_crm_multi_channel_attribution(mongo_client):
     assert by_channel.get("gbp_review") == 1
     assert by_channel.get("gbp_qr") == 1
     assert by_channel.get("ecommerce_admin") is None
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 5. Google Business Profile Sync Engine Test
+# ─────────────────────────────────────────────────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_gbp_sync_engine_upsert(mongo_client, monkeypatch):
+    from unittest.mock import AsyncMock, MagicMock
+    from app.routes.gmb import sync_google_reviews
+    from app.database import db
+
+    test_db = mongo_client[TEST_DB_NAME]
+    monkeypatch.setattr(db, "db", test_db)
+
+    tenant_id = str(ObjectId())
+    await test_db.gbp_connections.delete_many({})
+    await test_db.gbp_reviews.delete_many({})
+
+    # Seed encrypted connection
+    conn = GBPConnection.create_encrypted(
+        tenant_id=tenant_id,
+        location_id="loc_initial",
+        location_name="Initial Store",
+        access_token="test_mock_google_token",
+        token_expires_at=datetime.now(timezone.utc)
+    )
+    doc = conn.model_dump(by_alias=True)
+    await test_db.gbp_connections.insert_one(doc)
+
+    # Mock get_http_client
+    mock_client = MagicMock()
+    
+    # Mock accounts response
+    accounts_resp = MagicMock()
+    accounts_resp.status_code = 200
+    accounts_resp.json.return_value = {"accounts": [{"name": "accounts/112233"}]}
+
+    # Mock locations response
+    locations_resp = MagicMock()
+    locations_resp.status_code = 200
+    locations_resp.json.return_value = {"locations": [{
+        "name": "locations/998877",
+        "title": "Aura Boutique Flagship",
+        "storefrontAddress": {"addressLines": ["12 MG Road"], "locality": "Mumbai"}
+    }]}
+
+    # Mock reviews response
+    reviews_resp = MagicMock()
+    reviews_resp.status_code = 200
+    reviews_resp.json.return_value = {"reviews": [{
+        "reviewId": "rev_mock_sync_101",
+        "reviewer": {"displayName": "Rhea Kapoor"},
+        "starRating": "FIVE",
+        "comment": "Absolutely love the bespoke festive collection!",
+        "createTime": "2026-09-01T10:00:00Z"
+    }]}
+
+    async def mock_get(url, **kwargs):
+        if "accounts" in url and "locations" not in url:
+            return accounts_resp
+        elif "locations" in url and "reviews" not in url:
+            return locations_resp
+        elif "reviews" in url:
+            return reviews_resp
+        return MagicMock(status_code=404)
+
+    mock_client.get = AsyncMock(side_effect=mock_get)
+    monkeypatch.setattr("app.routes.gmb.get_http_client", lambda: mock_client)
+
+    # Execute sync
+    user = {"_id": str(ObjectId()), "tenantId": tenant_id, "email": "aura@boutique.com"}
+    res = await sync_google_reviews(current_user=user)
+
+    assert res["syncedReviews"] == 1
+    assert "Aura Boutique Flagship" in res["locations"]
+
+    # Verify review in database
+    review_in_db = await test_db.gbp_reviews.find_one({"reviewId": "rev_mock_sync_101"})
+    assert review_in_db is not None
+    assert review_in_db["tenantId"] == tenant_id
+    assert review_in_db["reviewerName"] == "Rhea Kapoor"
+    assert review_in_db["starRating"] == 5
+    assert review_in_db["sourceChannel"] == "gbp_review"
+

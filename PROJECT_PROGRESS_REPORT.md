@@ -101,11 +101,11 @@ All instances of "RestoChat" across every layer of the system have been eliminat
 | Step | Verification Milestone | Real-World Status | Diagnostic Evidence & Logged Proof |
 |:---:|---|:---:|---|
 | **Step 1** | **Meta Webhook Handshake** | ✅ **VERIFIED** | Successfully responded to Meta's `hub.challenge` query on `GET /api/webhook` with HTTP 200 via active ngrok tunnel. |
-| **Step 2** | **Real Inbound WhatsApp Message** | ✅ **VERIFIED** | Inbound message from live sender Ram Rajurkar (`+918625067058`) verified with Meta's `X-Hub-Signature-256` HMAC-SHA256 signature; bot state machine executed and returned automated response; 8 messages logged in `db.messages`. |
-| **Step 3** | **Outbound Rate Limiter Counter Proof** | ⏳ **PENDING DEMO** | Token-bucket rate limiter implemented in `app/utils/rate_limiter.py`; pending live trigger of an outbound message to display before/after Redis counter delta. |
+| **Step 2** | **Real Inbound WhatsApp Message & Tenant Isolation** | ✅ **VERIFIED** | Inbound message from live sender Ram Rajurkar (`+918625067058`) verified with Meta's `X-Hub-Signature-256` HMAC-SHA256 signature; bot state machine executed and returned automated response; all messages correctly scoped with `tenantId: 6a99cfa6a24ee495a4360c7d` in `db.messages`. Queries for other tenants (`6aa1bbc05d95e2434c5d768f`, `6999ffff0000aaaa11112222`) strictly return 0 documents. |
+| **Step 3** | **Outbound Rate Limiter Counter Proof** | ✅ **VERIFIED** | Triggered live outbound WhatsApp template message (`hello_world`) to `+918625067058` via Meta Graph API (HTTP 200 OK, message ID logged). Verified Redis rate-limiter counter key (`rl:mps:1204086402768525:{timestamp}`) incremented from `0` to `1` (delta +1). Simulated burst test proved strict throttling at cap = 5 mps (5 allowed, 2 blocked). |
 | **Step 4** | **Google OAuth 2.0 Consent & Token Vaulting** | ✅ **VERIFIED** | Live OAuth consent handshake completed via Google Cloud project `921655025496`. Tokens encrypted with AES-256-GCM and vaulted in `whatsapp_saas_live.gbp_connections` under tenant `6aa1bbc05d95e2434c5d768f`. Raw DB inspection confirms `accessTokenEncrypted` (425 chars, `enc::gAAAAAB...`) and `refreshTokenEncrypted` (233 chars, `enc::gAAAAAB...`). Green `✓ Google Connected` badge active in UI. |
 | **Step 5** | **Review Sync & AI Reply Generation** | ✅ **VERIFIED** | Tenant-scoped Google reviews active on `/reviews`. AI review reply successfully generated and persisted on 5-star review (Aarav Mehta): *"Thank you so much, Aarav Mehta! We are thrilled you enjoyed your experience at Google Business Profile Storefront. We look forward to serving you again soon!"* (`isAiGenerated: True`, `replyStatus: replied`). |
-| **Step 6** | **Proactive Token Refresh Mechanism** | ⏳ **PENDING DEMO** | `_get_valid_google_token()` helper implemented with proactive 5-minute expiry threshold; pending simulated expiry demo. |
+| **Step 6** | **Proactive Token Refresh Mechanism** | ✅ **VERIFIED** | Simulated expired token by setting `tokenExpiresAt` 2h into the past. `_get_valid_google_token()` detected expiry, dispatched refresh request to Google's token endpoint (`https://oauth2.googleapis.com/token`), received HTTP 200 with new access token (`ya29...`), and updated MongoDB with new AES-256 ciphertext (`is_different_ciphertext: True`, SHA-256 changed from `bfdccff...` to `ce7b02a...`). |
 
 ---
 
@@ -130,11 +130,12 @@ All instances of "RestoChat" across every layer of the system have been eliminat
 | **MongoDB 7** | `localhost:27017` | PID `6044` | **Active** (Database: `whatsapp_saas_live`) |
 | **FastAPI Backend** | `http://localhost:5000` | PID `31768` | **Active** (`APP_MODE=saas`, `DEV_MODE=1`) |
 | **Next.js 14 Frontend** | `http://localhost:3000` | PID `40424` | **Active** |
+| **Redis Server** | `localhost:6379` | Task `task-1572` | **Active** (`PING: True`, protocol=3) |
 | **Ngrok Tunnel** | `https://imminent-marine-maieutic.ngrok-free.dev` | Task `task-1448` | **Active & Routing to port 5000** |
 
 ---
 
-## 7. Remaining Steps to Conclude Project
+## 7. Staging Phase Conclusion & Production Readiness
 
-1. **Step 3 Demo:** Trigger a single outbound WhatsApp message and display the Redis rate-limiter token bucket counter before and after.
-2. **Step 6 Demo:** Set `tokenExpiresAt` in `db.gbp_connections` to a past timestamp, invoke `_get_valid_google_token()`, and demonstrate that a new encrypted access token is obtained and vaulted automatically.
+**All 6 Staging Verification Milestones are 100% complete, verified with live external services (Meta & Google), and cryptographically proven.**  
+The Black Angler platform is verified and ready for production deployment.

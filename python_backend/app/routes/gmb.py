@@ -229,6 +229,237 @@ async def google_oauth_callback(
     """)
 
 # ─────────────────────────────────────────────────────────────────────────────
+# 1.2 Token Refresh Helper & Google Business Profile Sync Engine
+# ─────────────────────────────────────────────────────────────────────────────
+
+async def _get_valid_google_token(conn_doc: dict) -> str:
+    """
+    Returns a valid access token for the given GBPConnection document.
+    If the token has expired or is expiring within 5 minutes, refreshes it via Google OAuth.
+    """
+    conn_obj = GBPConnection(**conn_doc)
+    access_token = conn_obj.get_decrypted_access_token()
+    refresh_token = conn_obj.get_decrypted_refresh_token()
+    expires_at = conn_doc.get("tokenExpiresAt")
+
+    from datetime import timedelta
+    is_expired = False
+    if expires_at:
+        if isinstance(expires_at, str):
+            try:
+                expires_at = datetime.fromisoformat(expires_at)
+            except Exception:
+                pass
+        if isinstance(expires_at, datetime):
+            if expires_at.tzinfo is None:
+                expires_at = expires_at.replace(tzinfo=timezone.utc)
+            if expires_at <= _now() + timedelta(minutes=5):
+                is_expired = True
+
+    if is_expired and refresh_token and settings.GOOGLE_CLIENT_ID and settings.GOOGLE_CLIENT_SECRET:
+        token_url = "https://oauth2.googleapis.com/token"
+        client = get_http_client()
+        payload = {
+            "client_id": settings.GOOGLE_CLIENT_ID,
+            "client_secret": settings.GOOGLE_CLIENT_SECRET,
+            "refresh_token": refresh_token,
+            "grant_type": "refresh_token"
+        }
+        resp = await client.post(token_url, data=payload)
+        if resp.status_code == 200:
+            token_data = resp.json()
+            new_access_token = token_data.get("access_token")
+            new_expires_in = token_data.get("expires_in", 3600)
+            new_expires_at = _now() + timedelta(seconds=new_expires_in)
+
+            from app.utils.crypto_vault import crypto_vault
+            new_enc = crypto_vault.encrypt_secret(new_access_token)
+            await db.db.gbp_connections.update_one(
+                {"tenantId": conn_doc["tenantId"]},
+                {"$set": {
+                    "accessTokenEncrypted": new_enc,
+                    "tokenExpiresAt": new_expires_at,
+                    "updatedAt": _now()
+                }}
+            )
+            return new_access_token
+
+    return access_token
+
+
+STAR_MAP = {
+    "FIVE": 5,
+    "FOUR": 4,
+    "THREE": 3,
+    "TWO": 2,
+    "ONE": 1,
+    "5": 5,
+    "4": 4,
+    "3": 3,
+    "2": 2,
+    "1": 1
+}
+
+
+@router.post("/sync")
+async def sync_google_reviews(current_user: dict = Depends(get_current_user)):
+    """
+    Synchronize storefront locations and customer reviews from Google Business Profile.
+    Calls Google My Business API and upserts reviews into gbp_reviews.
+    """
+    tenant_id = current_user.get("tenantId")
+    conn_repo, review_repo, _ = _get_gmb_repos(current_user)
+
+    conn_doc = await conn_repo.find_one({})
+    if not conn_doc:
+        raise HTTPException(status_code=400, detail="No Google Business Profile connected. Please connect your Google account first.")
+
+    try:
+        access_token = await _get_valid_google_token(conn_doc)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Failed to refresh Google authorization: {str(e)}")
+
+    if not access_token:
+        raise HTTPException(status_code=400, detail="Missing Google access token. Please re-authenticate your Google account.")
+
+    client = get_http_client()
+    headers = {
+        "Authorization": f"Bearer {access_token}",
+        "Content-Type": "application/json"
+    }
+
+    # 1. Fetch Accounts from Google Account Management API
+    acc_url = "https://mybusinessaccountmanagement.googleapis.com/v1/accounts"
+    try:
+        acc_res = await client.get(acc_url, headers=headers)
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Network error contacting Google API: {str(e)}")
+
+    if acc_res.status_code == 403:
+        err_body = acc_res.json() if "application/json" in acc_res.headers.get("content-type", "") else {}
+        err_msg = err_body.get("error", {}).get("message", "")
+        if "has not been used" in err_msg or "disabled" in err_msg:
+            raise HTTPException(
+                status_code=403,
+                detail="Google My Business APIs are not enabled in your Google Cloud Project. Please enable 'My Business Account Management API' and 'My Business Business Information API' in Google Cloud Console."
+            )
+        raise HTTPException(status_code=403, detail=f"Google API Access Denied: {err_msg or 'Permission denied'}")
+
+    if acc_res.status_code == 429:
+        raise HTTPException(
+            status_code=429,
+            detail="Google Business Profile API quota exceeded (429). Google Cloud requires Business Profile API quota approval for project 921655025496. Please request quota in Google Cloud Console."
+        )
+
+    if acc_res.status_code == 401:
+        raise HTTPException(
+            status_code=401,
+            detail="Google session expired. Please click 'Connect Google Account' to re-authenticate."
+        )
+
+    if acc_res.status_code != 200:
+        raise HTTPException(status_code=acc_res.status_code, detail=f"Google API error ({acc_res.status_code}): {acc_res.text[:300]}")
+
+    accounts = acc_res.json().get("accounts", [])
+    if not accounts:
+        return {
+            "message": "Connected Google account has no Google Business Profile accounts registered.",
+            "syncedReviews": 0,
+            "locationsFound": 0
+        }
+
+    synced_reviews_count = 0
+    synced_locations = []
+
+    for acc in accounts:
+        acc_name = acc.get("name")  # e.g. "accounts/123456789"
+        if not acc_name:
+            continue
+
+        # 2. Fetch Locations for this Account
+        loc_url = f"https://mybusinessbusinessinformation.googleapis.com/v1/{acc_name}/locations?readMask=name,title,storefrontAddress,storeCode"
+        loc_res = await client.get(loc_url, headers=headers)
+
+        locations = []
+        if loc_res.status_code == 200:
+            locations = loc_res.json().get("locations", [])
+
+        for loc in locations:
+            loc_name = loc.get("name")  # e.g. "locations/987654321"
+            loc_title = loc.get("title") or "Google Storefront"
+            address_obj = loc.get("storefrontAddress", {})
+            address_lines = address_obj.get("addressLines", [])
+            locality = address_obj.get("locality", "")
+            full_addr = ", ".join(address_lines + ([locality] if locality else []))
+
+            synced_locations.append(loc_title)
+
+            # Update connection location metadata
+            await conn_repo.update_one(
+                {"tenantId": tenant_id},
+                {"$set": {
+                    "locationId": loc_name,
+                    "locationName": loc_title,
+                    "address": full_addr or None,
+                    "updatedAt": _now()
+                }}
+            )
+
+            # 3. Fetch Reviews from Google My Business v4 API
+            rev_url = f"https://mybusiness.googleapis.com/v4/{acc_name}/{loc_name}/reviews"
+            rev_res = await client.get(rev_url, headers=headers)
+            if rev_res.status_code == 200:
+                google_reviews = rev_res.json().get("reviews", [])
+                for gr in google_reviews:
+                    rev_id = gr.get("reviewId") or gr.get("name")
+                    reviewer = gr.get("reviewer", {})
+                    reviewer_name = reviewer.get("displayName") or "Google User"
+                    reviewer_photo = reviewer.get("profilePhotoUrl")
+                    rating_val = STAR_MAP.get(str(gr.get("starRating", "FIVE")), 5)
+                    comment = gr.get("comment", "")
+
+                    review_reply = gr.get("reviewReply", {})
+                    reply_comment = review_reply.get("comment")
+                    reply_status = "replied" if reply_comment else "pending"
+
+                    created_at = _now()
+                    if gr.get("createTime"):
+                        try:
+                            created_at = datetime.fromisoformat(gr["createTime"].replace("Z", "+00:00"))
+                        except Exception:
+                            pass
+
+                    rev_doc = {
+                        "tenantId": tenant_id,
+                        "locationId": loc_name,
+                        "reviewId": rev_id,
+                        "reviewerName": reviewer_name,
+                        "reviewerPhotoUrl": reviewer_photo,
+                        "starRating": rating_val,
+                        "comment": comment,
+                        "replyComment": reply_comment,
+                        "replyStatus": reply_status,
+                        "sourceChannel": "gbp_review",
+                        "createdAt": created_at,
+                        "updatedAt": _now()
+                    }
+                    if reply_comment:
+                        rev_doc["repliedAt"] = _now()
+
+                    await review_repo.update_one(
+                        {"reviewId": rev_id},
+                        {"$set": rev_doc},
+                        upsert=True
+                    )
+                    synced_reviews_count += 1
+
+    return {
+        "message": f"Successfully synchronized {synced_reviews_count} reviews across {len(synced_locations)} location(s).",
+        "syncedReviews": synced_reviews_count,
+        "locations": synced_locations
+    }
+
+# ─────────────────────────────────────────────────────────────────────────────
 # 2. Reviews Management & AI Replies
 # ─────────────────────────────────────────────────────────────────────────────
 

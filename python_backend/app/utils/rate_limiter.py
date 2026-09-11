@@ -7,7 +7,7 @@ REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
 class RateLimiter:
     def __init__(self):
         # Setup connection pool for thread-safe worker usage
-        self.client = redis.from_url(REDIS_URL, decode_responses=True)
+        self.client = redis.from_url(REDIS_URL, decode_responses=True, protocol=3)
 
     def consume_throughput(self, phone_number_id: str, limit_mps: int = 70) -> bool:
         """
@@ -21,7 +21,7 @@ class RateLimiter:
         
         pipe = self.client.pipeline()
         pipe.incr(window_key)
-        pipe.expire(window_key, 2)
+        pipe.expire(window_key, 10)
         count, _ = pipe.execute()
         
         return count <= limit_mps

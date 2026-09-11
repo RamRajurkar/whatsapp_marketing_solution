@@ -4,6 +4,8 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '@/lib/api';
 import toast from 'react-hot-toast';
+import { useUserChannels } from '@/lib/hooks/useUserChannels';
+import { ChannelPaywall } from '@/components/ChannelPaywall';
 import {
   Star,
   MessageSquare,
@@ -17,6 +19,7 @@ import {
 
 export default function GmbReviewsPage() {
   const queryClient = useQueryClient();
+  const { isGbpEnabled, isLoading: isUserLoading } = useUserChannels();
   const [replyingReview, setReplyingReview] = useState<any>(null);
   const [replyText, setReplyText] = useState('');
   const [isAiGenerating, setIsAiGenerating] = useState(false);
@@ -51,6 +54,23 @@ export default function GmbReviewsPage() {
       toast.error(err.response?.data?.detail || 'Failed to initiate Google connection');
     }
   };
+
+  // Sync reviews from Google mutation
+  const syncMutation = useMutation({
+    mutationFn: async () => {
+      const res = await api.post('/api/gmb/sync');
+      return res.data;
+    },
+    onSuccess: (resData) => {
+      toast.success(resData.message || 'Reviews synchronized successfully');
+      queryClient.invalidateQueries({ queryKey: ['gmb_reviews'] });
+      queryClient.invalidateQueries({ queryKey: ['gmb_locations'] });
+    },
+    onError: (err: any) => {
+      const msg = err.response?.data?.detail || 'Failed to sync with Google Business Profile';
+      toast.error(msg, { duration: 7000 });
+    }
+  });
 
   // Reply mutation
   const replyMutation = useMutation({
@@ -90,6 +110,16 @@ export default function GmbReviewsPage() {
     );
   };
 
+  if (!isUserLoading && !isGbpEnabled) {
+    return (
+      <ChannelPaywall
+        channelName="Google Business Profile Suite"
+        channelKey="gbp"
+        description="Your subscription is currently scoped for WhatsApp Marketing only. Upgrade to our Google Business Booster or Omnichannel plan to manage storefront reviews, AI auto-replies, and local Maps SEO."
+      />
+    );
+  }
+
   return (
     <div style={{ padding: '24px 32px' }}>
       <div className="page-header" style={{ marginBottom: '24px' }}>
@@ -105,9 +135,20 @@ export default function GmbReviewsPage() {
           </div>
           <div style={{ display: 'flex', gap: '10px' }}>
             {isGoogleConnected ? (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 14px', background: '#ecfdf5', color: '#059669', borderRadius: '8px', fontSize: '13px', fontWeight: '600' }}>
-                <CheckCircle2 size={16} /> Google Connected
-              </div>
+              <>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 14px', background: '#ecfdf5', color: '#059669', borderRadius: '8px', fontSize: '13px', fontWeight: '600' }}>
+                  <CheckCircle2 size={16} /> Google Connected
+                </div>
+                <button
+                  onClick={() => syncMutation.mutate()}
+                  disabled={syncMutation.isPending}
+                  className="btn-primary"
+                  style={{ display: 'flex', alignItems: 'center', gap: '6px', background: '#2563EB', borderColor: '#2563EB' }}
+                >
+                  <RefreshCw size={14} className={syncMutation.isPending ? 'animate-spin' : ''} />
+                  {syncMutation.isPending ? 'Syncing...' : 'Sync from Google'}
+                </button>
+              </>
             ) : (
               <button
                 onClick={handleConnectGoogle}
@@ -159,9 +200,22 @@ export default function GmbReviewsPage() {
         <div className="glass-card" style={{ padding: '48px', textAlign: 'center', color: '#6B7280' }}>
           <MessageSquare size={48} style={{ margin: '0 auto 16px', opacity: 0.4 }} />
           <h3 style={{ margin: '0 0 8px', color: '#111827', fontSize: '16px' }}>No Google Reviews Yet</h3>
-          <p style={{ margin: 0, fontSize: '14px' }}>
-            Reviews synchronized from your Google Business Profile will appear here automatically.
+          <p style={{ margin: '0 0 16px', fontSize: '14px' }}>
+            {isGoogleConnected 
+              ? 'Click "Sync from Google" above to synchronize customer reviews from your Google Business Profile.'
+              : 'Reviews synchronized from your Google Business Profile will appear here automatically.'}
           </p>
+          {isGoogleConnected && (
+            <button
+              onClick={() => syncMutation.mutate()}
+              disabled={syncMutation.isPending}
+              className="btn-primary"
+              style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', margin: '0 auto' }}
+            >
+              <RefreshCw size={14} className={syncMutation.isPending ? 'animate-spin' : ''} />
+              {syncMutation.isPending ? 'Syncing...' : 'Sync Reviews Now'}
+            </button>
+          )}
         </div>
       ) : (
         <div className="glass-card" style={{ overflow: 'hidden' }}>
